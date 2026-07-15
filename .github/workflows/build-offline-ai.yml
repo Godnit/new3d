@@ -6,6 +6,11 @@ on:
     paths:
       - "android-offline-ai/**"
       - ".github/workflows/build-offline-ai.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "android-offline-ai/**"
+      - ".github/workflows/build-offline-ai.yml"
   workflow_dispatch:
 
 jobs:
