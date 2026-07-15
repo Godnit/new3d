@@ -1,6 +1,5 @@
 package com.ayman.offlineai;
 
-import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -34,10 +33,14 @@ import com.google.mediapipe.tasks.vision.core.RunningMode;
 import com.google.mediapipe.tasks.vision.imageclassifier.ImageClassifier;
 import com.google.mediapipe.tasks.vision.imageclassifier.ImageClassifierResult;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -46,9 +49,13 @@ import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String LANGUAGE_MODEL_ASSET = "models/qwen-0.5b.task";
+    private static final String MODEL_URL =
+            "https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/" +
+            "Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task?download=true";
+    private static final String MODEL_SHA256 =
+            "e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2";
+    private static final String MODEL_FILE_NAME = "qwen-0.5b.task";
     private static final String VISION_MODEL_ASSET = "models/efficientnet-lite0.tflite";
-    private static final String LANGUAGE_MODEL_FILE = "qwen-0.5b.task";
     private static final long MIN_VALID_MODEL_BYTES = 500_000_000L;
 
     private TextView statusText;
@@ -58,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
     private TextInputEditText promptInput;
     private MaterialButton sendButton;
     private MaterialButton selectImageButton;
+    private MaterialButton retryModelButton;
     private LinearProgressIndicator modelProgress;
     private ImageView selectedImageView;
     private View selectedImageCard;
@@ -69,7 +77,6 @@ public class MainActivity extends AppCompatActivity {
 
     private LlmInference llmInference;
     private ImageClassifier imageClassifier;
-    private File activeModelFile;
     private Bitmap selectedBitmap;
     private String selectedImageLabels = "";
     private volatile boolean busy = false;
@@ -90,6 +97,7 @@ public class MainActivity extends AppCompatActivity {
         promptInput = findViewById(R.id.promptInput);
         sendButton = findViewById(R.id.sendButton);
         selectImageButton = findViewById(R.id.selectImageButton);
+        retryModelButton = findViewById(R.id.retryModelButton);
         modelProgress = findViewById(R.id.modelProgress);
         selectedImageView = findViewById(R.id.selectedImageView);
         selectedImageCard = findViewById(R.id.selectedImageCard);
@@ -97,6 +105,7 @@ public class MainActivity extends AppCompatActivity {
         chatScroll = findViewById(R.id.chatScroll);
 
         selectImageButton.setOnClickListener(v -> imagePicker.launch(new String[]{"image/*"}));
+        retryModelButton.setOnClickListener(v -> prepareModels());
         findViewById(R.id.newChatButton).setOnClickListener(v -> clearChat());
         findViewById(R.id.removeImageButton).setOnClickListener(v -> clearSelectedImage());
         sendButton.setOnClickListener(v -> sendPrompt());
@@ -108,108 +117,184 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
 
-        addAssistantMessage("أهلًا بك 👋 أنا نبراس، مساعد يعمل داخل هاتفك دون إنترنت. يتم تجهيز النموذج المدمج تلقائيًا في أول تشغيل فقط.");
-        prepareEmbeddedModels();
+        addAssistantMessage("أهلًا بك 👋 أنا نبراس. في أول تشغيل سأحمّل نموذج الذكاء تلقائيًا مرة واحدة، ثم أعمل بعد ذلك دون إنترنت.");
+        prepareModels();
     }
 
-    private void prepareEmbeddedModels() {
+    private void prepareModels() {
+        if (busy) return;
         busy = true;
         setControlsEnabled(false);
-        setPreparationProgress(0, "جارٍ تجهيز الذكاء المحلي لأول مرة...");
-        statusText.setText("يتم التجهيز");
-        modelInfoText.setText("لا تغلق التطبيق أثناء نسخ النموذج");
+        retryModelButton.setVisibility(View.GONE);
+        modelProgress.setVisibility(View.VISIBLE);
+        progressText.setVisibility(View.VISIBLE);
+        modelProgress.setProgress(0);
+        statusText.setText("● يتم التجهيز");
+        modelInfoText.setText("النموذج سيُحفظ داخل التطبيق تلقائيًا");
+        progressText.setText("يتم فحص ملفات الذكاء المحلي...");
 
         executor.execute(() -> {
             try {
-                File modelFile = ensureLanguageModelExtracted();
-                activeModelFile = modelFile;
                 initializeVisionModelSafely();
-                initializeLanguageModel(modelFile);
+                File model = getModelFile();
+                if (!isLanguageModelReady(model)) {
+                    downloadLanguageModel(model);
+                }
+                initializeLanguageModel(model);
 
                 runOnUiThread(() -> {
                     busy = false;
                     setControlsEnabled(true);
                     modelProgress.setVisibility(View.GONE);
                     progressText.setVisibility(View.GONE);
+                    retryModelButton.setVisibility(View.GONE);
                     statusText.setText("● جاهز دون إنترنت");
-                    modelInfoText.setText("Qwen 2.5 محلي • " + humanSize(modelFile.length())
+                    modelInfoText.setText("Qwen 2.5 محلي • " + humanSize(model.length())
                             + (visionAvailable ? " • رؤية أساسية" : ""));
-                    addSystemMessage("تم تجهيز التطبيق بنجاح. من الآن سيعمل مباشرة دون اختيار أي ملفات.");
+                    addSystemMessage("تم تجهيز نبراس. لن تحتاج إلى الإنترنت في المحادثات القادمة ما دام النموذج محفوظًا.");
                 });
             } catch (Exception e) {
-                runOnUiThread(() -> showError("تعذر تجهيز الذكاء المحلي: " + safeMessage(e)));
+                runOnUiThread(() -> showModelError(e));
             }
         });
     }
 
-    private File ensureLanguageModelExtracted() throws Exception {
-        File modelDir = new File(getFilesDir(), "models");
-        if (!modelDir.exists() && !modelDir.mkdirs()) {
-            throw new IllegalStateException("تعذر إنشاء مساحة النموذج داخل الهاتف");
+    private File getModelFile() throws Exception {
+        File dir = new File(getFilesDir(), "models");
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IllegalStateException("تعذر إنشاء مجلد النموذج داخل الهاتف");
         }
+        return new File(dir, MODEL_FILE_NAME);
+    }
 
-        File target = new File(modelDir, LANGUAGE_MODEL_FILE);
-        if (target.exists() && target.length() >= MIN_VALID_MODEL_BYTES) {
-            runOnUiThread(() -> setPreparationProgress(88, "تم العثور على النموذج المدمج..."));
-            return target;
-        }
+    private boolean isLanguageModelReady(File model) {
+        return model.exists() && model.length() >= MIN_VALID_MODEL_BYTES;
+    }
 
-        File temporary = new File(modelDir, LANGUAGE_MODEL_FILE + ".part");
-        if (temporary.exists() && !temporary.delete()) {
-            throw new IllegalStateException("تعذر حذف نسخة تجهيز غير مكتملة");
-        }
-        if (target.exists() && !target.delete()) {
-            throw new IllegalStateException("تعذر استبدال النموذج غير المكتمل");
-        }
+    private void downloadLanguageModel(File target) throws Exception {
+        File partial = new File(target.getParentFile(), target.getName() + ".part");
+        long existingBytes = partial.exists() ? partial.length() : 0L;
 
-        long totalBytes = -1L;
-        try (AssetFileDescriptor descriptor = getAssets().openFd(LANGUAGE_MODEL_ASSET)) {
-            totalBytes = descriptor.getLength();
-        } catch (Exception ignored) {
-            // The copy still works even if the exact asset size cannot be read.
-        }
+        runOnUiThread(() -> {
+            statusText.setText("● تحميل النموذج لأول مرة");
+            modelInfoText.setText("مرة واحدة فقط • أبقِ التطبيق مفتوحًا");
+            modelProgress.setProgress(0);
+            progressText.setText(existingBytes > 0
+                    ? "استكمال التحميل السابق..."
+                    : "بدء تحميل نحو 547 ميجابايت...");
+        });
 
-        if (totalBytes > 0 && modelDir.getUsableSpace() < totalBytes + 160_000_000L) {
-            throw new IllegalStateException("المساحة الحرة غير كافية. حرر نحو 800 ميجابايت ثم افتح التطبيق مجددًا");
-        }
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(MODEL_URL).openConnection();
+            connection.setInstanceFollowRedirects(true);
+            connection.setConnectTimeout(30_000);
+            connection.setReadTimeout(90_000);
+            connection.setRequestProperty("User-Agent", "NebrasAI-Android/0.3");
+            connection.setRequestProperty("Accept-Encoding", "identity");
+            if (existingBytes > 0) {
+                connection.setRequestProperty("Range", "bytes=" + existingBytes + "-");
+            }
+            connection.connect();
 
-        long copied = 0L;
-        int lastProgress = -1;
-        try (InputStream input = getAssets().open(LANGUAGE_MODEL_ASSET);
-             OutputStream output = new FileOutputStream(temporary)) {
-            byte[] buffer = new byte[2 * 1024 * 1024];
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
-                copied += read;
-                if (totalBytes > 0) {
-                    int progress = Math.min(86, (int) ((copied * 86L) / totalBytes));
-                    if (progress >= lastProgress + 2) {
-                        lastProgress = progress;
-                        final int progressValue = progress;
-                        final String copiedText = "نسخ النموذج: " + progressValue + "%";
-                        runOnUiThread(() -> setPreparationProgress(progressValue, copiedText));
+            int responseCode = connection.getResponseCode();
+            boolean append = existingBytes > 0 && responseCode == HttpURLConnection.HTTP_PARTIAL;
+            if (responseCode != HttpURLConnection.HTTP_OK
+                    && responseCode != HttpURLConnection.HTTP_PARTIAL) {
+                throw new IllegalStateException("فشل الخادم برمز " + responseCode);
+            }
+
+            if (!append && existingBytes > 0) {
+                if (!partial.delete()) {
+                    throw new IllegalStateException("تعذر إعادة بدء التحميل");
+                }
+                existingBytes = 0L;
+            }
+
+            long remainingBytes = connection.getContentLengthLong();
+            long totalBytes = remainingBytes > 0
+                    ? existingBytes + remainingBytes
+                    : -1L;
+            long neededBytes = totalBytes > 0 ? totalBytes - existingBytes : 650_000_000L;
+            if (target.getParentFile().getUsableSpace() < neededBytes + 100_000_000L) {
+                throw new IllegalStateException("المساحة غير كافية. حرر نحو 700 ميجابايت ثم أعد المحاولة");
+            }
+
+            long downloaded = existingBytes;
+            int lastProgress = -1;
+            try (InputStream input = new BufferedInputStream(connection.getInputStream(), 1024 * 1024);
+                 FileOutputStream output = new FileOutputStream(partial, append)) {
+                byte[] buffer = new byte[1024 * 1024];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, read);
+                    downloaded += read;
+                    if (totalBytes > 0) {
+                        int progress = Math.min(90, (int) ((downloaded * 90L) / totalBytes));
+                        if (progress >= lastProgress + 1) {
+                            lastProgress = progress;
+                            final int value = progress;
+                            final String text = "تحميل النموذج: " + value + "% • "
+                                    + humanSize(downloaded) + " من " + humanSize(totalBytes);
+                            runOnUiThread(() -> {
+                                modelProgress.setProgress(value);
+                                progressText.setText(text);
+                            });
+                        }
+                    } else {
+                        final String text = "تم تحميل " + humanSize(downloaded);
+                        runOnUiThread(() -> progressText.setText(text));
                     }
                 }
+                output.flush();
             }
-            output.flush();
-        } catch (Exception e) {
-            temporary.delete();
-            throw e;
+        } finally {
+            if (connection != null) connection.disconnect();
         }
 
-        if (temporary.length() < MIN_VALID_MODEL_BYTES) {
-            temporary.delete();
-            throw new IllegalStateException("ملف النموذج المدمج غير مكتمل");
+        if (partial.length() < MIN_VALID_MODEL_BYTES) {
+            throw new IllegalStateException("انقطع التحميل قبل اكتمال النموذج؛ اضغط استكمال التحميل");
         }
-        if (!temporary.renameTo(target)) {
-            throw new IllegalStateException("تعذر تثبيت النموذج داخل التطبيق");
+
+        runOnUiThread(() -> {
+            modelProgress.setProgress(93);
+            progressText.setText("يتم التحقق من سلامة النموذج...");
+        });
+        String actualHash = sha256(partial);
+        if (!MODEL_SHA256.equalsIgnoreCase(actualHash)) {
+            partial.delete();
+            throw new IllegalStateException("الملف المحمّل غير سليم؛ أعد التحميل");
         }
-        return target;
+
+        if (target.exists() && !target.delete()) {
+            throw new IllegalStateException("تعذر استبدال النموذج السابق");
+        }
+        if (!partial.renameTo(target)) {
+            throw new IllegalStateException("تعذر تثبيت النموذج بعد التحميل");
+        }
+    }
+
+    private String sha256(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream input = new BufferedInputStream(new FileInputStream(file), 1024 * 1024)) {
+            byte[] buffer = new byte[1024 * 1024];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+        }
+        StringBuilder result = new StringBuilder();
+        for (byte value : digest.digest()) {
+            result.append(String.format(Locale.US, "%02x", value & 0xff));
+        }
+        return result.toString();
     }
 
     private void initializeLanguageModel(File modelFile) {
-        runOnUiThread(() -> setPreparationProgress(92, "جارٍ تشغيل محرك المحادثة..."));
+        runOnUiThread(() -> {
+            modelProgress.setProgress(96);
+            progressText.setText("جارٍ تشغيل محرك المحادثة...");
+        });
         closeLanguageModel();
         LlmInference.LlmInferenceOptions options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.getAbsolutePath())
@@ -217,11 +302,10 @@ public class MainActivity extends AppCompatActivity {
                 .setMaxTopK(40)
                 .build();
         llmInference = LlmInference.createFromOptions(getApplicationContext(), options);
-        runOnUiThread(() -> setPreparationProgress(100, "اكتمل التشغيل"));
+        runOnUiThread(() -> modelProgress.setProgress(100));
     }
 
     private void initializeVisionModelSafely() {
-        runOnUiThread(() -> setPreparationProgress(89, "جارٍ تشغيل نموذج رؤية الصور..."));
         try {
             BaseOptions baseOptions = BaseOptions.builder()
                     .setModelAssetPath(VISION_MODEL_ASSET)
@@ -234,14 +318,14 @@ public class MainActivity extends AppCompatActivity {
                     .build();
             imageClassifier = ImageClassifier.createFromOptions(getApplicationContext(), options);
             visionAvailable = true;
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
             visionAvailable = false;
             imageClassifier = null;
         }
     }
 
     private void onImageSelected(Uri uri) {
-        if (uri == null || busy) return;
+        if (uri == null || busy || llmInference == null) return;
         busy = true;
         setControlsEnabled(false);
         statusText.setText("● يحلل الصورة محليًا");
@@ -278,14 +362,12 @@ public class MainActivity extends AppCompatActivity {
         if (!visionAvailable || imageClassifier == null) {
             return "تم إرفاق الصورة، لكن نموذج الرؤية غير متاح على هذا الجهاز";
         }
-
         MPImage mpImage = new BitmapImageBuilder(bitmap).build();
         try {
             ImageClassifierResult result = imageClassifier.classify(mpImage);
             if (result.classificationResult().classifications().isEmpty()) {
                 return "لم يتعرف نموذج الرؤية على محتوى واضح";
             }
-
             List<Category> categories = result.classificationResult().classifications().get(0).categories();
             StringBuilder labels = new StringBuilder("رؤية محلية: ");
             int included = 0;
@@ -295,10 +377,8 @@ public class MainActivity extends AppCompatActivity {
                 if (name == null || name.trim().isEmpty()) name = category.categoryName();
                 if (name == null || name.trim().isEmpty()) continue;
                 if (included > 0) labels.append("، ");
-                labels.append(name.trim())
-                        .append(" ")
-                        .append(Math.round(category.score() * 100f))
-                        .append("%");
+                labels.append(name.trim()).append(" ")
+                        .append(Math.round(category.score() * 100f)).append("%");
                 included++;
             }
             return included == 0 ? "لم يتعرف نموذج الرؤية على محتوى واضح" : labels.toString();
@@ -310,7 +390,7 @@ public class MainActivity extends AppCompatActivity {
     private void sendPrompt() {
         if (busy) return;
         if (llmInference == null) {
-            Toast.makeText(this, "لا يزال النموذج قيد التجهيز", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "أكمل تحميل النموذج أولًا", Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -322,18 +402,17 @@ public class MainActivity extends AppCompatActivity {
 
         promptInput.setText("");
         addUserMessage(userText);
-
         String enrichedText = userText;
         if (selectedBitmap != null) {
             enrichedText += "\n\nنتائج نموذج الرؤية المحلي للصورة: " + selectedImageLabels
-                    + "\nاعتمد على هذه النتائج فقط، ولا تخترع تفاصيل بصرية غير موجودة. اشرح للمستخدم بالعربية بوضوح.";
+                    + "\nاعتمد على هذه النتائج فقط، ولا تخترع تفاصيل غير موجودة. اشرح بالعربية.";
         }
         conversation.add("<|im_start|>user\n" + enrichedText + "<|im_end|>\n");
 
         busy = true;
         setControlsEnabled(false);
         statusText.setText("● يفكر داخل الهاتف...");
-        modelInfoText.setText("قد يستغرق الرد بعض الوقت على الأجهزة القديمة");
+        modelInfoText.setText("قد يستغرق الرد وقتًا على الأجهزة القديمة");
         TextView assistantBubble = addAssistantMessage("يفكر...");
 
         executor.execute(() -> {
@@ -343,7 +422,6 @@ public class MainActivity extends AppCompatActivity {
                 String finalAnswer = cleanModelAnswer(answer);
                 conversation.add("<|im_start|>assistant\n" + finalAnswer + "<|im_end|>\n");
                 trimConversation();
-
                 runOnUiThread(() -> {
                     assistantBubble.setText(finalAnswer);
                     clearSelectedImage();
@@ -370,7 +448,7 @@ public class MainActivity extends AppCompatActivity {
         prompt.append("<|im_start|>system\n")
                 .append("أنت نبراس، مساعد عربي مفيد يعمل بالكامل داخل هاتف المستخدم دون إنترنت. ")
                 .append("أجب بالعربية الواضحة، وكن صادقًا بشأن حدود معرفتك. ")
-                .append("لا تقل إنك اتصلت بالإنترنت، ولا تدّع رؤية تفاصيل لم يقدمها نموذج الرؤية المحلي.")
+                .append("لا تدّع رؤية تفاصيل لم يقدمها نموذج الرؤية المحلي.")
                 .append("<|im_end|>\n");
         for (String turn : conversation) prompt.append(turn);
         prompt.append("<|im_start|>assistant\n");
@@ -394,7 +472,7 @@ public class MainActivity extends AppCompatActivity {
         conversation.clear();
         chatContainer.removeAllViews();
         clearSelectedImage();
-        addAssistantMessage("بدأنا محادثة جديدة. اسألني ما تريد وسأجيب محليًا دون إنترنت.");
+        addAssistantMessage("بدأنا محادثة جديدة. اسألني ما تريد وسأجيب محليًا.");
         statusText.setText("● جاهز دون إنترنت");
     }
 
@@ -464,22 +542,16 @@ public class MainActivity extends AppCompatActivity {
         promptInput.setEnabled(enabled);
     }
 
-    private void setPreparationProgress(int progress, String message) {
-        modelProgress.setVisibility(View.VISIBLE);
-        progressText.setVisibility(View.VISIBLE);
-        modelProgress.setProgress(progress);
-        progressText.setText(message);
-    }
-
-    private void showError(String message) {
+    private void showModelError(Exception error) {
         busy = false;
         setControlsEnabled(false);
-        statusText.setText("● تعذر التشغيل");
-        modelInfoText.setText("تأكد من وجود مساحة كافية ثم أعد فتح التطبيق");
+        statusText.setText("● يحتاج إلى الإنترنت");
+        modelInfoText.setText("اتصل بالإنترنت ثم اضغط استكمال التحميل");
+        modelProgress.setVisibility(View.VISIBLE);
         progressText.setVisibility(View.VISIBLE);
-        progressText.setText(message);
-        addSystemMessage(message);
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        progressText.setText("لم يكتمل النموذج: " + safeMessage(error));
+        retryModelButton.setVisibility(View.VISIBLE);
+        Toast.makeText(this, "يمكن استكمال التحميل من حيث توقف", Toast.LENGTH_LONG).show();
     }
 
     private void closeLanguageModel() {
@@ -512,7 +584,7 @@ public class MainActivity extends AppCompatActivity {
             value /= 1024;
             unit++;
         }
-        return String.format(Locale.US, "%.0f %s", value, units[unit]);
+        return String.format(Locale.US, "%.1f %s", value, units[unit]);
     }
 
     private String safeMessage(Exception e) {
