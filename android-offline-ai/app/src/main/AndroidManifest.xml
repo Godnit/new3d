@@ -3,8 +3,9 @@
 
     <application
         android:allowBackup="true"
+        android:hardwareAccelerated="true"
         android:largeHeap="true"
-        android:label="ذكاء محلي"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.OfflineAI"
         android:usesCleartextTraffic="false">
