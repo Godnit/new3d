@@ -1,4 +1,4 @@
-name: Build Nebras Offline AI APK
+name: Build Nebras Lightweight Offline AI
 
 on:
   push:
@@ -39,25 +39,25 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      - name: Cache embedded AI models
+      - name: Cache AI models
         uses: actions/cache@v4
         with:
           path: .model-cache
-          key: nebras-models-v2-qwen25-05b-q8-efficientnet-lite0
+          key: nebras-models-v3-qwen25-05b-q8-efficientnet-lite0
 
-      - name: Download embedded AI models
+      - name: Download and verify models
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p .model-cache
           mkdir -p android-offline-ai/app/src/main/assets/models
 
-          QWEN_FILE=.model-cache/qwen-0.5b.task
+          QWEN_FILE=.model-cache/Nebras-Qwen2.5-0.5B-Q8.task
           QWEN_URL='https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task?download=true'
           QWEN_SHA='e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2'
 
           if [ ! -f "$QWEN_FILE" ]; then
-            curl --fail --location --retry 5 --retry-delay 5 \
+            curl --fail --location --retry 8 --retry-delay 5 \
               --output "$QWEN_FILE" "$QWEN_URL"
           fi
           echo "$QWEN_SHA  $QWEN_FILE" | sha256sum --check
@@ -65,29 +65,24 @@ jobs:
           VISION_FILE=.model-cache/efficientnet-lite0.tflite
           VISION_URL='https://storage.googleapis.com/mediapipe-models/image_classifier/efficientnet_lite0/float32/1/efficientnet_lite0.tflite'
           if [ ! -s "$VISION_FILE" ]; then
-            curl --fail --location --retry 5 --retry-delay 5 \
+            curl --fail --location --retry 8 --retry-delay 5 \
               --output "$VISION_FILE" "$VISION_URL"
           fi
 
-          cp "$QWEN_FILE" android-offline-ai/app/src/main/assets/models/qwen-0.5b.task
           cp "$VISION_FILE" android-offline-ai/app/src/main/assets/models/efficientnet-lite0.tflite
-          du -h android-offline-ai/app/src/main/assets/models/*
+          echo "Text model is published separately and is not embedded in the APK."
+          du -h "$QWEN_FILE" android-offline-ai/app/src/main/assets/models/efficientnet-lite0.tflite
 
-      - name: Harden 32-bit image fallback
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("android-offline-ai/app/src/main/java/com/ayman/offlineai/MainActivity.java")
-          text = path.read_text(encoding="utf-8")
-          old = "} catch (Exception ignored) {\n            visionAvailable = false;"
-          new = "} catch (Throwable ignored) {\n            visionAvailable = false;"
-          if old not in text:
-              raise SystemExit("Expected vision fallback block was not found")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
-          PY
+      - name: Upload model backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Qwen2.5-0.5B-Q8-Model
+          path: .model-cache/Nebras-Qwen2.5-0.5B-Q8.task
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
 
-      - name: Build APK
+      - name: Build lightweight APK
         id: build
         continue-on-error: true
         working-directory: android-offline-ai
@@ -100,23 +95,32 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: NebrasAI-build-log
+          name: NebrasAI-Light-build-log
           path: android-offline-ai/build.log
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Rename APK
+      - name: Verify APK size and rename
         if: steps.build.outcome == 'success'
+        shell: bash
         run: |
-          cp android-offline-ai/app/build/outputs/apk/release/app-release.apk NebrasAI-Android8-Ready.apk
-          ls -lh NebrasAI-Android8-Ready.apk
+          APK='android-offline-ai/app/build/outputs/apk/release/app-release.apk'
+          SIZE=$(stat -c%s "$APK")
+          LIMIT=$((100 * 1000 * 1000))
+          echo "APK size: $SIZE bytes"
+          if [ "$SIZE" -ge "$LIMIT" ]; then
+            echo "APK is not below 100 MB"
+            exit 1
+          fi
+          cp "$APK" NebrasAI-Android8-Light.apk
+          ls -lh NebrasAI-Android8-Light.apk
 
-      - name: Upload ready APK
+      - name: Upload lightweight APK
         if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: NebrasAI-Android8-Ready-APK
-          path: NebrasAI-Android8-Ready.apk
+          name: NebrasAI-Android8-Light-APK
+          path: NebrasAI-Android8-Light.apk
           if-no-files-found: error
           retention-days: 30
 
