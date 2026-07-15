@@ -42,5 +42,5 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.activity:activity:1.10.1")
     implementation("com.google.mediapipe:tasks-genai:0.10.27")
-    implementation("com.google.mediapipe:tasks-vision:0.10.27")
+    implementation("com.google.mediapipe:tasks-vision:latest.release")
 }
