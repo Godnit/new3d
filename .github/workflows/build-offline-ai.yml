@@ -73,6 +73,20 @@ jobs:
           cp "$VISION_FILE" android-offline-ai/app/src/main/assets/models/efficientnet-lite0.tflite
           du -h android-offline-ai/app/src/main/assets/models/*
 
+      - name: Harden 32-bit image fallback
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android-offline-ai/app/src/main/java/com/ayman/offlineai/MainActivity.java")
+          text = path.read_text(encoding="utf-8")
+          old = "} catch (Exception ignored) {\n            visionAvailable = false;"
+          new = "} catch (Throwable ignored) {\n            visionAvailable = false;"
+          if old not in text:
+              raise SystemExit("Expected vision fallback block was not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
       - name: Build APK
         id: build
         continue-on-error: true
