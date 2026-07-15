@@ -1,0 +1,49 @@
+name: Build Offline AI APK
+
+on:
+  push:
+    branches: ["offline-ai-android"]
+    paths:
+      - "android-offline-ai/**"
+      - ".github/workflows/build-offline-ai.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Build APK
+        working-directory: android-offline-ai
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Rename APK
+        run: cp android-offline-ai/app/build/outputs/apk/release/app-release.apk OfflineAI-Android8.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OfflineAI-Android8-APK
+          path: OfflineAI-Android8.apk
+          if-no-files-found: error
