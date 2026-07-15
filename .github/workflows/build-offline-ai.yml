@@ -70,16 +70,74 @@ jobs:
           fi
 
           cp "$VISION_FILE" android-offline-ai/app/src/main/assets/models/efficientnet-lite0.tflite
-          echo "Text model is published separately and is not embedded in the APK."
           du -h "$QWEN_FILE" android-offline-ai/app/src/main/assets/models/efficientnet-lite0.tflite
 
-      - name: Upload model backup
+      - name: Split model into Drive-sized parts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .model-parts
+          mkdir -p .model-parts
+          split -b 95000000 -d -a 2 --additional-suffix=.part \
+            .model-cache/Nebras-Qwen2.5-0.5B-Q8.task \
+            .model-parts/Nebras-Qwen2.5-0.5B-Q8.part
+          cat > .model-parts/README.txt <<'EOF'
+          Nebras Qwen model backup
+          Rejoin the six parts in numerical order to recreate the model:
+          cat Nebras-Qwen2.5-0.5B-Q8.part*.part > Nebras-Qwen2.5-0.5B-Q8.task
+          SHA-256: e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2
+          The Nebras app normally downloads and resumes this model automatically.
+          EOF
+          ls -lh .model-parts
+
+      - name: Upload model part 00
         uses: actions/upload-artifact@v4
         with:
-          name: Nebras-Qwen2.5-0.5B-Q8-Model-Compressed
-          path: .model-cache/Nebras-Qwen2.5-0.5B-Q8.task
-          if-no-files-found: error
-          compression-level: 9
+          name: Nebras-Model-Part-00
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part00.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-01
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part01.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-02
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part02.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-03
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part03.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 04
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-04
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part04.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 05 and instructions
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-05
+          path: |
+            .model-parts/Nebras-Qwen2.5-0.5B-Q8.part05.part
+            .model-parts/README.txt
+          compression-level: 0
           retention-days: 30
 
       - name: Build lightweight APK
