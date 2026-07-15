@@ -1,4 +1,4 @@
-name: Build Offline AI APK
+name: Build Nebras Offline AI APK
 
 on:
   push:
@@ -16,7 +16,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -39,6 +39,40 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
+      - name: Cache embedded AI models
+        uses: actions/cache@v4
+        with:
+          path: .model-cache
+          key: nebras-models-v2-qwen25-05b-q8-efficientnet-lite0
+
+      - name: Download embedded AI models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .model-cache
+          mkdir -p android-offline-ai/app/src/main/assets/models
+
+          QWEN_FILE=.model-cache/qwen-0.5b.task
+          QWEN_URL='https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task?download=true'
+          QWEN_SHA='e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2'
+
+          if [ ! -f "$QWEN_FILE" ]; then
+            curl --fail --location --retry 5 --retry-delay 5 \
+              --output "$QWEN_FILE" "$QWEN_URL"
+          fi
+          echo "$QWEN_SHA  $QWEN_FILE" | sha256sum --check
+
+          VISION_FILE=.model-cache/efficientnet-lite0.tflite
+          VISION_URL='https://storage.googleapis.com/mediapipe-models/image_classifier/efficientnet_lite0/float32/1/efficientnet_lite0.tflite'
+          if [ ! -s "$VISION_FILE" ]; then
+            curl --fail --location --retry 5 --retry-delay 5 \
+              --output "$VISION_FILE" "$VISION_URL"
+          fi
+
+          cp "$QWEN_FILE" android-offline-ai/app/src/main/assets/models/qwen-0.5b.task
+          cp "$VISION_FILE" android-offline-ai/app/src/main/assets/models/efficientnet-lite0.tflite
+          du -h android-offline-ai/app/src/main/assets/models/*
+
       - name: Build APK
         id: build
         continue-on-error: true
@@ -46,27 +80,31 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          gradle :app:assembleRelease --stacktrace 2>&1 | tee build.log
+          gradle :app:assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: OfflineAI-build-log
+          name: NebrasAI-build-log
           path: android-offline-ai/build.log
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Rename APK
         if: steps.build.outcome == 'success'
-        run: cp android-offline-ai/app/build/outputs/apk/release/app-release.apk OfflineAI-Android8.apk
+        run: |
+          cp android-offline-ai/app/build/outputs/apk/release/app-release.apk NebrasAI-Android8-Ready.apk
+          ls -lh NebrasAI-Android8-Ready.apk
 
-      - name: Upload APK
+      - name: Upload ready APK
         if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: OfflineAI-Android8-APK
-          path: OfflineAI-Android8.apk
+          name: NebrasAI-Android8-Ready-APK
+          path: NebrasAI-Android8-Ready.apk
           if-no-files-found: error
+          retention-days: 30
 
       - name: Fail job if build failed
         if: steps.build.outcome == 'failure'
