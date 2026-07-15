@@ -40,15 +40,34 @@ jobs:
           gradle-version: "8.10.2"
 
       - name: Build APK
+        id: build
+        continue-on-error: true
         working-directory: android-offline-ai
-        run: gradle :app:assembleRelease --stacktrace
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:assembleRelease --stacktrace 2>&1 | tee build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: OfflineAI-build-log
+          path: android-offline-ai/build.log
+          if-no-files-found: error
 
       - name: Rename APK
+        if: steps.build.outcome == 'success'
         run: cp android-offline-ai/app/build/outputs/apk/release/app-release.apk OfflineAI-Android8.apk
 
       - name: Upload APK
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: OfflineAI-Android8-APK
           path: OfflineAI-Android8.apk
           if-no-files-found: error
+
+      - name: Fail job if build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
