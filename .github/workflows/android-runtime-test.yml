@@ -25,9 +25,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euxo pipefail
+          BEFORE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           gh workflow run build-android.yml --repo "${{ github.repository }}" --ref cityquest3d-legacy-tabs-v2
-          sleep 8
-          RUN_ID="$(gh run list --repo "${{ github.repository }}" --workflow build-android.yml --branch cityquest3d-legacy-tabs-v2 --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId')"
+          RUN_ID=""
+          for attempt in $(seq 1 30); do
+            RUN_ID="$(gh run list --repo "${{ github.repository }}" --workflow build-android.yml --branch cityquest3d-legacy-tabs-v2 --event workflow_dispatch --limit 10 --json databaseId,createdAt --jq '[.[] | select(.createdAt >= "'"$BEFORE"'")][0].databaseId // empty')"
+            if [ -n "$RUN_ID" ]; then break; fi
+            sleep 5
+          done
           test -n "$RUN_ID"
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           echo "$RUN_ID" > /tmp/full-build-run-id.txt
@@ -48,11 +53,17 @@ jobs:
         run: |
           set +e
           mkdir -p /tmp/delivery
-          gh run download "$RUN_ID" --repo "${{ github.repository }}" --name CityQuest3D-Legacy-v2-Ready --dir /tmp/delivery/ready
-          READY_CODE=$?
-          gh run download "$RUN_ID" --repo "${{ github.repository }}" --name CityQuest3D-Legacy-Diagnostics --dir /tmp/delivery/diagnostics
-          DIAG_CODE=$?
-          CONCLUSION="$(gh run view "$RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+          if [ -n "$RUN_ID" ]; then
+            gh run download "$RUN_ID" --repo "${{ github.repository }}" --name CityQuest3D-Legacy-v2-Ready --dir /tmp/delivery/ready
+            READY_CODE=$?
+            gh run download "$RUN_ID" --repo "${{ github.repository }}" --name CityQuest3D-Legacy-Diagnostics --dir /tmp/delivery/diagnostics
+            DIAG_CODE=$?
+            CONCLUSION="$(gh run view "$RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+          else
+            READY_CODE=1
+            DIAG_CODE=1
+            CONCLUSION="dispatch_failed"
+          fi
           {
             echo "run_id=$RUN_ID"
             echo "conclusion=$CONCLUSION"
@@ -84,5 +95,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ steps.dispatch.outputs.run_id }}
         run: |
+          test -n "$RUN_ID"
           CONCLUSION="$(gh run view "$RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
           test "$CONCLUSION" = "success"
