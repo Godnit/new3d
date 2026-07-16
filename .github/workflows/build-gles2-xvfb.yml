@@ -110,7 +110,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot -no-window -no-audio -no-boot-anim -camera-back none -gpu swiftshader_indirect
           script: |
-            set -euxo pipefail
+            set -eux
             adb install -r build/CityQuest3D-GLES2-Emulator.apk
             adb shell settings put secure immersive_mode_confirmations confirmed || true
             adb logcat -c
