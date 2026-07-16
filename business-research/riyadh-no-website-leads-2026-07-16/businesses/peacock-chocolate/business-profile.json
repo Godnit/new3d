@@ -1,0 +1,39 @@
+{
+  "name": "Peacock Chocolate",
+  "name_ar": "بيكوك شوكليت",
+  "category": ["chocolate", "cakes", "occasion desserts"],
+  "city": "Riyadh",
+  "rating": null,
+  "review_count": null,
+  "phone": "0550626590",
+  "whatsapp": "needs confirmation",
+  "address": null,
+  "website_status": "no independent business-owned domain found; LinkedIn presence only; provisional",
+  "platform_presence": [
+    {
+      "platform": "LinkedIn",
+      "url": "https://ae.linkedin.com/posts/peacock-chocolate_peacock-choco-chocolate-activity-7101881122971660288-6YFO"
+    }
+  ],
+  "products_and_services": [
+    "custom chocolate",
+    "cakes",
+    "cake decorating and design",
+    "wedding and occasion desserts"
+  ],
+  "image_reference_pages": [
+    "https://ae.linkedin.com/posts/peacock-chocolate_peacock-choco-chocolate-activity-7101881122971660288-6YFO"
+  ],
+  "image_usage": "The post contains a brand image. Obtain the original image set and permission from the owner before commercial reuse.",
+  "recommended_site_goal": "Visual catalog, event and wedding collections, custom-order request and WhatsApp ordering.",
+  "missing_information": [
+    "exact address and map link",
+    "opening hours",
+    "current rating and review count",
+    "official Instagram or other social accounts",
+    "original logo and product photos",
+    "product catalog, sizes and prices",
+    "confirmation that the phone accepts WhatsApp"
+  ],
+  "verified_at": "2026-07-16"
+}
