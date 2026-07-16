@@ -1,4 +1,4 @@
-name: Monitor City Quest Legacy Runs
+name: Inspect City Quest Android 8.1 Failure
 
 on:
   push:
@@ -7,11 +7,10 @@ on:
 
 permissions:
   actions: read
-  checks: read
   contents: write
 
 jobs:
-  publish-run-list:
+  inspect-failure:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,37 +18,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate workflow with actionlint
-        run: |
-          mkdir -p /tmp/cityquest-monitor /tmp/actionlint
-          bash <(curl -sL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) latest /tmp/actionlint
-          /tmp/actionlint/actionlint -verbose .github/workflows/build-android.yml > /tmp/cityquest-monitor/ACTIONLINT.txt 2>&1 || true
-          cat /tmp/cityquest-monitor/ACTIONLINT.txt
-
-      - name: Capture workflow runs and parser annotations
+      - name: Download failed run logs
         env:
           GH_TOKEN: ${{ github.token }}
+          FAILED_RUN_ID: "29507887382"
         run: |
-          sleep 20
           mkdir -p /tmp/cityquest-monitor
-          gh run list --repo "${{ github.repository }}" --branch cityquest3d-legacy-tabs-v2 --limit 30 --json databaseId,name,status,conclusion,event,headSha,createdAt,url > /tmp/cityquest-monitor/RUNS.json
-          BUILD_RUN_ID="$(gh run list --repo "${{ github.repository }}" --workflow build-android.yml --branch cityquest3d-legacy-tabs-v2 --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
-          echo "$BUILD_RUN_ID" > /tmp/cityquest-monitor/LATEST_BUILD_RUN_ID.txt
-          if [ -n "$BUILD_RUN_ID" ]; then
-            gh run view "$BUILD_RUN_ID" --repo "${{ github.repository }}" > /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>&1 || true
-            gh run view "$BUILD_RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt 2>&1 || true
-            gh api "repos/${{ github.repository }}/actions/runs/$BUILD_RUN_ID" > /tmp/cityquest-monitor/LATEST_BUILD_API.json 2>&1 || true
-          fi
-          {
-            echo "monitor_run_id=${{ github.run_id }}"
-            echo "latest_build_run_id=$BUILD_RUN_ID"
-            echo "head_sha=${{ github.sha }}"
-            echo "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } > /tmp/cityquest-monitor/STATUS.txt
-          cat /tmp/cityquest-monitor/STATUS.txt
-          cat /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>/dev/null || true
+          gh run view "$FAILED_RUN_ID" --repo "${{ github.repository }}" > /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>&1 || true
+          gh run view "$FAILED_RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt 2>&1 || true
+          gh api "repos/${{ github.repository }}/actions/runs/$FAILED_RUN_ID" > /tmp/cityquest-monitor/LATEST_BUILD_API.json 2>&1 || true
+          printf '%s\n' "failed_run_id=$FAILED_RUN_ID" "monitor_run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-monitor/STATUS.txt
+          tail -n 250 /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt || true
 
-      - name: Publish monitoring data
+      - name: Publish failure logs
         run: |
           git config user.name "City Quest Monitor"
           git config user.email "actions@users.noreply.github.com"
@@ -57,5 +38,5 @@ jobs:
           git rm -rf . || true
           cp -a /tmp/cityquest-monitor/. .
           git add -A
-          git commit -m "Publish City Quest actionlint diagnostics ${{ github.run_id }}"
+          git commit -m "Publish Android 8.1 failure logs ${{ github.run_id }}"
           git push origin HEAD:cityquest3d-monitor --force
