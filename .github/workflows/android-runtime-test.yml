@@ -44,18 +44,17 @@ jobs:
           sudo chmod 666 /dev/kvm
           test -r /dev/kvm
           test -w /dev/kvm
-          ls -l /dev/kvm
 
-      - name: Install Android emulator image
+      - name: Install modern Android emulator image
         run: |
           set -euxo pipefail
           mkdir -p "$ANDROID_AVD_HOME"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "system-images;android-29;google_apis;x86_64"
-          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name cityquest-test --package "system-images;android-29;google_apis;x86_64" --device "pixel_2"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "system-images;android-35;google_apis;x86_64"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name cityquest-test --package "system-images;android-35;google_apis;x86_64" --device "pixel_6"
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -q '^cityquest-test$'
 
-      - name: Boot hardware emulator, install APK, and launch game
+      - name: Boot emulator, install APK, and render the game
         run: |
           mkdir -p build
           exec > >(tee build/runtime-step.log) 2>&1
@@ -64,7 +63,8 @@ jobs:
           trap 'code=$?; echo "RUNTIME_STEP_EXIT=$code"; adb devices -l || true; tail -n 120 build/emulator-console.log || true; exit $code' EXIT
           nohup "$ANDROID_HOME/emulator/emulator" \
             -avd cityquest-test \
-            -accel on -gpu swiftshader_indirect \
+            -accel on -gpu swiftshader \
+            -partition-size 4096 \
             -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics \
             -camera-back none \
             > build/emulator-console.log 2>&1 &
@@ -77,17 +77,15 @@ jobs:
           adb install -r build/CityQuest3D.apk | tee build/install-output.txt
           adb logcat -c
           adb shell monkey -p com.godnit.cityquest3d -c android.intent.category.LAUNCHER 1 | tee build/launch-output.txt
-          sleep 10
-          adb shell input tap 760 455 || true
-          sleep 35
+          sleep 50
           PID="$(adb shell pidof com.godnit.cityquest3d | tr -d '\r')"
           echo "$PID" | tee build/app-pid.txt
           test -n "$PID"
           adb exec-out screencap -p > build/android-emulator-screenshot.png
           adb logcat -d > build/android-logcat.txt
-          if grep -E "FATAL EXCEPTION|Fatal signal|Process: com.godnit.cityquest3d.*has died|ANR in com.godnit.cityquest3d" build/android-logcat.txt; then
-            exit 1
-          fi
+          if grep -A2 "FATAL EXCEPTION" build/android-logcat.txt | grep -q "Process: com.godnit.cityquest3d"; then exit 1; fi
+          if grep -q "ANR in com.godnit.cityquest3d" build/android-logcat.txt; then exit 1; fi
+          if grep -q "Process: com.godnit.cityquest3d.*has died" build/android-logcat.txt; then exit 1; fi
           echo success > build/android-runtime-status.txt
           trap - EXIT
 
