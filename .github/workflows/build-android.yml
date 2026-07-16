@@ -170,8 +170,10 @@ jobs:
             sleep 22
             adb shell pidof com.godnit.cityquest3dlegacy | tr -d '\r' > /tmp/cityquest.pid
             test -s /tmp/cityquest.pid
+            adb shell input tap 1060 455
+            sleep 4
             adb exec-out screencap -p > build/android81-menu.png
-            adb shell input tap 480 390
+            adb shell input keyevent 66
             sleep 10
             adb exec-out screencap -p > build/android81-game.png
             adb logcat -d > build/android81-logcat.txt
