@@ -3,6 +3,8 @@ name: Android runtime test for City Quest 3D
 on:
   push:
     branches: [cityquest3d-build]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
