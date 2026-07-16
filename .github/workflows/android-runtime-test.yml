@@ -36,6 +36,16 @@ jobs:
           test -s build/CityQuest3D.apk
           unzip -t build/CityQuest3D.apk
 
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          sudo chmod 666 /dev/kvm
+          test -r /dev/kvm
+          test -w /dev/kvm
+          ls -l /dev/kvm
+
       - name: Install Android emulator image
         run: |
           set -euxo pipefail
@@ -45,20 +55,22 @@ jobs:
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name cityquest-test --package "system-images;android-29;google_apis;x86_64" --device "pixel_2"
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -q '^cityquest-test$'
 
-      - name: Boot software emulator, install APK, and launch game
+      - name: Boot hardware emulator, install APK, and launch game
         run: |
+          mkdir -p build
+          exec > >(tee build/runtime-step.log) 2>&1
           set -euxo pipefail
+          trap 'code=$?; echo "RUNTIME_STEP_EXIT=$code"; adb devices -l || true; tail -n 120 build/emulator-console.log || true; exit $code' EXIT
           nohup "$ANDROID_HOME/emulator/emulator" \
             -avd cityquest-test \
-            -accel off -gpu swiftshader \
+            -accel on -gpu swiftshader_indirect \
             -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics \
-            -camera-back none -verbose \
+            -camera-back none \
             > build/emulator-console.log 2>&1 &
           echo $! > build/emulator.pid
-          sleep 12
           adb start-server
-          timeout 600 bash -c 'until adb devices | grep -q "emulator-.*device"; do sleep 5; done'
-          timeout 600 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
+          timeout 360 bash -c 'until adb devices | grep -qE "^emulator-[0-9]+[[:space:]]+device"; do sleep 5; done'
+          timeout 360 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
           adb shell input keyevent 82 || true
           adb install -r build/CityQuest3D.apk | tee build/install-output.txt
           adb logcat -c
@@ -73,6 +85,7 @@ jobs:
             exit 1
           fi
           echo success > build/android-runtime-status.txt
+          trap - EXIT
 
       - name: Upload Android runtime evidence
         if: always()
@@ -84,6 +97,7 @@ jobs:
             build/android-emulator-screenshot.png
             build/android-logcat.txt
             build/emulator-console.log
+            build/runtime-step.log
             build/install-output.txt
             build/launch-output.txt
             build/app-pid.txt
