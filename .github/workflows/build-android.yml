@@ -42,6 +42,30 @@ jobs:
           echo "Car models: $(find assets/kenney/cars -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)"
           echo "Character models: $(find assets/kenney/characters -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)"
 
+      - name: Apply compiler compatibility fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/main.gd')
+          s = p.read_text()
+          replacements = {
+              'var move_input := hud.move_vector': 'var move_input: Vector2 = hud.move_vector',
+              'var jump := hud.consume_jump() or Input.is_key_pressed(KEY_SPACE)': 'var jump: bool = hud.consume_jump() or Input.is_key_pressed(KEY_SPACE)',
+              'var sprint := hud.sprint_held or Input.is_key_pressed(KEY_SHIFT)': 'var sprint: bool = hud.sprint_held or Input.is_key_pressed(KEY_SHIFT)',
+              'var attack := hud.consume_attack() or Input.is_key_pressed(KEY_F)': 'var attack: bool = hud.consume_attack() or Input.is_key_pressed(KEY_F)',
+              'var interact := hud.consume_interact() or Input.is_key_pressed(KEY_E)': 'var interact: bool = hud.consume_interact() or Input.is_key_pressed(KEY_E)',
+              'var look := hud.consume_look()': 'var look: Vector2 = hud.consume_look()',
+              'var instance := resource.instantiate()': 'var instance: Node = (resource as PackedScene).instantiate()',
+          }
+          for old, new in replacements.items():
+              s = s.replace(old, new)
+          p.write_text(s)
+          for filename in ('scripts/player.gd', 'scripts/car.gd', 'scripts/enemy.gd'):
+              p = Path(filename)
+              s = p.read_text().replace('var instance := resource.instantiate()', 'var instance: Node = (resource as PackedScene).instantiate()')
+              p.write_text(s)
+          PY
+
       - name: Install Godot 4.6.3 and export templates
         run: |
           set -euxo pipefail
