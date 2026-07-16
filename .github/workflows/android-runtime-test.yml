@@ -1,4 +1,4 @@
-name: Inspect Latest City Quest Android 8.1 Failure
+name: Monitor City Quest Direct Build
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  inspect-failure:
+  monitor:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -18,18 +18,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download failed run logs
+      - name: Capture latest build runs
         env:
           GH_TOKEN: ${{ github.token }}
-          FAILED_RUN_ID: "29508848385"
         run: |
+          sleep 35
           mkdir -p /tmp/cityquest-monitor
-          gh run view "$FAILED_RUN_ID" --repo "${{ github.repository }}" > /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>&1 || true
-          gh run view "$FAILED_RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt 2>&1 || true
-          printf '%s\n' "failed_run_id=$FAILED_RUN_ID" "monitor_run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-monitor/STATUS.txt
-          tail -n 300 /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt || true
+          gh run list --repo "${{ github.repository }}" --workflow build-android.yml --branch cityquest3d-legacy-tabs-v2 --limit 10 --json databaseId,name,status,conclusion,event,headSha,createdAt,url > /tmp/cityquest-monitor/RUNS.json
+          printf '%s\n' "monitor_run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-monitor/STATUS.txt
+          cat /tmp/cityquest-monitor/RUNS.json
 
-      - name: Publish failure logs
+      - name: Publish monitor data
         run: |
           git config user.name "City Quest Monitor"
           git config user.email "actions@users.noreply.github.com"
@@ -37,5 +36,5 @@ jobs:
           git rm -rf . || true
           cp -a /tmp/cityquest-monitor/. .
           git add -A
-          git commit -m "Publish latest Android 8.1 failure logs ${{ github.run_id }}"
+          git commit -m "Publish direct build monitor ${{ github.run_id }}"
           git push origin HEAD:cityquest3d-monitor --force
