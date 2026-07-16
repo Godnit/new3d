@@ -6,13 +6,13 @@ A complete small 3D city mission game built with Godot 4.6.3 and exported as a r
 
 - Third-person movement, sprint and jump
 - Touch controls designed for landscape phones
-- Imported Kenney 3D buildings, cars and characters
+- Imported Kenney 3D buildings and cars, plus an imported Khronos glTF character
 - Enemy pursuit and melee combat
 - Collectibles, health and four-stage mission flow
 - Enter, drive and exit a car
 - Pause, restart, win and lose states
 - Offline after installation
 
-## Build
+## Android build
 
-The GitHub Actions workflow downloads the CC0 3D packs, imports them through Godot, exports a signed APK, installs it in an Android emulator, launches it, checks the process/logcat, captures a screenshot and uploads the final artifacts.
+The APK uses Godot's mobile renderer with an OpenGL fallback. The automated build downloads the licensed ready-made 3D models, imports them, runs a scene smoke test, exports and signs the APK, validates its archive, and packages the full editable source.
