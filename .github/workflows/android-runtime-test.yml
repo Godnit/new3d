@@ -18,19 +18,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Capture workflow runs
+      - name: Capture workflow runs and latest build details
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sleep 25
+          sleep 20
           mkdir -p /tmp/cityquest-monitor
           gh run list --repo "${{ github.repository }}" --branch cityquest3d-legacy-tabs-v2 --limit 30 --json databaseId,name,status,conclusion,event,headSha,createdAt,url > /tmp/cityquest-monitor/RUNS.json
+          BUILD_RUN_ID="$(gh run list --repo "${{ github.repository }}" --workflow build-android.yml --branch cityquest3d-legacy-tabs-v2 --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          echo "$BUILD_RUN_ID" > /tmp/cityquest-monitor/LATEST_BUILD_RUN_ID.txt
+          if [ -n "$BUILD_RUN_ID" ]; then
+            gh run view "$BUILD_RUN_ID" --repo "${{ github.repository }}" > /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>&1 || true
+            gh run view "$BUILD_RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt 2>&1 || true
+            gh api "repos/${{ github.repository }}/actions/runs/$BUILD_RUN_ID" > /tmp/cityquest-monitor/LATEST_BUILD_API.json 2>&1 || true
+          fi
           {
             echo "monitor_run_id=${{ github.run_id }}"
+            echo "latest_build_run_id=$BUILD_RUN_ID"
             echo "head_sha=${{ github.sha }}"
             echo "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > /tmp/cityquest-monitor/STATUS.txt
-          cat /tmp/cityquest-monitor/RUNS.json
+          cat /tmp/cityquest-monitor/STATUS.txt
+          cat /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>/dev/null || true
 
       - name: Publish monitoring data
         run: |
@@ -40,5 +49,5 @@ jobs:
           git rm -rf . || true
           cp -a /tmp/cityquest-monitor/. .
           git add -A
-          git commit -m "Publish City Quest workflow run list ${{ github.run_id }}"
+          git commit -m "Publish City Quest workflow diagnostics ${{ github.run_id }}"
           git push origin HEAD:cityquest3d-monitor --force
