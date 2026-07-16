@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject portrait, black, blank, overlay-only, or unchanged Android screenshots."""
+"""Reject portrait, black, blank, overlay-only, or frozen Android screenshots."""
 
 from pathlib import Path
 from PIL import Image, ImageChops, ImageStat
@@ -28,19 +28,17 @@ for path in SCREENSHOTS:
     if contrast <= 8.0:
         raise SystemExit(f"Flat/blank screen: {path}")
 
-menu, game = images
-if menu.size != game.size:
-    raise SystemExit(f"Screenshot size changed unexpectedly: {menu.size} vs {game.size}")
+start, playing = images
+if start.size != playing.size:
+    raise SystemExit(f"Screenshot size changed unexpectedly: {start.size} vs {playing.size}")
 
-difference = ImageChops.difference(menu, game)
+difference = ImageChops.difference(start, playing)
 difference_mean = sum(ImageStat.Stat(difference).mean) / 3.0
-print(f"menu-to-game difference={difference_mean:.2f}")
-if difference_mean <= 4.0:
-    raise SystemExit("Menu and gameplay screenshots are effectively unchanged")
+print(f"start-to-playing difference={difference_mean:.2f}")
+if difference_mean <= 0.45:
+    raise SystemExit("The gameplay view did not respond to movement input")
 
-# Android 8.1's one-time immersive-mode explanation has a large teal center panel.
-# Its center is nearly uniform and should never be accepted as the game preview.
-for label, image in (("menu", menu), ("game", game)):
+for label, image in (("start", start), ("playing", playing)):
     center = image.crop((image.width * 0.25, image.height * 0.08, image.width * 0.75, image.height * 0.62))
     center_stats = ImageStat.Stat(center)
     center_mean = center_stats.mean
