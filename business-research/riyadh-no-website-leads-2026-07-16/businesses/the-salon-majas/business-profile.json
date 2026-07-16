@@ -1,0 +1,41 @@
+{
+  "name": "The Salon Majas",
+  "category": ["beauty salon", "hair", "nails", "skin care"],
+  "city": "Riyadh",
+  "district": "Al Rabie",
+  "rating": 4.8,
+  "review_count": 355,
+  "phone": null,
+  "whatsapp": null,
+  "address": "Al Rabie District, Riyadh",
+  "opening_information": "The public Fresha page displayed an 11:00 AM opening time when checked; confirm the full weekly schedule with the business.",
+  "website_status": "no independent business-owned domain found; Fresha booking page only; provisional",
+  "platform_presence": [
+    {
+      "platform": "Fresha",
+      "url": "https://www.fresha.com/a/the-salon-riyadh-prince-mohammed-ibn-salman-ibn-abdulaziz-rd-ind01zju"
+    }
+  ],
+  "products_and_services": [
+    "hair care, coloring, styling and haircuts",
+    "nail care",
+    "brows and lashes",
+    "hair removal",
+    "makeup and face care",
+    "selected home beauty services"
+  ],
+  "image_reference_pages": [
+    "https://www.fresha.com/a/the-salon-riyadh-prince-mohammed-ibn-salman-ibn-abdulaziz-rd-ind01zju"
+  ],
+  "image_usage": "Fresha shows eight venue images. Obtain originals and written approval from the owner before commercial reuse.",
+  "recommended_site_goal": "Luxury brand presentation, service catalog, portfolio, booking handoff, packages and WhatsApp enquiries.",
+  "missing_information": [
+    "direct phone and WhatsApp",
+    "exact postal address and map link",
+    "complete weekly hours",
+    "official social accounts",
+    "original logo and image library",
+    "confirmed service prices and booking policies"
+  ],
+  "verified_at": "2026-07-16"
+}
