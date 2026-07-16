@@ -54,10 +54,8 @@ jobs:
             -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics \
             -camera-back none -verbose \
             > build/emulator-console.log 2>&1 &
-          EMU_PID=$!
-          echo "$EMU_PID" > build/emulator.pid
+          echo $! > build/emulator.pid
           sleep 12
-          ps -p "$EMU_PID"
           adb start-server
           timeout 600 bash -c 'until adb devices | grep -q "emulator-.*device"; do sleep 5; done'
           timeout 600 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
