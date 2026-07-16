@@ -1,4 +1,4 @@
-name: Monitor City Quest Direct Build
+name: Monitor City Quest GLES2 Builds
 
 on:
   push:
@@ -18,13 +18,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Capture latest build runs
+      - name: Capture latest branch runs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sleep 35
+          sleep 25
           mkdir -p /tmp/cityquest-monitor
-          gh run list --repo "${{ github.repository }}" --workflow build-android.yml --branch cityquest3d-legacy-tabs-v2 --limit 10 --json databaseId,name,status,conclusion,event,headSha,createdAt,url > /tmp/cityquest-monitor/RUNS.json
+          gh run list --repo "${{ github.repository }}" --branch cityquest3d-legacy-tabs-v2 --limit 30 --json databaseId,name,status,conclusion,event,headSha,createdAt,url > /tmp/cityquest-monitor/RUNS.json
           printf '%s\n' "monitor_run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-monitor/STATUS.txt
           cat /tmp/cityquest-monitor/RUNS.json
 
@@ -36,5 +36,5 @@ jobs:
           git rm -rf . || true
           cp -a /tmp/cityquest-monitor/. .
           git add -A
-          git commit -m "Publish direct build monitor ${{ github.run_id }}"
+          git commit -m "Publish GLES2 run monitor ${{ github.run_id }}"
           git push origin HEAD:cityquest3d-monitor --force
