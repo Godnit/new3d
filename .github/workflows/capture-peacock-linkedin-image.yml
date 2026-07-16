@@ -1,0 +1,73 @@
+name: Capture Peacock LinkedIn reference image
+
+on:
+  push:
+    paths:
+      - '.github/workflows/capture-peacock-linkedin-image.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright@1.52.0
+          npx playwright install --with-deps chromium
+      - name: Capture largest post image
+        shell: bash
+        run: |
+          cat > capture.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const url = 'https://ae.linkedin.com/posts/peacock-chocolate_peacock-choco-chocolate-activity-7101881122971660288-6YFO';
+          const out = 'business-research/riyadh-no-website-leads-2026-07-16/businesses/peacock-chocolate/reference-images/01-linkedin-product-post.png';
+          fs.mkdirSync(out.split('/').slice(0, -1).join('/'), { recursive: true });
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, locale: 'ar-SA' });
+          await page.goto(url, { waitUntil: 'networkidle', timeout: 120000 }).catch(() => {});
+          await page.waitForTimeout(7000);
+          const images = page.locator('img');
+          let best = null;
+          let bestArea = 0;
+          for (let i = 0; i < await images.count(); i++) {
+            const img = images.nth(i);
+            const box = await img.boundingBox().catch(() => null);
+            if (!box) continue;
+            const area = box.width * box.height;
+            const src = await img.getAttribute('src').catch(() => '');
+            if (area > bestArea && box.width > 300 && box.height > 220 && src && !src.includes('logo')) {
+              best = img;
+              bestArea = area;
+            }
+          }
+          if (best) {
+            await best.screenshot({ path: out });
+            console.log(`Captured image area ${bestArea}`);
+          } else {
+            await page.screenshot({ path: out, fullPage: true });
+            console.log('Captured full public post page as fallback');
+          }
+          await browser.close();
+          EOF
+          node capture.mjs
+          file business-research/riyadh-no-website-leads-2026-07-16/businesses/peacock-chocolate/reference-images/01-linkedin-product-post.png
+      - name: Commit captured image
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add business-research/riyadh-no-website-leads-2026-07-16/businesses/peacock-chocolate/reference-images/01-linkedin-product-post.png
+          if git diff --cached --quiet; then
+            echo 'No image captured.'
+          else
+            git commit -m 'Capture Peacock Chocolate public post reference image'
+            git push
+          fi
