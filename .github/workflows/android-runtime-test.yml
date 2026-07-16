@@ -60,6 +60,7 @@ jobs:
           mkdir -p build
           exec > >(tee build/runtime-step.log) 2>&1
           set -euxo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           trap 'code=$?; echo "RUNTIME_STEP_EXIT=$code"; adb devices -l || true; tail -n 120 build/emulator-console.log || true; exit $code' EXIT
           nohup "$ANDROID_HOME/emulator/emulator" \
             -avd cityquest-test \
@@ -69,8 +70,8 @@ jobs:
             > build/emulator-console.log 2>&1 &
           echo $! > build/emulator.pid
           adb start-server
-          timeout 360 bash -c 'until adb devices | grep -qE "^emulator-[0-9]+[[:space:]]+device"; do sleep 5; done'
-          timeout 360 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
+          timeout 360 bash -c 'export PATH="$ANDROID_HOME/platform-tools:$PATH"; until adb devices | grep -qE "^emulator-[0-9]+[[:space:]]+device"; do sleep 5; done'
+          timeout 360 bash -c 'export PATH="$ANDROID_HOME/platform-tools:$PATH"; until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
           adb shell input keyevent 82 || true
           adb install -r build/CityQuest3D.apk | tee build/install-output.txt
           adb logcat -c
