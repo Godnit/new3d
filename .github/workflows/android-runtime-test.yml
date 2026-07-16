@@ -19,6 +19,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate workflow with actionlint
+        run: |
+          mkdir -p /tmp/cityquest-monitor /tmp/actionlint
+          bash <(curl -sL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) latest /tmp/actionlint
+          /tmp/actionlint/actionlint -verbose .github/workflows/build-android.yml > /tmp/cityquest-monitor/ACTIONLINT.txt 2>&1 || true
+          cat /tmp/cityquest-monitor/ACTIONLINT.txt
+
       - name: Capture workflow runs and parser annotations
         env:
           GH_TOKEN: ${{ github.token }}
@@ -32,15 +39,6 @@ jobs:
             gh run view "$BUILD_RUN_ID" --repo "${{ github.repository }}" > /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>&1 || true
             gh run view "$BUILD_RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt 2>&1 || true
             gh api "repos/${{ github.repository }}/actions/runs/$BUILD_RUN_ID" > /tmp/cityquest-monitor/LATEST_BUILD_API.json 2>&1 || true
-            CHECK_SUITE_ID="$(gh api "repos/${{ github.repository }}/actions/runs/$BUILD_RUN_ID" --jq '.check_suite_id // empty' 2>/dev/null || true)"
-            echo "$CHECK_SUITE_ID" > /tmp/cityquest-monitor/CHECK_SUITE_ID.txt
-            if [ -n "$CHECK_SUITE_ID" ]; then
-              gh api "repos/${{ github.repository }}/check-suites/$CHECK_SUITE_ID/check-runs" > /tmp/cityquest-monitor/CHECK_RUNS.json 2>&1 || true
-              gh api "repos/${{ github.repository }}/check-suites/$CHECK_SUITE_ID/check-runs" --jq '.check_runs[] | [.id,.name,.conclusion,.output.title,.output.summary,.output.text] | @tsv' > /tmp/cityquest-monitor/CHECK_RUNS.txt 2>&1 || true
-              for CHECK_ID in $(gh api "repos/${{ github.repository }}/check-suites/$CHECK_SUITE_ID/check-runs" --jq '.check_runs[].id' 2>/dev/null || true); do
-                gh api "repos/${{ github.repository }}/check-runs/$CHECK_ID/annotations" >> /tmp/cityquest-monitor/ANNOTATIONS.json 2>&1 || true
-              done
-            fi
           fi
           {
             echo "monitor_run_id=${{ github.run_id }}"
@@ -49,8 +47,7 @@ jobs:
             echo "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > /tmp/cityquest-monitor/STATUS.txt
           cat /tmp/cityquest-monitor/STATUS.txt
-          cat /tmp/cityquest-monitor/CHECK_RUNS.txt 2>/dev/null || true
-          cat /tmp/cityquest-monitor/ANNOTATIONS.json 2>/dev/null || true
+          cat /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>/dev/null || true
 
       - name: Publish monitoring data
         run: |
@@ -60,5 +57,5 @@ jobs:
           git rm -rf . || true
           cp -a /tmp/cityquest-monitor/. .
           git add -A
-          git commit -m "Publish City Quest parser diagnostics ${{ github.run_id }}"
+          git commit -m "Publish City Quest actionlint diagnostics ${{ github.run_id }}"
           git push origin HEAD:cityquest3d-monitor --force
