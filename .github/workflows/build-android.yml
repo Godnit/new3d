@@ -1,10 +1,128 @@
-name: Rebuild City Quest 3D APK
+name: Build City Quest 3D Mobile APK
 
 on:
+  push:
+    branches: [cityquest3d-build]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  rebuild:
+  build-mobile-apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 55
     steps:
-      - run: echo "The verified APK was produced by workflow run 29491295879."
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install build tools and Vulkan software driver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip zip wget libgl1 libvulkan1 mesa-vulkan-drivers
+
+      - name: Download ready-made 3D models
+        run: |
+          set -euxo pipefail
+          rm -rf assets/kenney /tmp/city-models /tmp/car-models
+          mkdir -p assets/kenney/{city,cars,characters}
+          git clone --depth 1 https://github.com/immaculate-lift-studio/CityCrafter3D.git /tmp/city-models
+          git clone --depth 1 https://github.com/Arslan12216775/kenney_car-kit.git /tmp/car-models
+          cp -a "/tmp/city-models/addons/citycrafter/assets/example_assets/kenney_city-kit-commercial_20/Models/OBJ format"/. assets/kenney/city/
+          cp -a /tmp/car-models/. assets/kenney/cars/
+          rm -rf assets/kenney/cars/.git
+          wget -q --show-progress -O assets/kenney/characters/CesiumMan.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb"
+          test "$(find assets/kenney/city -type f -iname '*.obj' | wc -l)" -gt 5
+          test "$(find assets/kenney/cars -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)" -gt 0
+          test -s assets/kenney/characters/CesiumMan.glb
+
+      - name: Apply source compatibility fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/main.gd')
+          s = p.read_text()
+          replacements = {
+              'var move_input := hud.move_vector': 'var move_input: Vector2 = hud.move_vector',
+              'var jump := hud.consume_jump() or Input.is_key_pressed(KEY_SPACE)': 'var jump: bool = hud.consume_jump() or Input.is_key_pressed(KEY_SPACE)',
+              'var sprint := hud.sprint_held or Input.is_key_pressed(KEY_SHIFT)': 'var sprint: bool = hud.sprint_held or Input.is_key_pressed(KEY_SHIFT)',
+              'var attack := hud.consume_attack() or Input.is_key_pressed(KEY_F)': 'var attack: bool = hud.consume_attack() or Input.is_key_pressed(KEY_F)',
+              'var interact := hud.consume_interact() or Input.is_key_pressed(KEY_E)': 'var interact: bool = hud.consume_interact() or Input.is_key_pressed(KEY_E)',
+              'var look := hud.consume_look()': 'var look: Vector2 = hud.consume_look()',
+              'var instance := resource.instantiate()': 'var instance: Node = (resource as PackedScene).instantiate()',
+              'player.global_position = Vector3(-4, 0.3, 7)': 'player.position = Vector3(-4, 0.3, 7)',
+              'drive_car.global_position = Vector3(8, 0.3, 8)': 'drive_car.position = Vector3(8, 0.3, 8)',
+              'enemy.global_position = Vector3(cos(angle) * 30.0, 0.3, sin(angle) * 30.0)': 'enemy.position = Vector3(cos(angle) * 30.0, 0.3, sin(angle) * 30.0)',
+          }
+          for old, new in replacements.items():
+              s = s.replace(old, new)
+          p.write_text(s)
+          for filename in ('scripts/player.gd', 'scripts/car.gd', 'scripts/enemy.gd'):
+              p = Path(filename)
+              p.write_text(p.read_text().replace('var instance := resource.instantiate()', 'var instance: Node = (resource as PackedScene).instantiate()'))
+          Path('THIRD_PARTY_LICENSES.md').write_text('''# Third-party assets\n\n- Kenney City Kit (Commercial) 2.1 — CC0 1.0.\n- Kenney Car Kit — CC0 1.0.\n- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.\n- Godot Engine runtime — MIT License.\n''')
+          PY
+
+      - name: Install Godot 4.6.3 and Android export templates
+        run: |
+          set -euxo pipefail
+          wget -q --show-progress -O /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip"
+          wget -q --show-progress -O /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_export_templates.tpz"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo install -m 0755 /tmp/godot/Godot_v4.6.3-stable_linux.x86_64 /usr/local/bin/godot
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.6.3.stable" /tmp/godot-templates
+          unzip -q /tmp/templates.tpz -d /tmp/godot-templates
+          cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.6.3.stable/"
+          godot --version
+
+      - name: Generate signing key
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=City Quest,C=US" -keyalg RSA -keysize 2048 -validity 10000
+
+      - name: Import assets and smoke-test the mobile renderer
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+        run: |
+          set -o pipefail
+          timeout 12m godot --headless --editor --path . --import 2>&1 | tee import.log
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" import.log; then exit 1; fi
+          timeout 70s godot --headless --path . --quit-after 180 2>&1 | tee smoke-headless.log || true
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Failed loading resource|Failed to load model" smoke-headless.log; then exit 1; fi
+          grep -q "CITYQUEST_READY" smoke-headless.log
+
+      - name: Export signed Android APK
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-debug "Android" build/CityQuest3D.apk 2>&1 | tee export.log
+          test -s build/CityQuest3D.apk
+          unzip -t build/CityQuest3D.apk
+          keytool -printcert -jarfile build/CityQuest3D.apk > build/signature.txt
+          sha256sum build/CityQuest3D.apk | tee build/SHA256SUMS.txt
+
+      - name: Package full source with models
+        run: |
+          zip -qr build/CityQuest3D-Full-Source.zip . -x '.git/*' '.godot/*' 'build/*' 'debug.keystore' 'project-source.zip'
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CityQuest3D-Mobile-Diagnostics
+          path: |
+            import.log
+            smoke-headless.log
+            export.log
+          if-no-files-found: ignore
+          retention-days: 4
+
+      - name: Upload mobile-renderer APK and source
+        uses: actions/upload-artifact@v4
+        with:
+          name: CityQuest3D-Mobile-Ready
+          path: |
+            build/CityQuest3D.apk
+            build/CityQuest3D-Full-Source.zip
+            build/SHA256SUMS.txt
+            build/signature.txt
+          if-no-files-found: error
+          retention-days: 30
