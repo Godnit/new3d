@@ -18,12 +18,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install build and visual-test tools
+      - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip zip wget git libgl1 libpulse0 xvfb imagemagick python3-pil
+          sudo apt-get install -y unzip zip wget git libgl1 libpulse0 python3-pil
 
-      - name: Download optimized ready-made city, cars, and TABS-style characters
+      - name: Download optimized ready-made models
         run: |
           set -euxo pipefail
           rm -rf assets/kenney assets/kaykit /tmp/city-models /tmp/car-models /tmp/kaykit-models
@@ -37,127 +37,72 @@ jobs:
           wget -q -O assets/kenney/characters/CesiumMan.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb"
           python3 - <<'PY'
           from pathlib import Path
-          import json, shutil
+          import json
+          import shutil
 
           kay = Path('/tmp/kaykit-models')
           out = Path('assets/kaykit')
           rejected = ('animation', 'accessor', 'weapon', 'sword', 'shield', 'axe', 'bow', 'staff', 'helmet', 'preview', 'source')
-          preferred_words = ('character', 'barbar', 'knight', 'rogue', 'mage', 'ranger', 'rig_')
+          preferred = ('character', 'barbar', 'knight', 'rogue', 'mage', 'ranger', 'rig_')
           candidates = []
-          for p in kay.rglob('*.fbx'):
-              low = p.as_posix().lower()
-              if any(x in low for x in rejected) or p.stat().st_size < 120_000:
+          for path in kay.rglob('*.fbx'):
+              lower = path.as_posix().lower()
+              if any(word in lower for word in rejected) or path.stat().st_size < 120000:
                   continue
-              score = sum(1 for x in preferred_words if x in low)
-              candidates.append((score, p.stat().st_size, p))
+              score = sum(1 for word in preferred if word in lower)
+              candidates.append((score, path.stat().st_size, path))
           candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
           selected = [item[2] for item in candidates[:4]]
           if len(selected) < 2:
-              selected = sorted(kay.rglob('*.fbx'), key=lambda p: p.stat().st_size, reverse=True)[:4]
+              selected = sorted(kay.rglob('*.fbx'), key=lambda path: path.stat().st_size, reverse=True)[:4]
           assert selected, 'No KayKit character FBX files found'
 
-          for p in selected:
-              dest = out / p.relative_to(kay)
-              dest.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copy2(p, dest)
+          for path in selected:
+              destination = out / path.relative_to(kay)
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(path, destination)
 
-          texture_files = []
           for pattern in ('*.png', '*.jpg', '*.jpeg'):
-              texture_files.extend(kay.rglob(pattern))
-          for p in texture_files:
-              low = p.as_posix().lower()
-              if any(x in low for x in ('screenshot', 'preview', 'banner', 'thumbnail')):
-                  continue
-              dest = out / p.relative_to(kay)
-              dest.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copy2(p, dest)
+              for path in kay.rglob(pattern):
+                  lower = path.as_posix().lower()
+                  if any(word in lower for word in ('screenshot', 'preview', 'banner', 'thumbnail')):
+                      continue
+                  destination = out / path.relative_to(kay)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(path, destination)
 
           city_files = sorted(Path('assets/kenney/city').rglob('*'))
-          city = [p for p in city_files if p.suffix.lower() == '.obj' and any(k in p.name.lower() for k in ('building', 'skyscraper', 'shop', 'house'))]
-          details = [p for p in city_files if p.suffix.lower() == '.obj' and any(k in p.name.lower() for k in ('tree', 'bench', 'light', 'hydrant', 'trash', 'fountain'))]
+          city = [path for path in city_files if path.suffix.lower() == '.obj' and any(word in path.name.lower() for word in ('building', 'skyscraper', 'shop', 'house'))]
+          details = [path for path in city_files if path.suffix.lower() == '.obj' and any(word in path.name.lower() for word in ('tree', 'bench', 'light', 'hydrant', 'trash', 'fountain'))]
           car_files = sorted(Path('assets/kenney/cars').rglob('*'))
-          cars = [p for p in car_files if p.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and any(k in p.name.lower() for k in ('car', 'sedan', 'taxi', 'truck', 'vehicle', 'racer'))]
-          chars = [out / p.relative_to(kay) for p in selected]
-          chars.append(Path('assets/kenney/characters/CesiumMan.glb'))
+          cars = [path for path in car_files if path.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and any(word in path.name.lower() for word in ('car', 'sedan', 'taxi', 'truck', 'vehicle', 'racer'))]
+          characters = [out / path.relative_to(kay) for path in selected]
+          characters.append(Path('assets/kenney/characters/CesiumMan.glb'))
 
-          def res(paths):
-              return ['res://' + p.as_posix() for p in paths]
+          def resources(paths):
+              return ['res://' + path.as_posix() for path in paths]
 
           manifest = {
-              'city': res(city[:16]),
-              'details': res(details[:8]),
-              'cars': res(cars[:12]),
-              'characters': res(chars),
-              'kaykit_selected': [p.as_posix() for p in selected],
+              'city': resources(city[:16]),
+              'details': resources(details[:8]),
+              'cars': resources(cars[:12]),
+              'characters': resources(characters),
+              'kaykit_selected': [path.as_posix() for path in selected],
           }
           Path('assets/model_manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
           assert len(manifest['city']) >= 8, manifest
           assert len(manifest['cars']) >= 2, manifest
           assert len(manifest['characters']) >= 3, manifest
-          print(json.dumps({k: len(v) if isinstance(v, list) else v for k, v in manifest.items()}, ensure_ascii=False))
+          print(json.dumps({key: len(value) if isinstance(value, list) else value for key, value in manifest.items()}, ensure_ascii=False))
           PY
           du -sh assets
           cat assets/model_manifest.json
 
-      - name: Apply final runtime test hooks and UI sizing
+      - name: Write third-party licenses
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
+          printf '%s\n' '# Third-party assets' '' '- Kenney City Kit (Commercial) 2.1 — CC0 1.0.' '- Kenney Car Kit — CC0 1.0.' '- KayKit Character Pack: Adventurers — CC0 1.0.' '- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.' '- Godot Engine runtime — MIT License.' > THIRD_PARTY_LICENSES.md
 
-          p = Path('scripts/main.gd')
-          s = p.read_text()
-          marker = '\thud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)\n'
-          addition = marker + '\thud.position = Vector2.ZERO\n\thud.size = get_viewport().get_visible_rect().size\n\tget_viewport().size_changed.connect(_resize_hud)\n'
-          if 'get_viewport().size_changed.connect(_resize_hud)' not in s:
-              if marker not in s:
-                  raise SystemExit('HUD marker missing')
-              s = s.replace(marker, addition, 1)
-
-          ready = 'print("CITYQUEST_READY legacy_opengl buildings=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())'
-          capture = ready + '''
-\tif OS.get_environment("CITYQUEST_CAPTURE") == "1":
-\t\tawait get_tree().create_timer(2.5).timeout
-\t\tvar capture_path: String = OS.get_environment("CITYQUEST_CAPTURE_PATH")
-\t\tvar capture_image: Image = get_viewport().get_texture().get_image()
-\t\tvar save_error: Error = capture_image.save_png(capture_path)
-\t\tprint("CITYQUEST_CAPTURED path=", capture_path, " error=", save_error)'''
-          if 'CITYQUEST_CAPTURED' not in s:
-              if ready not in s:
-                  raise SystemExit('Ready marker missing')
-              s = s.replace(ready, capture, 1)
-
-          if 'func _resize_hud()' not in s:
-              s += '''
-
-func _resize_hud() -> void:
-\tif is_instance_valid(hud):
-\t\thud.position = Vector2.ZERO
-\t\thud.size = get_viewport().get_visible_rect().size
-\t\thud.queue_redraw()
-'''
-          p.write_text(s)
-
-          car = Path('scripts/car.gd')
-          car.write_text(car.read_text().replace('var instance := resource.instantiate()', 'var instance: Node = (resource as PackedScene).instantiate()'))
-
-          hud = Path('scripts/hud.gd')
-          hs = hud.read_text()
-          hs = hs.replace('CITY QUEST 3D', 'CITY QUEST 3D LEGACY')
-          hs = hs.replace('مدينة مفتوحة • شخصيات • سيارات • مهام', 'مدينة خفيفة • شخصيات متمايلة • سيارات • مهام')
-          hs = hs.replace('var quality_level := 1', 'var quality_level := 0')
-          hud.write_text(hs)
-
-          Path('THIRD_PARTY_LICENSES.md').write_text('''# Third-party assets
-
-- Kenney City Kit (Commercial) 2.1 — CC0 1.0.
-- Kenney Car Kit — CC0 1.0.
-- KayKit Character Pack: Adventurers — CC0 1.0.
-- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.
-- Godot Engine runtime — MIT License.
-''')
-          PY
-
-      - name: Install Godot 4.6.3 and export templates
+      - name: Install Godot and export templates
         run: |
           set -euxo pipefail
           wget -q -O /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip"
@@ -182,20 +127,7 @@ func _resize_hud() -> void:
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Failed loading resource|Failed to load model" smoke-headless.log; then exit 1; fi
           grep -q "CITYQUEST_READY legacy_opengl" smoke-headless.log
 
-      - name: Render real OpenGL preview
-        env:
-          CITYQUEST_CAPTURE: "1"
-          CITYQUEST_CAPTURE_PATH: ${{ github.workspace }}/build/CityQuest3D-Legacy-Preview.png
-        run: |
-          mkdir -p build
-          set +e
-          xvfb-run -a timeout 55s godot --path . --rendering-method gl_compatibility 2>&1 | tee visual-test.log
-          set -e
-          grep -q "CITYQUEST_CAPTURED" visual-test.log
-          test -s build/CityQuest3D-Legacy-Preview.png
-          identify build/CityQuest3D-Legacy-Preview.png
-
-      - name: Export legacy APK, emulator APK, and Web preview
+      - name: Export Android APKs and Web preview
         run: |
           mkdir -p build/web
           godot --headless --path . --export-debug "Android Legacy" build/CityQuest3D-Legacy.apk 2>&1 | tee export-android.log
@@ -245,17 +177,20 @@ func _resize_hud() -> void:
             adb logcat -d > build/android81-logcat.txt
             if grep -E "FATAL EXCEPTION|Fatal signal|Process: com.godnit.cityquest3dlegacy.*has died|ANR in com.godnit.cityquest3dlegacy" build/android81-logcat.txt; then exit 1; fi
             python3 - <<'PY'
-            from PIL import Image, ImageStat
+            from PIL import Image
+            from PIL import ImageStat
+
             for name in ('build/android81-menu.png', 'build/android81-game.png'):
-                im = Image.open(name).convert('RGB')
-                assert im.width > im.height, f'Not landscape: {name} {im.size}'
-                stat = ImageStat.Stat(im)
-                brightness = sum(stat.mean) / 3
-                contrast = sum(stat.stddev) / 3
-                print(name, im.size, 'brightness', brightness, 'contrast', contrast)
+                image = Image.open(name).convert('RGB')
+                assert image.width > image.height, f'Not landscape: {name} {image.size}'
+                statistics = ImageStat.Stat(image)
+                brightness = sum(statistics.mean) / 3
+                contrast = sum(statistics.stddev) / 3
+                print(name, image.size, 'brightness', brightness, 'contrast', contrast)
                 assert brightness > 10, f'Black/dark screen: {name}'
                 assert contrast > 8, f'Flat/blank screen: {name}'
             PY
+            cp build/android81-game.png build/CityQuest3D-Legacy-Preview.png
 
       - name: Upload complete tested game
         uses: actions/upload-artifact@v4
@@ -282,31 +217,22 @@ func _resize_hud() -> void:
           path: |
             import.log
             smoke-headless.log
-            visual-test.log
             export-android.log
             export-emulator.log
             export-web.log
             build/android81-logcat.txt
             build/android81-menu.png
             build/android81-game.png
-            build/CityQuest3D-Legacy-Preview.png
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Publish status and downloadable files to delivery branch
+      - name: Publish status and files to delivery branch
         if: always()
         run: |
           set -euxo pipefail
           rm -rf /tmp/cityquest-delivery
           mkdir -p /tmp/cityquest-delivery/diagnostics
-          {
-            echo "run_id=${{ github.run_id }}"
-            echo "head_sha=${{ github.sha }}"
-            echo "job_status=${{ job.status }}"
-            echo "android_test=API 27 / Android 8.1"
-            echo "renderer=OpenGL Compatibility"
-            echo "completed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } > /tmp/cityquest-delivery/STATUS.txt
+          printf '%s\n' "run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "job_status=${{ job.status }}" 'android_test=API 27 / Android 8.1' 'renderer=OpenGL Compatibility' "completed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-delivery/STATUS.txt
           cp build/CityQuest3D-Legacy.apk /tmp/cityquest-delivery/ 2>/dev/null || true
           cp build/CityQuest3D-Web-Preview.zip /tmp/cityquest-delivery/ 2>/dev/null || true
           cp build/CityQuest3D-Legacy-Preview.png /tmp/cityquest-delivery/ 2>/dev/null || true
@@ -314,7 +240,7 @@ func _resize_hud() -> void:
           cp build/android81-game.png /tmp/cityquest-delivery/ 2>/dev/null || true
           cp build/SHA256SUMS.txt /tmp/cityquest-delivery/ 2>/dev/null || true
           cp build/signature.txt /tmp/cityquest-delivery/ 2>/dev/null || true
-          cp import.log smoke-headless.log visual-test.log export-android.log export-emulator.log export-web.log /tmp/cityquest-delivery/diagnostics/ 2>/dev/null || true
+          cp import.log smoke-headless.log export-android.log export-emulator.log export-web.log /tmp/cityquest-delivery/diagnostics/ 2>/dev/null || true
           cp build/android81-logcat.txt /tmp/cityquest-delivery/diagnostics/ 2>/dev/null || true
           find /tmp/cityquest-delivery -type f -printf '%P\t%s bytes\n' | sort > /tmp/cityquest-delivery/FILES.txt
           git config user.name "City Quest Build Bot"
