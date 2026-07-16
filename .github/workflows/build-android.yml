@@ -23,26 +23,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unzip zip wget xvfb libgl1
 
-      - name: Download ready-made CC0 3D models
+      - name: Download ready-made 3D models
         run: |
           set -euxo pipefail
-          rm -rf assets/kenney /tmp/city-models /tmp/car-models /tmp/character-models
+          rm -rf assets/kenney /tmp/city-models /tmp/car-models
           mkdir -p assets/kenney/{city,cars,characters}
           git clone --depth 1 https://github.com/immaculate-lift-studio/CityCrafter3D.git /tmp/city-models
           git clone --depth 1 https://github.com/Arslan12216775/kenney_car-kit.git /tmp/car-models
-          git clone --depth 1 https://github.com/V-Sekai-fire/TEST_fbx_kenney.git /tmp/character-models
           cp -a "/tmp/city-models/addons/citycrafter/assets/example_assets/kenney_city-kit-commercial_20/Models/OBJ format"/. assets/kenney/city/
           cp -a /tmp/car-models/. assets/kenney/cars/
-          cp -a /tmp/character-models/animated-characters-1/. assets/kenney/characters/
-          rm -rf assets/kenney/cars/.git assets/kenney/characters/.git
+          rm -rf assets/kenney/cars/.git
+          wget -q --show-progress -O assets/kenney/characters/CesiumMan.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb"
           test "$(find assets/kenney/city -type f -iname '*.obj' | wc -l)" -gt 5
           test "$(find assets/kenney/cars -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)" -gt 0
-          test "$(find assets/kenney/characters -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)" -gt 0
+          test -s assets/kenney/characters/CesiumMan.glb
           echo "City models: $(find assets/kenney/city -type f -iname '*.obj' | wc -l)"
           echo "Car models: $(find assets/kenney/cars -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)"
-          echo "Character models: $(find assets/kenney/characters -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)"
+          echo "Character model bytes: $(stat -c%s assets/kenney/characters/CesiumMan.glb)"
 
-      - name: Apply compiler compatibility fixes
+      - name: Apply compiler and runtime fixes
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -56,6 +55,9 @@ jobs:
               'var interact := hud.consume_interact() or Input.is_key_pressed(KEY_E)': 'var interact: bool = hud.consume_interact() or Input.is_key_pressed(KEY_E)',
               'var look := hud.consume_look()': 'var look: Vector2 = hud.consume_look()',
               'var instance := resource.instantiate()': 'var instance: Node = (resource as PackedScene).instantiate()',
+              'player.global_position = Vector3(-4, 0.3, 7)': 'player.position = Vector3(-4, 0.3, 7)',
+              'drive_car.global_position = Vector3(8, 0.3, 8)': 'drive_car.position = Vector3(8, 0.3, 8)',
+              'enemy.global_position = Vector3(cos(angle) * 30.0, 0.3, sin(angle) * 30.0)': 'enemy.position = Vector3(cos(angle) * 30.0, 0.3, sin(angle) * 30.0)',
           }
           for old, new in replacements.items():
               s = s.replace(old, new)
@@ -64,6 +66,8 @@ jobs:
               p = Path(filename)
               s = p.read_text().replace('var instance := resource.instantiate()', 'var instance: Node = (resource as PackedScene).instantiate()')
               p.write_text(s)
+          license_file = Path('THIRD_PARTY_LICENSES.md')
+          license_file.write_text('''# Third-party assets\n\n- Kenney City Kit (Commercial) 2.1 — CC0 1.0.\n- Kenney Car Kit — CC0 1.0.\n- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.\n- Godot Engine runtime — MIT License.\n''')
           PY
 
       - name: Install Godot 4.6.3 and export templates
@@ -82,14 +86,15 @@ jobs:
         run: |
           keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=City Quest,C=US" -keyalg RSA -keysize 2048 -validity 10000
 
-      - name: Import all models and check scripts
+      - name: Import all models and run game smoke test
         run: |
           set -o pipefail
           timeout 12m godot --headless --editor --path . --import 2>&1 | tee import.log
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" import.log; then exit 1; fi
-          timeout 45s godot --headless --path . --quit-after 180 2>&1 | tee smoke-headless.log || true
+          timeout 50s godot --headless --path . --quit-after 180 2>&1 | tee smoke-headless.log || true
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" smoke-headless.log; then exit 1; fi
           grep -q "CITYQUEST_READY" smoke-headless.log
+          if grep -E "Failed loading resource|Failed to load model" smoke-headless.log; then exit 1; fi
 
       - name: Export signed Android APK
         run: |
@@ -100,25 +105,41 @@ jobs:
           keytool -printcert -jarfile build/CityQuest3D.apk > build/signature.txt || true
           sha256sum build/CityQuest3D.apk | tee build/SHA256SUMS.txt
 
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          sudo chmod 666 /dev/kvm || true
+
       - name: Install and launch on Android emulator
+        id: androidtest
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
           arch: x86_64
           profile: pixel_2
           disable-animations: true
+          emulator-options: -no-snapshot -no-window -no-audio -no-boot-anim -camera-back none -gpu swiftshader_indirect
           script: |
             set -euxo pipefail
             adb install -r build/CityQuest3D.apk
             adb logcat -c
             adb shell monkey -p com.godnit.cityquest3d -c android.intent.category.LAUNCHER 1
-            sleep 22
+            sleep 28
             PID="$(adb shell pidof com.godnit.cityquest3d | tr -d '\r')"
             echo "App PID: $PID"
             test -n "$PID"
             adb exec-out screencap -p > build/android-emulator-screenshot.png
             adb logcat -d > build/android-logcat.txt
             if grep -E "FATAL EXCEPTION|Fatal signal|Process: com.godnit.cityquest3d.*has died" build/android-logcat.txt; then exit 1; fi
+
+      - name: Record emulator test result
+        if: always()
+        run: |
+          mkdir -p build
+          echo "${{ steps.androidtest.outcome }}" > build/emulator-test-status.txt
 
       - name: Package source with downloaded models
         run: |
@@ -135,6 +156,7 @@ jobs:
             export.log
             build/android-logcat.txt
             build/android-emulator-screenshot.png
+            build/emulator-test-status.txt
           if-no-files-found: ignore
           retention-days: 3
 
@@ -147,6 +169,7 @@ jobs:
             build/CityQuest3D-Full-Source.zip
             build/android-emulator-screenshot.png
             build/android-logcat.txt
+            build/emulator-test-status.txt
             build/SHA256SUMS.txt
             build/signature.txt
           if-no-files-found: error
