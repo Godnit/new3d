@@ -17,7 +17,6 @@ var world_root: Node3D
 var city_paths: Array[String] = []
 var car_paths: Array[String] = []
 var character_paths: Array[String] = []
-var detail_paths: Array[String] = []
 
 var camera_yaw: float = 0.55
 var camera_pitch: float = -0.22
@@ -28,17 +27,15 @@ var coin_count: int = 0
 var kill_count: int = 0
 var mission_stage: int = 0
 var quality_level: int = 0
-var random: RandomNumberGenerator = RandomNumberGenerator.new()
 
 func _ready() -> void:
 	Engine.max_fps = 30
 	if OS.has_feature("mobile"):
 		DisplayServer.screen_set_orientation(DisplayServer.SCREEN_LANDSCAPE)
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-	random.seed = 736281
 	_create_hud()
 	_create_camera_and_lighting()
-	call_deferred("_build_game")
+	_build_game_direct()
 
 func _create_hud() -> void:
 	var layer: CanvasLayer = CanvasLayer.new()
@@ -47,18 +44,27 @@ func _create_hud() -> void:
 	hud = HUDScript.new()
 	layer.add_child(hud)
 	hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hud.position = Vector2.ZERO
+	hud.size = get_viewport().get_visible_rect().size
+	get_viewport().size_changed.connect(_resize_hud)
 	hud.start_requested.connect(_start_game)
 	hud.restart_requested.connect(_restart_game)
 	hud.pause_requested.connect(_toggle_pause)
 	hud.quality_requested.connect(_set_quality)
 	hud.quality_level = 0
 
+func _resize_hud() -> void:
+	if is_instance_valid(hud):
+		hud.position = Vector2.ZERO
+		hud.size = get_viewport().get_visible_rect().size
+		hud.queue_redraw()
+
 func _create_camera_and_lighting() -> void:
 	camera = Camera3D.new()
 	camera.current = true
 	camera.fov = 72.0
 	camera.near = 0.15
-	camera.far = 125.0
+	camera.far = 105.0
 	add_child(camera)
 
 	var environment_node: WorldEnvironment = WorldEnvironment.new()
@@ -66,171 +72,135 @@ func _create_camera_and_lighting() -> void:
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = Color(0.16, 0.35, 0.58)
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.72, 0.78, 0.86)
-	environment.ambient_light_energy = 0.78
+	environment.ambient_light_color = Color(0.76, 0.8, 0.88)
+	environment.ambient_light_energy = 0.85
 	environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	environment_node.environment = environment
 	add_child(environment_node)
 
 	var sun: DirectionalLight3D = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48.0, -30.0, 0.0)
-	sun.light_energy = 1.1
+	sun.light_energy = 1.05
 	sun.shadow_enabled = false
 	add_child(sun)
 
-func _build_game() -> void:
-	hud.loading_text = "تجهيز نسخة OpenGL المتوافقة مع هاتفك..."
-	await get_tree().process_frame
-	_scan_assets()
+func _build_game_direct() -> void:
+	# The previous build recursively scanned and loaded dozens of source models at
+	# runtime. That could leave low-memory Android 8 phones on the loading screen.
+	# This build reads the tiny generated manifest and loads only three resources:
+	# one building, one car and one GLB character, then reuses their instances.
+	_read_manifest()
 	world_root = Node3D.new()
-	world_root.name = "LegacyOpenCity"
+	world_root.name = "DirectCity"
 	add_child(world_root)
 	_build_ground_and_roads()
-	await get_tree().process_frame
-	hud.loading_text = "إضافة المباني والسيارات الجاهزة..."
-	_build_city()
-	await get_tree().process_frame
-	hud.loading_text = "إضافة الشخصيات المتحركة والمهام..."
-	_build_actors()
-	await get_tree().process_frame
+
+	var building_resource: Resource = _load_first(city_paths)
+	var car_resource: Resource = _load_first(car_paths)
+	var character_resource: Resource = _load_character()
+
+	_build_city_fast(building_resource)
+	_build_actors_fast(character_resource, car_resource)
 	_build_collectibles_and_checkpoint()
-	hud.assets_ready = true
-	hud.loading_text = "جاهزة — OpenGL / Landscape"
 	_update_mission()
 	_update_camera(1.0)
-	print("CITYQUEST_READY legacy_opengl buildings=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())
 
-func _scan_assets() -> void:
-	var all_city: Array[String] = []
-	var all_cars: Array[String] = []
-	var all_characters: Array[String] = []
-	_scan_dir("res://assets/kenney/city", all_city)
-	_scan_dir("res://assets/kenney/cars", all_cars)
-	_scan_dir("res://assets/kaykit", all_characters)
-	_scan_dir("res://assets/kenney/characters", all_characters)
+	hud.assets_ready = true
+	hud.loading_text = "جاهزة"
+	game_started = true
+	hud.set_mode(hud.MODE_PLAY)
+	print("CITYQUEST_READY direct_start city=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())
 
-	for path: String in all_city:
-		var lower: String = path.to_lower()
-		if "building" in lower or "skyscraper" in lower or "shop" in lower or "house" in lower:
-			city_paths.append(path)
-		elif "tree" in lower or "bench" in lower or "light" in lower or "hydrant" in lower or "trash" in lower or "fountain" in lower:
-			detail_paths.append(path)
-
-	for path: String in all_cars:
-		var lower: String = path.to_lower()
-		if "car" in lower or "sedan" in lower or "truck" in lower or "vehicle" in lower or "taxi" in lower or "racer" in lower:
-			car_paths.append(path)
-
-	for path: String in all_characters:
-		var lower: String = path.to_lower()
-		var rejected: bool = "animation" in lower or "weapon" in lower or "accessor" in lower or "sword" in lower or "shield" in lower or "axe" in lower or "bow" in lower or "staff" in lower or "helmet" in lower
-		var likely_character: bool = "character" in lower or "barbar" in lower or "knight" in lower or "rogue" in lower or "mage" in lower or "ranger" in lower or "cesiumman" in lower or "rig_" in lower
-		if not rejected and likely_character and lower.get_extension() in ["glb", "gltf", "fbx", "obj"]:
-			character_paths.append(path)
-
-	if city_paths.is_empty():
-		city_paths = all_city
-	if car_paths.is_empty():
-		car_paths = all_cars
-	if character_paths.is_empty():
-		character_paths = all_characters
-	city_paths.sort()
-	car_paths.sort()
-	character_paths.sort()
-	detail_paths.sort()
-
-func _scan_dir(path: String, output: Array[String]) -> void:
-	var dir: DirAccess = DirAccess.open(path)
-	if dir == null:
+func _read_manifest() -> void:
+	var file: FileAccess = FileAccess.open("res://assets/model_manifest.json", FileAccess.READ)
+	if file == null:
+		push_warning("Model manifest missing; fallback visuals will be used")
 		return
-	dir.list_dir_begin()
-	var file_name: String = dir.get_next()
-	while file_name != "":
-		if not file_name.begins_with("."):
-			var full: String = path.path_join(file_name)
-			if dir.current_is_dir():
-				_scan_dir(full, output)
-			else:
-				var ext: String = file_name.get_extension().to_lower()
-				if ext in ["obj", "glb", "gltf", "fbx"]:
-					output.append(full)
-		file_name = dir.get_next()
-	dir.list_dir_end()
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if not (parsed is Dictionary):
+		push_warning("Model manifest is invalid")
+		return
+	var data: Dictionary = parsed
+	city_paths = _to_string_array(data.get("city", []))
+	car_paths = _to_string_array(data.get("cars", []))
+	character_paths = _to_string_array(data.get("characters", []))
+
+func _to_string_array(value: Variant) -> Array[String]:
+	var output: Array[String] = []
+	if value is Array:
+		for item: Variant in value:
+			if item is String:
+				output.append(item)
+	return output
+
+func _load_first(paths: Array[String]) -> Resource:
+	if paths.is_empty():
+		return null
+	return load(paths[0])
+
+func _load_character() -> Resource:
+	# Prefer the single compact GLB. FBX character packs were the main source of
+	# long startup times on the target phone.
+	for path: String in character_paths:
+		if "cesiumman" in path.to_lower():
+			return load(path)
+	for path: String in character_paths:
+		if path.get_extension().to_lower() == "glb":
+			return load(path)
+	return null
 
 func _build_ground_and_roads() -> void:
-	_add_box(Vector3(0.0, -0.34, 0.0), Vector3(92.0, 0.55, 92.0), Color(0.18, 0.34, 0.14), true)
-	var road_positions: Array[float] = [-24.0, 0.0, 24.0]
+	_add_box(Vector3(0.0, -0.34, 0.0), Vector3(70.0, 0.55, 70.0), Color(0.18, 0.34, 0.14), true)
+	var road_positions: Array[float] = [-18.0, 0.0, 18.0]
 	for road_pos: float in road_positions:
-		_add_box(Vector3(road_pos, -0.045, 0.0), Vector3(7.2, 0.08, 82.0), Color(0.075, 0.085, 0.1), false)
-		_add_box(Vector3(0.0, -0.04, road_pos), Vector3(82.0, 0.08, 7.2), Color(0.075, 0.085, 0.1), false)
-		for mark: int in range(-38, 39, 8):
-			_add_box(Vector3(road_pos, 0.015, float(mark)), Vector3(0.12, 0.02, 2.6), Color(0.95, 0.76, 0.18), false)
-			_add_box(Vector3(float(mark), 0.02, road_pos), Vector3(2.6, 0.02, 0.12), Color(0.95, 0.76, 0.18), false)
-	var cells: Array[float] = [-12.0, 12.0]
-	for block_x: float in cells:
-		for block_z: float in cells:
-			_add_box(Vector3(block_x, -0.005, block_z), Vector3(15.5, 0.12, 15.5), Color(0.34, 0.36, 0.37), false)
+		_add_box(Vector3(road_pos, -0.045, 0.0), Vector3(6.8, 0.08, 64.0), Color(0.075, 0.085, 0.1), false)
+		_add_box(Vector3(0.0, -0.04, road_pos), Vector3(64.0, 0.08, 6.8), Color(0.075, 0.085, 0.1), false)
+		for mark: int in range(-29, 30, 8):
+			_add_box(Vector3(road_pos, 0.015, float(mark)), Vector3(0.12, 0.02, 2.4), Color(0.95, 0.76, 0.18), false)
+			_add_box(Vector3(float(mark), 0.02, road_pos), Vector3(2.4, 0.02, 0.12), Color(0.95, 0.76, 0.18), false)
 
-func _build_city() -> void:
-	var cells: Array[float] = [-12.0, 12.0]
-	var model_index: int = 0
-	for block_x: float in cells:
-		for block_z: float in cells:
-			var placements: Array[Vector2] = [Vector2(-4.0, -4.0), Vector2(4.0, 3.8)]
-			for local: Vector2 in placements:
-				if city_paths.is_empty():
-					_add_fallback_building(Vector3(block_x + local.x, 0.0, block_z + local.y), random.randf_range(6.0, 10.0))
-				else:
-					var path: String = city_paths[model_index % city_paths.size()]
-					model_index += 1
-					_add_imported_prop(path, Vector3(block_x + local.x, 0.0, block_z + local.y), random.randf_range(6.5, 10.5), true, random.randf_range(-PI, PI))
-			if not detail_paths.is_empty():
-				var detail_path: String = detail_paths[model_index % detail_paths.size()]
-				_add_imported_prop(detail_path, Vector3(block_x + random.randf_range(-6.0, 6.0), 0.0, block_z + random.randf_range(-6.0, 6.0)), 2.1, false, random.randf_range(-PI, PI))
+func _build_city_fast(building_resource: Resource) -> void:
+	var placements: Array[Vector3] = [
+		Vector3(-10.5, 0.0, -10.5), Vector3(10.5, 0.0, -10.5),
+		Vector3(-10.5, 0.0, 10.5), Vector3(10.5, 0.0, 10.5),
+		Vector3(-27.0, 0.0, 27.0), Vector3(27.0, 0.0, -27.0)
+	]
+	for index: int in range(placements.size()):
+		var height: float = 7.0 + float(index % 3) * 1.4
+		if building_resource != null:
+			_add_resource_prop(building_resource, placements[index], height, true, float(index) * 0.72)
+		else:
+			_add_fallback_building(placements[index], height)
 
-func _build_actors() -> void:
-	var player_resource: Resource = _load_safe(_pick_path(character_paths, 0))
+func _build_actors_fast(character_resource: Resource, car_resource: Resource) -> void:
 	player = PlayerScript.new()
 	player.name = "Player"
 	world_root.add_child(player)
 	player.position = Vector3(-4.0, 0.3, 7.0)
-	player.setup_visual(player_resource)
+	player.setup_visual(character_resource if character_resource != null else _fallback_character_mesh())
 	player.health_changed.connect(_on_health_changed)
 	player.died.connect(_on_player_died)
 
-	var car_resource: Resource = _load_safe(_pick_path(car_paths, 0))
 	drive_car = CarScript.new()
 	drive_car.name = "DriveCar"
 	world_root.add_child(drive_car)
-	drive_car.position = Vector3(8.0, 0.3, 8.0)
+	drive_car.position = Vector3(7.5, 0.3, 7.5)
 	drive_car.rotation.y = -0.6
-	drive_car.setup_visual(car_resource, Color(0.85, 0.03, 0.02))
+	drive_car.setup_visual(car_resource if car_resource != null else _fallback_car_mesh(), Color(0.85, 0.03, 0.02))
 
-	for i: int in range(3):
+	for i: int in range(2):
 		var enemy: CharacterBody3D = EnemyScript.new()
 		enemy.name = "Enemy_%d" % i
 		world_root.add_child(enemy)
-		var angle: float = float(i) / 3.0 * TAU
-		enemy.position = Vector3(cos(angle) * 23.0, 0.3, sin(angle) * 23.0)
-		var enemy_resource: Resource = _load_safe(_pick_path(character_paths, i + 1))
-		enemy.setup(enemy_resource, player)
+		enemy.position = Vector3(-19.0 if i == 0 else 19.0, 0.3, -15.0 if i == 0 else 16.0)
+		enemy.setup(character_resource if character_resource != null else _fallback_character_mesh(), player)
 		enemy.defeated.connect(_on_enemy_defeated)
 		enemies.append(enemy)
 
-	for i: int in range(2):
-		if car_paths.is_empty():
-			break
-		var decorative: Node3D = _create_visual(_load_safe(_pick_path(car_paths, i + 1)))
-		if decorative:
-			world_root.add_child(decorative)
-			decorative.position = Vector3(-18.0 + float(i) * 36.0, 0.1, -5.0 if i % 2 == 0 else 5.0)
-			decorative.rotation.y = 0.0 if i % 2 == 0 else PI
-			_fit_visual(decorative, 1.35)
-
 func _build_collectibles_and_checkpoint() -> void:
 	var positions: Array[Vector3] = [
-		Vector3(-18.0, 1.0, -5.0), Vector3(-8.0, 1.0, 18.0), Vector3(8.0, 1.0, -18.0),
-		Vector3(18.0, 1.0, 8.0), Vector3(-18.0, 1.0, 18.0), Vector3(18.0, 1.0, -18.0)
+		Vector3(-15.0, 1.0, -5.0), Vector3(-7.0, 1.0, 15.0),
+		Vector3(10.0, 1.0, -15.0), Vector3(15.0, 1.0, 9.0)
 	]
 	for pos: Vector3 in positions:
 		var area: Area3D = Area3D.new()
@@ -250,7 +220,7 @@ func _build_collectibles_and_checkpoint() -> void:
 		material.albedo_color = Color(0.08, 0.95, 1.0)
 		material.emission_enabled = true
 		material.emission = Color(0.05, 0.65, 0.95)
-		material.emission_energy_multiplier = 1.25
+		material.emission_energy_multiplier = 1.15
 		mesh_node.material_override = material
 		area.add_child(mesh_node)
 		world_root.add_child(area)
@@ -258,7 +228,7 @@ func _build_collectibles_and_checkpoint() -> void:
 		coins.append(area)
 
 	checkpoint = Area3D.new()
-	checkpoint.position = Vector3(31.0, 0.2, 31.0)
+	checkpoint.position = Vector3(28.0, 0.2, 28.0)
 	var cp_shape_node: CollisionShape3D = CollisionShape3D.new()
 	var cp_shape: CylinderShape3D = CylinderShape3D.new()
 	cp_shape.radius = 3.5
@@ -276,7 +246,7 @@ func _build_collectibles_and_checkpoint() -> void:
 	ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	ring_material.emission_enabled = true
 	ring_material.emission = Color(0.08, 0.8, 0.2)
-	ring_material.emission_energy_multiplier = 1.4
+	ring_material.emission_energy_multiplier = 1.3
 	ring.material_override = ring_material
 	checkpoint.add_child(ring)
 	world_root.add_child(checkpoint)
@@ -342,7 +312,6 @@ func _start_game() -> void:
 	game_started = true
 	game_paused = false
 	hud.set_mode(hud.MODE_PLAY)
-	_play_tone(440.0, 0.12, 0.18)
 
 func _restart_game() -> void:
 	get_tree().reload_current_scene()
@@ -365,7 +334,6 @@ func _toggle_vehicle() -> void:
 		player.global_position = drive_car.global_position + drive_car.global_transform.basis.x * 2.3 + Vector3.UP * 0.2
 		player.set_active(true)
 		hud.vehicle_mode = false
-		_play_tone(360.0, 0.10, 0.15)
 		return
 	if player.global_position.distance_to(drive_car.global_position) < 3.4:
 		in_vehicle = true
@@ -375,7 +343,6 @@ func _toggle_vehicle() -> void:
 		if mission_stage == 2:
 			mission_stage = 3
 			_update_mission()
-		_play_tone(620.0, 0.10, 0.18)
 
 func _attack_nearby() -> void:
 	var best: CharacterBody3D
@@ -389,7 +356,6 @@ func _attack_nearby() -> void:
 			best_distance = distance
 	if best:
 		best.take_damage(50)
-		_play_tone(170.0, 0.08, 0.22)
 
 func _on_health_changed(value: int) -> void:
 	hud.health = value
@@ -397,14 +363,12 @@ func _on_health_changed(value: int) -> void:
 func _on_player_died() -> void:
 	game_paused = true
 	hud.set_mode(hud.MODE_LOSE)
-	_play_tone(75.0, 0.38, 0.2)
 
 func _on_enemy_defeated(enemy: CharacterBody3D) -> void:
 	enemies.erase(enemy)
 	kill_count += 1
 	hud.kills = kill_count
-	player.heal(8)
-	_play_tone(520.0, 0.14, 0.2)
+	player.heal(10)
 	_check_mission_progress()
 
 func _on_coin_body_entered(body: Node3D, area: Area3D) -> void:
@@ -416,15 +380,14 @@ func _on_coin_body_entered(body: Node3D, area: Area3D) -> void:
 	area.queue_free()
 	coin_count += 1
 	hud.coins = coin_count
-	player.heal(4)
-	_play_tone(780.0 + float(coin_count) * 35.0, 0.10, 0.18)
+	player.heal(5)
 	_check_mission_progress()
 
 func _check_mission_progress() -> void:
-	if mission_stage == 0 and coin_count >= 4:
+	if mission_stage == 0 and coin_count >= 3:
 		mission_stage = 1
 		_update_mission()
-	elif mission_stage == 1 and kill_count >= 3:
+	elif mission_stage == 1 and kill_count >= 2:
 		mission_stage = 2
 		_update_mission()
 	elif mission_stage == 3 and in_vehicle and drive_car.global_position.distance_to(checkpoint.global_position) < 4.8:
@@ -432,14 +395,13 @@ func _check_mission_progress() -> void:
 		_update_mission()
 		game_paused = true
 		hud.set_mode(hud.MODE_WIN)
-		_play_tone(960.0, 0.45, 0.24)
 
 func _update_mission() -> void:
 	match mission_stage:
 		0:
-			hud.mission_text = "المهمة 1: اجمع 4 بلورات (%d/4)" % coin_count
+			hud.mission_text = "المهمة 1: اجمع 3 بلورات (%d/3)" % coin_count
 		1:
-			hud.mission_text = "المهمة 2: اهزم 3 أعداء (%d/3)" % kill_count
+			hud.mission_text = "المهمة 2: اهزم عدوين (%d/2)" % kill_count
 		2:
 			hud.mission_text = "المهمة 3: اقترب من السيارة واضغط ركوب"
 		3:
@@ -480,10 +442,10 @@ func _animate_collectibles(delta: float) -> void:
 	if is_instance_valid(checkpoint):
 		checkpoint.rotate_y(delta * 0.25)
 
-func _add_imported_prop(path: String, pos: Vector3, target_height: float, collision: bool, yaw: float) -> void:
-	var resource: Resource = _load_safe(path)
+func _add_resource_prop(resource: Resource, pos: Vector3, target_height: float, collision: bool, yaw: float) -> void:
 	var visual: Node3D = _create_visual(resource)
 	if visual == null:
+		_add_fallback_building(pos, target_height)
 		return
 	world_root.add_child(visual)
 	visual.position = pos
@@ -512,10 +474,7 @@ func _add_box(pos: Vector3, box_size: Vector3, color: Color, collision: bool) ->
 	material.albedo_color = color
 	material.roughness = 0.86
 	mesh_node.material_override = material
-	if world_root:
-		world_root.add_child(mesh_node)
-	else:
-		add_child(mesh_node)
+	world_root.add_child(mesh_node)
 	if collision:
 		var body: StaticBody3D = StaticBody3D.new()
 		body.position = pos
@@ -524,10 +483,7 @@ func _add_box(pos: Vector3, box_size: Vector3, color: Color, collision: bool) ->
 		shape.size = box_size
 		shape_node.shape = shape
 		body.add_child(shape_node)
-		if world_root:
-			world_root.add_child(body)
-		else:
-			add_child(body)
+		world_root.add_child(body)
 	return mesh_node
 
 func _create_visual(resource: Resource) -> Node3D:
@@ -561,42 +517,13 @@ func _find_mesh(node: Node) -> MeshInstance3D:
 			return found
 	return null
 
-func _load_safe(path: String) -> Resource:
-	if path == "":
-		return _fallback_character_mesh()
-	var resource: Resource = load(path)
-	if resource == null:
-		push_warning("Failed to load model: " + path)
-		return _fallback_character_mesh()
-	return resource
-
-func _pick_path(paths: Array[String], index: int) -> String:
-	if paths.is_empty():
-		return ""
-	return paths[index % paths.size()]
-
 func _fallback_character_mesh() -> Mesh:
 	var mesh: CapsuleMesh = CapsuleMesh.new()
 	mesh.radius = 0.4
 	mesh.height = 1.7
 	return mesh
 
-func _play_tone(frequency: float, duration: float, volume: float) -> void:
-	var rate: int = 22050
-	var sample_count: int = int(duration * float(rate))
-	var bytes: PackedByteArray = PackedByteArray()
-	bytes.resize(sample_count * 2)
-	for i: int in range(sample_count):
-		var fade: float = 1.0 - float(i) / float(maxi(sample_count, 1))
-		var sample: float = sin(TAU * frequency * float(i) / float(rate)) * fade * volume
-		bytes.encode_s16(i * 2, int(clampf(sample, -1.0, 1.0) * 32767.0))
-	var stream: AudioStreamWAV = AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = rate
-	stream.stereo = false
-	stream.data = bytes
-	var audio: AudioStreamPlayer = AudioStreamPlayer.new()
-	audio.stream = stream
-	add_child(audio)
-	audio.finished.connect(audio.queue_free)
-	audio.play()
+func _fallback_car_mesh() -> Mesh:
+	var mesh: BoxMesh = BoxMesh.new()
+	mesh.size = Vector3(1.8, 1.0, 3.8)
+	return mesh
