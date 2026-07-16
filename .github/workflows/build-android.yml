@@ -23,25 +23,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unzip zip wget xvfb libgl1
 
-      - name: Download CC0 3D asset packs
+      - name: Download ready-made CC0 3D models
         run: |
           set -euxo pipefail
-          rm -rf assets/kenney /tmp/kenney-assets
-          mkdir -p assets/kenney/{city,cars,characters} /tmp/kenney-assets/{city,cars,characters}
-          wget -q --show-progress -O /tmp/city.zip "https://kenney.nl/media/pages/assets/city-kit-commercial/a742d900eb-1753115042/kenney_city-kit-commercial_2.1.zip"
-          wget -q --show-progress -O /tmp/cars.zip "https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip"
-          wget -q --show-progress -O /tmp/characters.zip "https://kenney.nl/media/pages/assets/animated-characters-1/8c3221c3de-1694862559/kenney_animated-characters-1.zip"
-          unzip -q /tmp/city.zip -d /tmp/kenney-assets/city
-          unzip -q /tmp/cars.zip -d /tmp/kenney-assets/cars
-          unzip -q /tmp/characters.zip -d /tmp/kenney-assets/characters
-          CITY_DIR="$(find /tmp/kenney-assets/city -type d -iname 'OBJ format' | head -n 1)"
-          CARS_DIR="$(find /tmp/kenney-assets/cars -type d -iname 'OBJ format' | head -n 1)"
-          test -n "$CITY_DIR" && cp -a "$CITY_DIR"/. assets/kenney/city/
-          test -n "$CARS_DIR" && cp -a "$CARS_DIR"/. assets/kenney/cars/
-          cp -a /tmp/kenney-assets/characters/. assets/kenney/characters/
-          echo "City files: $(find assets/kenney/city -type f | wc -l)"
-          echo "Car files: $(find assets/kenney/cars -type f | wc -l)"
-          echo "Character files: $(find assets/kenney/characters -type f | wc -l)"
+          rm -rf assets/kenney /tmp/city-models /tmp/car-models /tmp/character-models
+          mkdir -p assets/kenney/{city,cars,characters}
+          git clone --depth 1 https://github.com/immaculate-lift-studio/CityCrafter3D.git /tmp/city-models
+          git clone --depth 1 https://github.com/Arslan12216775/kenney_car-kit.git /tmp/car-models
+          git clone --depth 1 https://github.com/V-Sekai-fire/TEST_fbx_kenney.git /tmp/character-models
+          cp -a "/tmp/city-models/addons/citycrafter/assets/example_assets/kenney_city-kit-commercial_20/Models/OBJ format"/. assets/kenney/city/
+          cp -a /tmp/car-models/. assets/kenney/cars/
+          cp -a /tmp/character-models/animated-characters-1/. assets/kenney/characters/
+          rm -rf assets/kenney/cars/.git assets/kenney/characters/.git
+          test "$(find assets/kenney/city -type f -iname '*.obj' | wc -l)" -gt 5
+          test "$(find assets/kenney/cars -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)" -gt 0
+          test "$(find assets/kenney/characters -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)" -gt 0
+          echo "City models: $(find assets/kenney/city -type f -iname '*.obj' | wc -l)"
+          echo "Car models: $(find assets/kenney/cars -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)"
+          echo "Character models: $(find assets/kenney/characters -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)"
 
       - name: Install Godot 4.6.3 and export templates
         run: |
