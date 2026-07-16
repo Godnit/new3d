@@ -69,10 +69,11 @@ jobs:
           wget -q -O /tmp/t.tpz https://github.com/godotengine/godot/releases/download/3.5.3-stable/Godot_v3.5.3-stable_export_templates.tpz
           unzip -q /tmp/g.zip -d /tmp/g
           sudo install -m755 /tmp/g/Godot_v3.5.3-stable_x11.64 /usr/local/bin/godot3
-          mkdir -p "$HOME/.local/share/godot/templates/3.5.3.stable" /tmp/t "$HOME/.android"
+          mkdir -p "$HOME/.local/share/godot/templates/3.5.3.stable" /tmp/t "$HOME/.android" "$HOME/.config/godot"
           unzip -q /tmp/t.tpz -d /tmp/t
           cp -a /tmp/t/templates/. "$HOME/.local/share/godot/templates/3.5.3.stable/"
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=CityQuest,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          cp godot3/editor_settings-3.tres "$HOME/.config/godot/editor_settings-3.tres"
           godot3 --version
 
       - name: Import and smoke-test under Xvfb
@@ -93,6 +94,7 @@ jobs:
           test -s build/CityQuest3D-GLES2.apk
           test -s build/CityQuest3D-GLES2-Emulator.apk
           unzip -t build/CityQuest3D-GLES2.apk
+          keytool -printcert -jarfile build/CityQuest3D-GLES2.apk > build/signature.txt
           sha256sum build/CityQuest3D-GLES2.apk > build/SHA256SUMS.txt
           zip -qr build/CityQuest3D-GLES2-Source.zip godot3
 
@@ -137,6 +139,7 @@ jobs:
             build/android81-game.png
             build/android81-logcat.txt
             build/SHA256SUMS.txt
+            build/signature.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -160,7 +163,7 @@ jobs:
         run: |
           rm -rf /tmp/out && mkdir -p /tmp/out/diagnostics
           printf '%s\n' "run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "job_status=${{ job.status }}" 'engine=Godot 3.5.3 GLES2' 'android_test=API 27 direct gameplay' > /tmp/out/STATUS.txt
-          cp build/CityQuest3D-GLES2.apk build/CityQuest3D-GLES2-Source.zip build/CityQuest3D-GLES2-Preview.png build/android81-menu.png build/android81-game.png build/SHA256SUMS.txt /tmp/out/ 2>/dev/null || true
+          cp build/CityQuest3D-GLES2.apk build/CityQuest3D-GLES2-Source.zip build/CityQuest3D-GLES2-Preview.png build/android81-menu.png build/android81-game.png build/SHA256SUMS.txt build/signature.txt /tmp/out/ 2>/dev/null || true
           cp import3.log smoke3.log export-phone3.log export-emulator3.log build/android81-logcat.txt /tmp/out/diagnostics/ 2>/dev/null || true
           find /tmp/out -type f -printf '%P\t%s bytes\n' | sort > /tmp/out/FILES.txt
           git config user.name "City Quest GLES2 Bot"
