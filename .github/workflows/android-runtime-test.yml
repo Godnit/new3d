@@ -1,10 +1,44 @@
-name: Obsolete City Quest Legacy Dispatcher
+name: Monitor City Quest Legacy Runs
 
 on:
+  push:
+    branches: [cityquest3d-legacy-tabs-v2]
   workflow_dispatch:
 
+permissions:
+  actions: read
+  contents: write
+
 jobs:
-  disabled:
+  publish-run-list:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "The legacy build now runs directly from build-android.yml."
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Capture workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 25
+          mkdir -p /tmp/cityquest-monitor
+          gh run list --repo "${{ github.repository }}" --branch cityquest3d-legacy-tabs-v2 --limit 30 --json databaseId,name,status,conclusion,event,headSha,createdAt,url > /tmp/cityquest-monitor/RUNS.json
+          {
+            echo "monitor_run_id=${{ github.run_id }}"
+            echo "head_sha=${{ github.sha }}"
+            echo "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > /tmp/cityquest-monitor/STATUS.txt
+          cat /tmp/cityquest-monitor/RUNS.json
+
+      - name: Publish monitoring data
+        run: |
+          git config user.name "City Quest Monitor"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan monitor-work
+          git rm -rf . || true
+          cp -a /tmp/cityquest-monitor/. .
+          git add -A
+          git commit -m "Publish City Quest workflow run list ${{ github.run_id }}"
+          git push origin HEAD:cityquest3d-monitor --force
