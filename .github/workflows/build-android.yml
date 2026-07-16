@@ -163,7 +163,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot -no-window -no-audio -no-boot-anim -camera-back none -gpu swiftshader_indirect
           script: |
-            set -euxo pipefail
+            set -eux
             adb install -r build/CityQuest3D-Emulator.apk
             adb logcat -c
             adb shell monkey -p com.godnit.cityquest3dlegacy -c android.intent.category.LAUNCHER 1
