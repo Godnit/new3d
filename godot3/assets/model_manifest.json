@@ -1,0 +1,11 @@
+{
+  "city": [
+    "res://assets/city/low-detail-building-n.obj"
+  ],
+  "cars": [
+    "res://assets/cars/sedan.obj"
+  ],
+  "characters": [
+    "res://assets/characters/CesiumMan.glb"
+  ]
+}

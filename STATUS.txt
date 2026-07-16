@@ -1,0 +1,6 @@
+run_id=29521638037
+head_sha=20a0786afd82bc34e6ee89a1538991b46f72d8b9
+job_status=failure
+engine=Godot 3.5.3 GLES2
+android_test=API 27 / Android 8.1 direct play
+completed_utc=2026-07-16T18:01:21Z

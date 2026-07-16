@@ -1,0 +1,6 @@
+FILES.txt	0 bytes
+STATUS.txt	194 bytes
+diagnostics/godot3-export-emulator.log	1431 bytes
+diagnostics/godot3-export-phone.log	1425 bytes
+diagnostics/godot3-import.log	1153 bytes
+diagnostics/godot3-smoke.log	1235 bytes
