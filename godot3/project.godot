@@ -21,6 +21,8 @@ quality/intended_usage/framebuffer_allocation=2
 quality/shadows/filter_mode=0
 quality/reflections/high_quality_ggx=false
 quality/filters/use_nearest_mipmap_filter=false
+vram_compression/import_etc=true
+vram_compression/import_etc2=false
 environment/default_clear_color=Color(0.08, 0.22, 0.38, 1)
 
 [physics]
