@@ -26,7 +26,6 @@ var in_vehicle: bool = false
 var coin_count: int = 0
 var kill_count: int = 0
 var mission_stage: int = 0
-var quality_level: int = 0
 
 func _ready() -> void:
 	Engine.max_fps = 30
@@ -34,7 +33,7 @@ func _ready() -> void:
 		DisplayServer.screen_set_orientation(DisplayServer.SCREEN_LANDSCAPE)
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	_create_hud()
-	_create_camera_and_lighting()
+	_create_camera()
 	_build_game_direct()
 
 func _create_hud() -> void:
@@ -59,39 +58,18 @@ func _resize_hud() -> void:
 		hud.size = get_viewport().get_visible_rect().size
 		hud.queue_redraw()
 
-func _create_camera_and_lighting() -> void:
+func _create_camera() -> void:
 	camera = Camera3D.new()
 	camera.current = true
 	camera.fov = 72.0
 	camera.near = 0.15
-	camera.far = 105.0
+	camera.far = 100.0
 	add_child(camera)
 
-	var environment_node: WorldEnvironment = WorldEnvironment.new()
-	var environment: Environment = Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.16, 0.35, 0.58)
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.76, 0.8, 0.88)
-	environment.ambient_light_energy = 0.85
-	environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-	environment_node.environment = environment
-	add_child(environment_node)
-
-	var sun: DirectionalLight3D = DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-48.0, -30.0, 0.0)
-	sun.light_energy = 1.05
-	sun.shadow_enabled = false
-	add_child(sun)
-
 func _build_game_direct() -> void:
-	# The previous build recursively scanned and loaded dozens of source models at
-	# runtime. That could leave low-memory Android 8 phones on the loading screen.
-	# This build reads the tiny generated manifest and loads only three resources:
-	# one building, one car and one GLB character, then reuses their instances.
 	_read_manifest()
 	world_root = Node3D.new()
-	world_root.name = "DirectCity"
+	world_root.name = "DirectUnshadedCity"
 	add_child(world_root)
 	_build_ground_and_roads()
 
@@ -109,7 +87,7 @@ func _build_game_direct() -> void:
 	hud.loading_text = "جاهزة"
 	game_started = true
 	hud.set_mode(hud.MODE_PLAY)
-	print("CITYQUEST_READY direct_start city=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())
+	print("CITYQUEST_READY direct_start_unshaded city=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())
 
 func _read_manifest() -> void:
 	var file: FileAccess = FileAccess.open("res://assets/model_manifest.json", FileAccess.READ)
@@ -139,8 +117,6 @@ func _load_first(paths: Array[String]) -> Resource:
 	return load(paths[0])
 
 func _load_character() -> Resource:
-	# Prefer the single compact GLB. FBX character packs were the main source of
-	# long startup times on the target phone.
 	for path: String in character_paths:
 		if "cesiumman" in path.to_lower():
 			return load(path)
@@ -150,11 +126,11 @@ func _load_character() -> Resource:
 	return null
 
 func _build_ground_and_roads() -> void:
-	_add_box(Vector3(0.0, -0.34, 0.0), Vector3(70.0, 0.55, 70.0), Color(0.18, 0.34, 0.14), true)
+	_add_box(Vector3(0.0, -0.34, 0.0), Vector3(70.0, 0.55, 70.0), Color(0.18, 0.36, 0.16), true)
 	var road_positions: Array[float] = [-18.0, 0.0, 18.0]
 	for road_pos: float in road_positions:
-		_add_box(Vector3(road_pos, -0.045, 0.0), Vector3(6.8, 0.08, 64.0), Color(0.075, 0.085, 0.1), false)
-		_add_box(Vector3(0.0, -0.04, road_pos), Vector3(64.0, 0.08, 6.8), Color(0.075, 0.085, 0.1), false)
+		_add_box(Vector3(road_pos, -0.045, 0.0), Vector3(6.8, 0.08, 64.0), Color(0.08, 0.09, 0.12), false)
+		_add_box(Vector3(0.0, -0.04, road_pos), Vector3(64.0, 0.08, 6.8), Color(0.08, 0.09, 0.12), false)
 		for mark: int in range(-29, 30, 8):
 			_add_box(Vector3(road_pos, 0.015, float(mark)), Vector3(0.12, 0.02, 2.4), Color(0.95, 0.76, 0.18), false)
 			_add_box(Vector3(float(mark), 0.02, road_pos), Vector3(2.4, 0.02, 0.12), Color(0.95, 0.76, 0.18), false)
@@ -165,12 +141,16 @@ func _build_city_fast(building_resource: Resource) -> void:
 		Vector3(-10.5, 0.0, 10.5), Vector3(10.5, 0.0, 10.5),
 		Vector3(-27.0, 0.0, 27.0), Vector3(27.0, 0.0, -27.0)
 	]
+	var colors: Array[Color] = [
+		Color(0.42, 0.55, 0.72), Color(0.58, 0.45, 0.34), Color(0.42, 0.64, 0.52),
+		Color(0.63, 0.5, 0.68), Color(0.38, 0.5, 0.6), Color(0.64, 0.58, 0.42)
+	]
 	for index: int in range(placements.size()):
 		var height: float = 7.0 + float(index % 3) * 1.4
 		if building_resource != null:
-			_add_resource_prop(building_resource, placements[index], height, true, float(index) * 0.72)
+			_add_resource_prop(building_resource, placements[index], height, true, float(index) * 0.72, colors[index])
 		else:
-			_add_fallback_building(placements[index], height)
+			_add_fallback_building(placements[index], height, colors[index])
 
 func _build_actors_fast(character_resource: Resource, car_resource: Resource) -> void:
 	player = PlayerScript.new()
@@ -186,7 +166,7 @@ func _build_actors_fast(character_resource: Resource, car_resource: Resource) ->
 	world_root.add_child(drive_car)
 	drive_car.position = Vector3(7.5, 0.3, 7.5)
 	drive_car.rotation.y = -0.6
-	drive_car.setup_visual(car_resource if car_resource != null else _fallback_car_mesh(), Color(0.85, 0.03, 0.02))
+	drive_car.setup_visual(car_resource if car_resource != null else _fallback_car_mesh(), Color(0.88, 0.05, 0.03))
 
 	for i: int in range(2):
 		var enemy: CharacterBody3D = EnemyScript.new()
@@ -216,12 +196,8 @@ func _build_collectibles_and_checkpoint() -> void:
 		var crystal: PrismMesh = PrismMesh.new()
 		crystal.size = Vector3(0.68, 1.15, 0.68)
 		mesh_node.mesh = crystal
-		var material: StandardMaterial3D = StandardMaterial3D.new()
-		material.albedo_color = Color(0.08, 0.95, 1.0)
-		material.emission_enabled = true
-		material.emission = Color(0.05, 0.65, 0.95)
-		material.emission_energy_multiplier = 1.15
-		mesh_node.material_override = material
+		mesh_node.material_override = _flat_material(Color(0.05, 0.9, 1.0))
+		mesh_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		area.add_child(mesh_node)
 		world_root.add_child(area)
 		area.body_entered.connect(_on_coin_body_entered.bind(area))
@@ -241,13 +217,8 @@ func _build_collectibles_and_checkpoint() -> void:
 	ring_mesh.bottom_radius = 3.5
 	ring_mesh.height = 0.10
 	ring.mesh = ring_mesh
-	var ring_material: StandardMaterial3D = StandardMaterial3D.new()
-	ring_material.albedo_color = Color(0.1, 1.0, 0.25, 0.55)
-	ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	ring_material.emission_enabled = true
-	ring_material.emission = Color(0.08, 0.8, 0.2)
-	ring_material.emission_energy_multiplier = 1.3
-	ring.material_override = ring_material
+	ring.material_override = _flat_material(Color(0.08, 0.95, 0.2))
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	checkpoint.add_child(ring)
 	world_root.add_child(checkpoint)
 
@@ -323,7 +294,6 @@ func _toggle_pause() -> void:
 	hud.set_mode(hud.MODE_PAUSE if game_paused else hud.MODE_PLAY)
 
 func _set_quality(level: int) -> void:
-	quality_level = level
 	if camera:
 		camera.fov = [72.0, 69.0, 66.0][level]
 
@@ -442,15 +412,16 @@ func _animate_collectibles(delta: float) -> void:
 	if is_instance_valid(checkpoint):
 		checkpoint.rotate_y(delta * 0.25)
 
-func _add_resource_prop(resource: Resource, pos: Vector3, target_height: float, collision: bool, yaw: float) -> void:
+func _add_resource_prop(resource: Resource, pos: Vector3, target_height: float, collision: bool, yaw: float, color: Color) -> void:
 	var visual: Node3D = _create_visual(resource)
 	if visual == null:
-		_add_fallback_building(pos, target_height)
+		_add_fallback_building(pos, target_height, color)
 		return
 	world_root.add_child(visual)
 	visual.position = pos
 	visual.rotation.y = yaw
 	_fit_visual(visual, target_height)
+	_apply_flat_material(visual, color)
 	if collision:
 		var body: StaticBody3D = StaticBody3D.new()
 		body.position = pos + Vector3.UP * target_height * 0.44
@@ -461,8 +432,8 @@ func _add_resource_prop(resource: Resource, pos: Vector3, target_height: float, 
 		body.add_child(shape_node)
 		world_root.add_child(body)
 
-func _add_fallback_building(pos: Vector3, height: float) -> void:
-	_add_box(pos + Vector3.UP * height * 0.5, Vector3(5.0, height, 5.0), Color(0.25, 0.31, 0.39), true)
+func _add_fallback_building(pos: Vector3, height: float, color: Color) -> void:
+	_add_box(pos + Vector3.UP * height * 0.5, Vector3(5.0, height, 5.0), color, true)
 
 func _add_box(pos: Vector3, box_size: Vector3, color: Color, collision: bool) -> Node3D:
 	var mesh_node: MeshInstance3D = MeshInstance3D.new()
@@ -470,10 +441,8 @@ func _add_box(pos: Vector3, box_size: Vector3, color: Color, collision: bool) ->
 	mesh.size = box_size
 	mesh_node.mesh = mesh
 	mesh_node.position = pos
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.86
-	mesh_node.material_override = material
+	mesh_node.material_override = _flat_material(color)
+	mesh_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	world_root.add_child(mesh_node)
 	if collision:
 		var body: StaticBody3D = StaticBody3D.new()
@@ -485,6 +454,20 @@ func _add_box(pos: Vector3, box_size: Vector3, color: Color, collision: bool) ->
 		body.add_child(shape_node)
 		world_root.add_child(body)
 	return mesh_node
+
+func _flat_material(color: Color) -> StandardMaterial3D:
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+	material.albedo_color = color
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.vertex_color_use_as_albedo = false
+	return material
+
+func _apply_flat_material(node: Node, color: Color) -> void:
+	if node is MeshInstance3D:
+		node.material_override = _flat_material(color)
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for child: Node in node.get_children():
+		_apply_flat_material(child, color)
 
 func _create_visual(resource: Resource) -> Node3D:
 	if resource is PackedScene:
