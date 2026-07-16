@@ -74,9 +74,12 @@ func _find_mesh(node: Node) -> MeshInstance3D:
 	return null
 
 func _tint_first_body(node: Node, color: Color) -> void:
-	var mesh_node: MeshInstance3D = _find_mesh(node)
-	if mesh_node:
-		var overlay: StandardMaterial3D = StandardMaterial3D.new()
-		overlay.albedo_color = Color(color.r, color.g, color.b, 0.22)
-		overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mesh_node.material_overlay = overlay
+	if node is MeshInstance3D:
+		var material: StandardMaterial3D = StandardMaterial3D.new()
+		material.albedo_color = Color(color.r, color.g, color.b, 1.0)
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.vertex_color_use_as_albedo = false
+		node.material_override = material
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for child: Node in node.get_children():
+		_tint_first_body(child, color)
