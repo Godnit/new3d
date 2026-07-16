@@ -13,17 +13,17 @@ permissions:
 jobs:
   build-mobile-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 60
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Install build tools and Vulkan software driver
+      - name: Install build and visual-test tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip zip wget libgl1 libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y unzip zip wget libgl1 libvulkan1 mesa-vulkan-drivers xvfb
 
-      - name: Download ready-made 3D models
+      - name: Download ready-made 3D models and write manifest
         run: |
           set -euxo pipefail
           rm -rf assets/kenney /tmp/city-models /tmp/car-models
@@ -34,11 +34,28 @@ jobs:
           cp -a /tmp/car-models/. assets/kenney/cars/
           rm -rf assets/kenney/cars/.git
           wget -q --show-progress -O assets/kenney/characters/CesiumMan.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb"
-          test "$(find assets/kenney/city -type f -iname '*.obj' | wc -l)" -gt 5
-          test "$(find assets/kenney/cars -type f \( -iname '*.obj' -o -iname '*.glb' -o -iname '*.fbx' \) | wc -l)" -gt 0
-          test -s assets/kenney/characters/CesiumMan.glb
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root = Path('.')
+          city_files = sorted(Path('assets/kenney/city').rglob('*'))
+          city = [p for p in city_files if p.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and ('building' in p.name.lower() or 'skyscraper' in p.name.lower())]
+          details = [p for p in city_files if p.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and any(k in p.name.lower() for k in ('tree', 'bench', 'light', 'hydrant', 'trash', 'parasol', 'awning'))]
+          car_files = sorted(Path('assets/kenney/cars').rglob('*'))
+          allowed = ('sedan', 'suv', 'taxi', 'police', 'ambulance', 'hatchback', 'race', 'truck', 'van', 'delivery', 'firetruck', 'tractor')
+          excluded = ('wheel', 'debris', 'flat', 'fantasy', 'road', 'wall', 'roof', 'stairs', 'fountain')
+          cars = [p for p in car_files if p.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and any(k in p.name.lower() for k in allowed) and not any(k in p.as_posix().lower() for k in excluded)]
+          chars = sorted(Path('assets/kenney/characters').rglob('*.glb'))
+          def res(paths): return ['res://' + p.as_posix() for p in paths]
+          manifest = {'city': res(city[:32]), 'details': res(details[:16]), 'cars': res(cars[:24]), 'characters': res(chars[:4])}
+          Path('assets/model_manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+          assert len(manifest['city']) >= 10, manifest
+          assert len(manifest['cars']) >= 5, manifest
+          assert len(manifest['characters']) >= 1, manifest
+          print(json.dumps({k: len(v) for k, v in manifest.items()}))
+          PY
 
-      - name: Apply source compatibility fixes
+      - name: Apply source, UI, and export compatibility fixes
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -55,13 +72,25 @@ jobs:
               'player.global_position = Vector3(-4, 0.3, 7)': 'player.position = Vector3(-4, 0.3, 7)',
               'drive_car.global_position = Vector3(8, 0.3, 8)': 'drive_car.position = Vector3(8, 0.3, 8)',
               'enemy.global_position = Vector3(cos(angle) * 30.0, 0.3, sin(angle) * 30.0)': 'enemy.position = Vector3(cos(angle) * 30.0, 0.3, sin(angle) * 30.0)',
+              'hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)': 'hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)\n\thud.position = Vector2.ZERO\n\thud.size = get_viewport().get_visible_rect().size\n\tget_viewport().size_changed.connect(_resize_hud)',
           }
           for old, new in replacements.items():
               s = s.replace(old, new)
+          old_scan = 'func _scan_assets() -> void:\n\tvar all_city: Array[String] = []'
+          new_scan = '''func _scan_assets() -> void:\n\tif FileAccess.file_exists("res://assets/model_manifest.json"):\n\t\tvar parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/model_manifest.json"))\n\t\tif parsed is Dictionary:\n\t\t\tcity_paths.assign(parsed.get("city", []))\n\t\t\tdetail_paths.assign(parsed.get("details", []))\n\t\t\tcar_paths.assign(parsed.get("cars", []))\n\t\t\tcharacter_paths.assign(parsed.get("characters", []))\n\t\t\tif not city_paths.is_empty() and not car_paths.is_empty() and not character_paths.is_empty():\n\t\t\t\treturn\n\tvar all_city: Array[String] = []'''
+          if old_scan not in s:
+              raise SystemExit('scan function marker not found')
+          s = s.replace(old_scan, new_scan)
+          ready_line = 'print("CITYQUEST_READY buildings=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())'
+          capture = '''print("CITYQUEST_READY buildings=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())\n\tif OS.get_environment("CITYQUEST_CAPTURE") == "1":\n\t\tawait get_tree().create_timer(3.0).timeout\n\t\tvar capture_path: String = OS.get_environment("CITYQUEST_CAPTURE_PATH")\n\t\tvar capture_image: Image = get_viewport().get_texture().get_image()\n\t\tvar save_error: Error = capture_image.save_png(capture_path)\n\t\tprint("CITYQUEST_CAPTURED path=", capture_path, " error=", save_error)'''
+          if ready_line not in s:
+              raise SystemExit('ready marker not found')
+          s = s.replace(ready_line, capture)
+          s += '''\nfunc _resize_hud() -> void:\n\tif is_instance_valid(hud):\n\t\thud.position = Vector2.ZERO\n\t\thud.size = get_viewport().get_visible_rect().size\n\t\thud.queue_redraw()\n'''
           p.write_text(s)
           for filename in ('scripts/player.gd', 'scripts/car.gd', 'scripts/enemy.gd'):
-              p = Path(filename)
-              p.write_text(p.read_text().replace('var instance := resource.instantiate()', 'var instance: Node = (resource as PackedScene).instantiate()'))
+              fp = Path(filename)
+              fp.write_text(fp.read_text().replace('var instance := resource.instantiate()', 'var instance: Node = (resource as PackedScene).instantiate()'))
           Path('THIRD_PARTY_LICENSES.md').write_text('''# Third-party assets\n\n- Kenney City Kit (Commercial) 2.1 — CC0 1.0.\n- Kenney Car Kit — CC0 1.0.\n- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.\n- Godot Engine runtime — MIT License.\n''')
           PY
 
@@ -81,18 +110,30 @@ jobs:
         run: |
           keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=City Quest,C=US" -keyalg RSA -keysize 2048 -validity 10000
 
-      - name: Import assets and smoke-test the mobile renderer
+      - name: Import models and smoke-test gameplay
         env:
           VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
         run: |
           set -o pipefail
           timeout 12m godot --headless --editor --path . --import 2>&1 | tee import.log
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" import.log; then exit 1; fi
-          timeout 70s godot --headless --path . --quit-after 180 2>&1 | tee smoke-headless.log || true
+          timeout 75s godot --headless --path . --quit-after 180 2>&1 | tee smoke-headless.log || true
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Failed loading resource|Failed to load model" smoke-headless.log; then exit 1; fi
-          grep -q "CITYQUEST_READY" smoke-headless.log
+          grep -Eq "CITYQUEST_READY buildings=[1-9][0-9]* cars=[1-9][0-9]* characters=[1-9][0-9]*" smoke-headless.log
 
-      - name: Export signed Android APK
+      - name: Render a real game preview
+        env:
+          CITYQUEST_CAPTURE: "1"
+          CITYQUEST_CAPTURE_PATH: ${{ github.workspace }}/build/CityQuest3D-Preview.png
+        run: |
+          mkdir -p build
+          set +e
+          xvfb-run -a timeout 50s godot --path . --rendering-method gl_compatibility 2>&1 | tee visual-test.log
+          set -e
+          grep -q "CITYQUEST_CAPTURED" visual-test.log
+          test -s build/CityQuest3D-Preview.png
+
+      - name: Export and validate signed Android APK
         run: |
           mkdir -p build
           godot --headless --path . --export-debug "Android" build/CityQuest3D.apk 2>&1 | tee export.log
@@ -101,7 +142,7 @@ jobs:
           keytool -printcert -jarfile build/CityQuest3D.apk > build/signature.txt
           sha256sum build/CityQuest3D.apk | tee build/SHA256SUMS.txt
 
-      - name: Package full source with models
+      - name: Package full editable source
         run: |
           zip -qr build/CityQuest3D-Full-Source.zip . -x '.git/*' '.godot/*' 'build/*' 'debug.keystore' 'project-source.zip'
 
@@ -109,21 +150,24 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: CityQuest3D-Mobile-Diagnostics
+          name: CityQuest3D-v1.1-Diagnostics
           path: |
             import.log
             smoke-headless.log
+            visual-test.log
             export.log
+            build/CityQuest3D-Preview.png
           if-no-files-found: ignore
-          retention-days: 4
+          retention-days: 5
 
-      - name: Upload mobile-renderer APK and source
+      - name: Upload completed APK and source
         uses: actions/upload-artifact@v4
         with:
-          name: CityQuest3D-Mobile-Ready
+          name: CityQuest3D-v1.1-Ready
           path: |
             build/CityQuest3D.apk
             build/CityQuest3D-Full-Source.zip
+            build/CityQuest3D-Preview.png
             build/SHA256SUMS.txt
             build/signature.txt
           if-no-files-found: error
