@@ -24,7 +24,7 @@ func setup_visual(resource: Resource) -> void:
 		_fit_visual(visual_root, 1.78)
 		base_visual_scale = visual_root.scale
 		animation_player = _find_animation_player(visual_root)
-		_apply_team_tint(visual_root, Color(0.12, 0.42, 1.0, 0.13))
+		_apply_team_tint(visual_root, Color(0.14, 0.48, 1.0, 1.0))
 
 	var collider: CollisionShape3D = CollisionShape3D.new()
 	var capsule: CapsuleShape3D = CapsuleShape3D.new()
@@ -169,10 +169,11 @@ func _find_animation_player(node: Node) -> AnimationPlayer:
 
 func _apply_team_tint(node: Node, tint: Color) -> void:
 	if node is MeshInstance3D:
-		var overlay: StandardMaterial3D = StandardMaterial3D.new()
-		overlay.albedo_color = tint
-		overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		overlay.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-		node.material_overlay = overlay
+		var material: StandardMaterial3D = StandardMaterial3D.new()
+		material.albedo_color = tint
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.vertex_color_use_as_albedo = false
+		node.material_override = material
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for child: Node in node.get_children():
 		_apply_team_tint(child, tint)
