@@ -1,0 +1,118 @@
+name: Build and test City Quest 3D APK
+
+on:
+  push:
+    branches: [cityquest3d-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip zip wget xvfb libgl1 libpulse0
+
+      - name: Expand project source
+        run: unzip -q project-source.zip -d .
+
+      - name: Download CC0 3D asset packs
+        run: |
+          set -euxo pipefail
+          rm -rf assets/kenney /tmp/kenney-assets
+          mkdir -p assets/kenney/{city,cars,characters} /tmp/kenney-assets/{city,cars,characters}
+          wget -q --show-progress -O /tmp/city.zip "https://kenney.nl/media/pages/assets/city-kit-commercial/a742d900eb-1753115042/kenney_city-kit-commercial_2.1.zip"
+          wget -q --show-progress -O /tmp/cars.zip "https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip"
+          wget -q --show-progress -O /tmp/characters.zip "https://kenney.nl/media/pages/assets/animated-characters-1/8c3221c3de-1694862559/kenney_animated-characters-1.zip"
+          unzip -q /tmp/city.zip -d /tmp/kenney-assets/city
+          unzip -q /tmp/cars.zip -d /tmp/kenney-assets/cars
+          unzip -q /tmp/characters.zip -d /tmp/kenney-assets/characters
+          CITY_DIR="$(find /tmp/kenney-assets/city -type d -iname 'OBJ format' | head -n 1)"
+          CARS_DIR="$(find /tmp/kenney-assets/cars -type d -iname 'OBJ format' | head -n 1)"
+          test -n "$CITY_DIR" && cp -a "$CITY_DIR"/. assets/kenney/city/
+          test -n "$CARS_DIR" && cp -a "$CARS_DIR"/. assets/kenney/cars/
+          cp -a /tmp/kenney-assets/characters/. assets/kenney/characters/
+          echo "City files: $(find assets/kenney/city -type f | wc -l)"
+          echo "Car files: $(find assets/kenney/cars -type f | wc -l)"
+          echo "Character files: $(find assets/kenney/characters -type f | wc -l)"
+          find assets/kenney/characters -type f | head -n 30
+
+      - name: Install Godot 4.6.3 and export templates
+        run: |
+          set -euxo pipefail
+          wget -q --show-progress -O /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip"
+          wget -q --show-progress -O /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_export_templates.tpz"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo install -m 0755 /tmp/godot/Godot_v4.6.3-stable_linux.x86_64 /usr/local/bin/godot
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.6.3.stable" /tmp/godot-templates
+          unzip -q /tmp/templates.tpz -d /tmp/godot-templates
+          cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.6.3.stable/"
+          godot --version
+
+      - name: Generate Android debug signing key
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=City Quest,C=US" -keyalg RSA -keysize 2048 -validity 10000
+
+      - name: Import all models and check scripts
+        run: |
+          set -o pipefail
+          timeout 12m godot --headless --editor --path . --import 2>&1 | tee import.log
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" import.log; then exit 1; fi
+          timeout 45s godot --headless --path . --quit-after 180 2>&1 | tee smoke-headless.log || true
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" smoke-headless.log; then exit 1; fi
+          grep -q "CITYQUEST_READY" smoke-headless.log
+
+      - name: Export signed Android APK
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-debug "Android" build/CityQuest3D.apk 2>&1 | tee export.log
+          test -s build/CityQuest3D.apk
+          unzip -t build/CityQuest3D.apk
+          keytool -printcert -jarfile build/CityQuest3D.apk > build/signature.txt || true
+          sha256sum build/CityQuest3D.apk | tee build/SHA256SUMS.txt
+
+      - name: Install and launch on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -euxo pipefail
+            adb install -r build/CityQuest3D.apk
+            adb logcat -c
+            adb shell monkey -p com.godnit.cityquest3d -c android.intent.category.LAUNCHER 1
+            sleep 22
+            PID="$(adb shell pidof com.godnit.cityquest3d | tr -d '\r')"
+            echo "App PID: $PID"
+            test -n "$PID"
+            adb exec-out screencap -p > build/android-emulator-screenshot.png
+            adb logcat -d > build/android-logcat.txt
+            if grep -E "FATAL EXCEPTION|Fatal signal|Process: com.godnit.cityquest3d.*has died" build/android-logcat.txt; then exit 1; fi
+
+      - name: Package source with downloaded models
+        run: |
+          zip -qr build/CityQuest3D-Full-Source.zip . -x '.git/*' '.godot/*' 'build/*' 'debug.keystore'
+
+      - name: Upload ready files
+        uses: actions/upload-artifact@v4
+        with:
+          name: CityQuest3D-Ready
+          path: |
+            build/CityQuest3D.apk
+            build/CityQuest3D-Full-Source.zip
+            build/android-emulator-screenshot.png
+            build/android-logcat.txt
+            build/SHA256SUMS.txt
+            build/signature.txt
+          if-no-files-found: error
+          retention-days: 30
