@@ -1,0 +1,40 @@
+{
+  "name": "Water Splash",
+  "name_ar": "مغاسل رشة المياه لخدمات السيارات",
+  "category": ["car wash", "vehicle services"],
+  "city": "Riyadh",
+  "district": "Al Munsiyah",
+  "postal_code": "13253",
+  "rating": 4.4,
+  "review_count": null,
+  "phone": "+966557895613",
+  "whatsapp": "needs confirmation",
+  "address": "Al Najah, Al Munsiyah, Riyadh 13253",
+  "website_status": "no independent business-owned domain found; provisional",
+  "platform_presence": [
+    {
+      "platform": "Al Muraba directory article",
+      "url": "https://www.almuraba.net/%D8%A7%D9%82%D8%B1%D8%A8-%D9%85%D8%BA%D8%B3%D9%84%D8%A9-%D8%B3%D9%8A%D8%A7%D8%B1%D8%A7%D8%AA/"
+    }
+  ],
+  "products_and_services": [
+    "car washing",
+    "vehicle cleaning and care services",
+    "exact service list needs owner confirmation"
+  ],
+  "image_reference_pages": [
+    "https://www.almuraba.net/%D8%A7%D9%82%D8%B1%D8%A8-%D9%85%D8%BA%D8%B3%D9%84%D8%A9-%D8%B3%D9%8A%D8%A7%D8%B1%D8%A7%D8%AA/"
+  ],
+  "image_usage": "The directory article displays reference images. Request original branch and service photos from the business before commercial reuse.",
+  "recommended_site_goal": "Bookings, wash packages, recurring subscriptions, service list, location and WhatsApp contact.",
+  "missing_information": [
+    "complete service list and prices",
+    "opening hours",
+    "map link and coordinates",
+    "official social accounts",
+    "original logo and branch photos",
+    "confirmation that the phone accepts WhatsApp",
+    "current review count"
+  ],
+  "verified_at": "2026-07-16"
+}
