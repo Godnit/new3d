@@ -140,10 +140,11 @@ func _find_animation_player(node: Node) -> AnimationPlayer:
 
 func _mark_enemy(node: Node) -> void:
 	if node is MeshInstance3D:
-		var overlay: StandardMaterial3D = StandardMaterial3D.new()
-		overlay.albedo_color = Color(1.0, 0.08, 0.08, 0.18)
-		overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		overlay.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-		node.material_overlay = overlay
+		var material: StandardMaterial3D = StandardMaterial3D.new()
+		material.albedo_color = Color(0.92, 0.09, 0.12, 1.0)
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.vertex_color_use_as_albedo = false
+		node.material_override = material
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for child: Node in node.get_children():
 		_mark_enemy(child)
