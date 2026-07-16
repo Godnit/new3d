@@ -1,0 +1,50 @@
+name: Retry Peacock Chocolate reference image
+
+on:
+  push:
+    paths:
+      - '.github/workflows/retry-peacock-reference-image.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  retry-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Peacock post image with browser headers
+        shell: bash
+        run: |
+          set -u
+          OUT='business-research/riyadh-no-website-leads-2026-07-16/businesses/peacock-chocolate/reference-images/01-linkedin-product-post.jpg'
+          mkdir -p "$(dirname "$OUT")"
+          URL1='https://media.licdn.com/dms/image/v2/D4D22AQGkvQZCSi_HlA/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1691310169991?e=2147483647&t=fqrUM4fw62eojEmXGoKyPiwJWN5O4gci_oUINJ4gL4I&v=beta'
+          URL2='https://media.licdn.com/dms/image/v2/D4D22AQGkvQZCSi_HlA/feedshare-shrink_800/feedshare-shrink_800/0/1691310169991?e=2147483647&t=fqrUM4fw62eojEmXGoKyPiwJWN5O4gci_oUINJ4gL4I&v=beta'
+          download() {
+            curl -L --fail --retry 2 --connect-timeout 20 --max-time 120 \
+              -H 'Referer: https://www.linkedin.com/' \
+              -H 'Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+              -H 'Accept-Language: ar,en;q=0.9' \
+              -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36' \
+              "$1" -o "$OUT"
+          }
+          download "$URL1" || download "$URL2" || true
+          if [ -s "$OUT" ] && file -b --mime-type "$OUT" | grep -q '^image/'; then
+            file "$OUT"
+          else
+            rm -f "$OUT"
+            echo 'LinkedIn blocked both public image URLs.'
+          fi
+      - name: Commit image if downloaded
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add business-research/riyadh-no-website-leads-2026-07-16/businesses/peacock-chocolate/reference-images || true
+          if git diff --cached --quiet; then
+            echo 'No Peacock product image downloaded.'
+          else
+            git commit -m 'Add Peacock Chocolate product reference image'
+            git push
+          fi
