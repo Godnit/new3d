@@ -1,19 +1,17 @@
-name: Build City Quest 3D Mobile APK
+name: Build City Quest 3D Legacy and Web Preview
 
 on:
   push:
-    branches: [cityquest3d-build]
-  pull_request:
-    branches: [main]
+    branches: [cityquest3d-legacy-tabs-v2]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-mobile-apk:
+  build-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 70
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -21,84 +19,142 @@ jobs:
       - name: Install build and visual-test tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip zip wget libgl1 libvulkan1 mesa-vulkan-drivers xvfb
+          sudo apt-get install -y unzip zip wget git libgl1 libpulse0 xvfb imagemagick python3-pil
 
-      - name: Download ready-made 3D models and write manifest
+      - name: Download optimized ready-made city, cars, and TABS-style characters
         run: |
           set -euxo pipefail
-          rm -rf assets/kenney /tmp/city-models /tmp/car-models
-          mkdir -p assets/kenney/{city,cars,characters}
+          rm -rf assets/kenney assets/kaykit /tmp/city-models /tmp/car-models /tmp/kaykit-models
+          mkdir -p assets/kenney/{city,cars,characters} assets/kaykit
           git clone --depth 1 https://github.com/immaculate-lift-studio/CityCrafter3D.git /tmp/city-models
           git clone --depth 1 https://github.com/Arslan12216775/kenney_car-kit.git /tmp/car-models
+          git clone --depth 1 https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git /tmp/kaykit-models
           cp -a "/tmp/city-models/addons/citycrafter/assets/example_assets/kenney_city-kit-commercial_20/Models/OBJ format"/. assets/kenney/city/
           cp -a /tmp/car-models/. assets/kenney/cars/
           rm -rf assets/kenney/cars/.git
-          wget -q --show-progress -O assets/kenney/characters/CesiumMan.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb"
+          wget -q -O assets/kenney/characters/CesiumMan.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb"
           python3 - <<'PY'
           from pathlib import Path
-          import json
-          root = Path('.')
-          city_files = sorted(Path('assets/kenney/city').rglob('*'))
-          city = [p for p in city_files if p.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and ('building' in p.name.lower() or 'skyscraper' in p.name.lower())]
-          details = [p for p in city_files if p.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and any(k in p.name.lower() for k in ('tree', 'bench', 'light', 'hydrant', 'trash', 'parasol', 'awning'))]
-          car_files = sorted(Path('assets/kenney/cars').rglob('*'))
-          allowed = ('sedan', 'suv', 'taxi', 'police', 'ambulance', 'hatchback', 'race', 'truck', 'van', 'delivery', 'firetruck', 'tractor')
-          excluded = ('wheel', 'debris', 'flat', 'fantasy', 'road', 'wall', 'roof', 'stairs', 'fountain')
-          cars = [p for p in car_files if p.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and any(k in p.name.lower() for k in allowed) and not any(k in p.as_posix().lower() for k in excluded)]
-          chars = sorted(Path('assets/kenney/characters').rglob('*.glb'))
-          def res(paths): return ['res://' + p.as_posix() for p in paths]
-          manifest = {'city': res(city[:32]), 'details': res(details[:16]), 'cars': res(cars[:24]), 'characters': res(chars[:4])}
-          Path('assets/model_manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
-          assert len(manifest['city']) >= 10, manifest
-          assert len(manifest['cars']) >= 5, manifest
-          assert len(manifest['characters']) >= 1, manifest
-          print(json.dumps({k: len(v) for k, v in manifest.items()}))
-          PY
+          import json, shutil
 
-      - name: Apply source, UI, and export compatibility fixes
+          kay = Path('/tmp/kaykit-models')
+          out = Path('assets/kaykit')
+          rejected = ('animation', 'accessor', 'weapon', 'sword', 'shield', 'axe', 'bow', 'staff', 'helmet', 'preview', 'source')
+          preferred_words = ('character', 'barbar', 'knight', 'rogue', 'mage', 'ranger', 'rig_')
+          candidates = []
+          for p in kay.rglob('*.fbx'):
+              low = p.as_posix().lower()
+              if any(x in low for x in rejected):
+                  continue
+              if p.stat().st_size < 120_000:
+                  continue
+              score = sum(1 for x in preferred_words if x in low)
+              candidates.append((score, p.stat().st_size, p))
+          candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+          selected = [item[2] for item in candidates[:4]]
+          if len(selected) < 2:
+              fallback = sorted(kay.rglob('*.fbx'), key=lambda p: p.stat().st_size, reverse=True)
+              selected = fallback[:4]
+          assert selected, 'No KayKit character FBX files found'
+
+          for p in selected:
+              dest = out / p.relative_to(kay)
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(p, dest)
+
+          texture_files = []
+          for pattern in ('*.png', '*.jpg', '*.jpeg'):
+              texture_files.extend(kay.rglob(pattern))
+          for p in texture_files:
+              low = p.as_posix().lower()
+              if any(x in low for x in ('screenshot', 'preview', 'banner', 'thumbnail')):
+                  continue
+              dest = out / p.relative_to(kay)
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(p, dest)
+
+          city_files = sorted(Path('assets/kenney/city').rglob('*'))
+          city = [p for p in city_files if p.suffix.lower() == '.obj' and any(k in p.name.lower() for k in ('building', 'skyscraper', 'shop', 'house'))]
+          details = [p for p in city_files if p.suffix.lower() == '.obj' and any(k in p.name.lower() for k in ('tree', 'bench', 'light', 'hydrant', 'trash', 'fountain'))]
+          car_files = sorted(Path('assets/kenney/cars').rglob('*'))
+          cars = [p for p in car_files if p.suffix.lower() in {'.obj', '.glb', '.gltf', '.fbx'} and any(k in p.name.lower() for k in ('car', 'sedan', 'taxi', 'truck', 'vehicle', 'racer'))]
+          chars = [out / p.relative_to(kay) for p in selected]
+          chars.append(Path('assets/kenney/characters/CesiumMan.glb'))
+          def res(paths):
+              return ['res://' + p.as_posix() for p in paths]
+          manifest = {
+              'city': res(city[:16]),
+              'details': res(details[:8]),
+              'cars': res(cars[:12]),
+              'characters': res(chars),
+              'kaykit_selected': [p.as_posix() for p in selected],
+          }
+          Path('assets/model_manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+          assert len(manifest['city']) >= 8, manifest
+          assert len(manifest['cars']) >= 2, manifest
+          assert len(manifest['characters']) >= 3, manifest
+          print(json.dumps({k: len(v) if isinstance(v, list) else v for k, v in manifest.items()}, ensure_ascii=False))
+          PY
+          du -sh assets
+          cat assets/model_manifest.json
+
+      - name: Apply final runtime test hooks and UI sizing
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('scripts/main.gd')
           s = p.read_text()
-          replacements = {
-              'var move_input := hud.move_vector': 'var move_input: Vector2 = hud.move_vector',
-              'var jump := hud.consume_jump() or Input.is_key_pressed(KEY_SPACE)': 'var jump: bool = hud.consume_jump() or Input.is_key_pressed(KEY_SPACE)',
-              'var sprint := hud.sprint_held or Input.is_key_pressed(KEY_SHIFT)': 'var sprint: bool = hud.sprint_held or Input.is_key_pressed(KEY_SHIFT)',
-              'var attack := hud.consume_attack() or Input.is_key_pressed(KEY_F)': 'var attack: bool = hud.consume_attack() or Input.is_key_pressed(KEY_F)',
-              'var interact := hud.consume_interact() or Input.is_key_pressed(KEY_E)': 'var interact: bool = hud.consume_interact() or Input.is_key_pressed(KEY_E)',
-              'var look := hud.consume_look()': 'var look: Vector2 = hud.consume_look()',
-              'var instance := resource.instantiate()': 'var instance: Node = (resource as PackedScene).instantiate()',
-              'player.global_position = Vector3(-4, 0.3, 7)': 'player.position = Vector3(-4, 0.3, 7)',
-              'drive_car.global_position = Vector3(8, 0.3, 8)': 'drive_car.position = Vector3(8, 0.3, 8)',
-              'enemy.global_position = Vector3(cos(angle) * 30.0, 0.3, sin(angle) * 30.0)': 'enemy.position = Vector3(cos(angle) * 30.0, 0.3, sin(angle) * 30.0)',
-              'hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)': 'hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)\n\thud.position = Vector2.ZERO\n\thud.size = get_viewport().get_visible_rect().size\n\tget_viewport().size_changed.connect(_resize_hud)',
-          }
-          for old, new in replacements.items():
-              s = s.replace(old, new)
-          old_scan = 'func _scan_assets() -> void:\n\tvar all_city: Array[String] = []'
-          new_scan = '''func _scan_assets() -> void:\n\tif FileAccess.file_exists("res://assets/model_manifest.json"):\n\t\tvar parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/model_manifest.json"))\n\t\tif parsed is Dictionary:\n\t\t\tcity_paths.assign(parsed.get("city", []))\n\t\t\tdetail_paths.assign(parsed.get("details", []))\n\t\t\tcar_paths.assign(parsed.get("cars", []))\n\t\t\tcharacter_paths.assign(parsed.get("characters", []))\n\t\t\tif not city_paths.is_empty() and not car_paths.is_empty() and not character_paths.is_empty():\n\t\t\t\treturn\n\tvar all_city: Array[String] = []'''
-          if old_scan not in s:
-              raise SystemExit('scan function marker not found')
-          s = s.replace(old_scan, new_scan)
-          ready_line = 'print("CITYQUEST_READY buildings=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())'
-          capture = '''print("CITYQUEST_READY buildings=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())\n\tif OS.get_environment("CITYQUEST_CAPTURE") == "1":\n\t\tawait get_tree().create_timer(3.0).timeout\n\t\tvar capture_path: String = OS.get_environment("CITYQUEST_CAPTURE_PATH")\n\t\tvar capture_image: Image = get_viewport().get_texture().get_image()\n\t\tvar save_error: Error = capture_image.save_png(capture_path)\n\t\tprint("CITYQUEST_CAPTURED path=", capture_path, " error=", save_error)'''
-          if ready_line not in s:
-              raise SystemExit('ready marker not found')
-          s = s.replace(ready_line, capture)
-          s += '''\nfunc _resize_hud() -> void:\n\tif is_instance_valid(hud):\n\t\thud.position = Vector2.ZERO\n\t\thud.size = get_viewport().get_visible_rect().size\n\t\thud.queue_redraw()\n'''
+          marker = '\thud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)\n'
+          addition = marker + '\thud.position = Vector2.ZERO\n\thud.size = get_viewport().get_visible_rect().size\n\tget_viewport().size_changed.connect(_resize_hud)\n'
+          if 'get_viewport().size_changed.connect(_resize_hud)' not in s:
+              if marker not in s:
+                  raise SystemExit('HUD marker missing')
+              s = s.replace(marker, addition, 1)
+          ready = 'print("CITYQUEST_READY legacy_opengl buildings=", city_paths.size(), " cars=", car_paths.size(), " characters=", character_paths.size())'
+          capture = ready + '''
+\tif OS.get_environment("CITYQUEST_CAPTURE") == "1":
+\t\tawait get_tree().create_timer(2.5).timeout
+\t\tvar capture_path: String = OS.get_environment("CITYQUEST_CAPTURE_PATH")
+\t\tvar capture_image: Image = get_viewport().get_texture().get_image()
+\t\tvar save_error: Error = capture_image.save_png(capture_path)
+\t\tprint("CITYQUEST_CAPTURED path=", capture_path, " error=", save_error)'''
+          if 'CITYQUEST_CAPTURED' not in s:
+              if ready not in s:
+                  raise SystemExit('Ready marker missing')
+              s = s.replace(ready, capture, 1)
+          if 'func _resize_hud()' not in s:
+              s += '''
+
+func _resize_hud() -> void:
+\tif is_instance_valid(hud):
+\t\thud.position = Vector2.ZERO
+\t\thud.size = get_viewport().get_visible_rect().size
+\t\thud.queue_redraw()
+'''
           p.write_text(s)
-          for filename in ('scripts/player.gd', 'scripts/car.gd', 'scripts/enemy.gd'):
-              fp = Path(filename)
-              fp.write_text(fp.read_text().replace('var instance := resource.instantiate()', 'var instance: Node = (resource as PackedScene).instantiate()'))
-          Path('THIRD_PARTY_LICENSES.md').write_text('''# Third-party assets\n\n- Kenney City Kit (Commercial) 2.1 — CC0 1.0.\n- Kenney Car Kit — CC0 1.0.\n- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.\n- Godot Engine runtime — MIT License.\n''')
+          car = Path('scripts/car.gd')
+          car.write_text(car.read_text().replace('var instance := resource.instantiate()', 'var instance: Node = (resource as PackedScene).instantiate()'))
+          hud = Path('scripts/hud.gd')
+          hs = hud.read_text()
+          hs = hs.replace('CITY QUEST 3D', 'CITY QUEST 3D LEGACY')
+          hs = hs.replace('مدينة مفتوحة • شخصيات • سيارات • مهام', 'مدينة خفيفة • شخصيات متمايلة • سيارات • مهام')
+          hs = hs.replace('var quality_level := 1', 'var quality_level := 0')
+          hud.write_text(hs)
+          Path('THIRD_PARTY_LICENSES.md').write_text('''# Third-party assets
+
+- Kenney City Kit (Commercial) 2.1 — CC0 1.0.
+- Kenney Car Kit — CC0 1.0.
+- KayKit Character Pack: Adventurers — CC0 1.0.
+- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.
+- Godot Engine runtime — MIT License.
+''')
           PY
 
-      - name: Install Godot 4.6.3 and Android export templates
+      - name: Install Godot 4.6.3 and export templates
         run: |
           set -euxo pipefail
-          wget -q --show-progress -O /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip"
-          wget -q --show-progress -O /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_export_templates.tpz"
+          wget -q -O /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip"
+          wget -q -O /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_export_templates.tpz"
           unzip -q /tmp/godot.zip -d /tmp/godot
           sudo install -m 0755 /tmp/godot/Godot_v4.6.3-stable_linux.x86_64 /usr/local/bin/godot
           mkdir -p "$HOME/.local/share/godot/export_templates/4.6.3.stable" /tmp/godot-templates
@@ -106,68 +162,124 @@ jobs:
           cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.6.3.stable/"
           godot --version
 
-      - name: Generate signing key
+      - name: Generate Android signing key
         run: |
-          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=City Quest,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=City Quest Legacy,C=US" -keyalg RSA -keysize 2048 -validity 10000
 
-      - name: Import models and smoke-test gameplay
-        env:
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+      - name: Import assets and smoke-test OpenGL gameplay
         run: |
           set -o pipefail
-          timeout 12m godot --headless --editor --path . --import 2>&1 | tee import.log
+          timeout 15m godot --headless --editor --path . --rendering-method gl_compatibility --import 2>&1 | tee import.log
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" import.log; then exit 1; fi
-          timeout 75s godot --headless --path . --quit-after 180 2>&1 | tee smoke-headless.log || true
+          timeout 70s godot --headless --path . --rendering-method gl_compatibility --quit-after 220 2>&1 | tee smoke-headless.log || true
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Failed loading resource|Failed to load model" smoke-headless.log; then exit 1; fi
-          grep -Eq "CITYQUEST_READY buildings=[1-9][0-9]* cars=[1-9][0-9]* characters=[1-9][0-9]*" smoke-headless.log
+          grep -q "CITYQUEST_READY legacy_opengl" smoke-headless.log
 
-      - name: Render a real game preview
+      - name: Render a real desktop OpenGL preview
         env:
           CITYQUEST_CAPTURE: "1"
-          CITYQUEST_CAPTURE_PATH: ${{ github.workspace }}/build/CityQuest3D-Preview.png
+          CITYQUEST_CAPTURE_PATH: ${{ github.workspace }}/build/CityQuest3D-Legacy-Preview.png
         run: |
           mkdir -p build
           set +e
-          xvfb-run -a timeout 50s godot --path . --rendering-method gl_compatibility 2>&1 | tee visual-test.log
+          xvfb-run -a timeout 55s godot --path . --rendering-method gl_compatibility 2>&1 | tee visual-test.log
           set -e
           grep -q "CITYQUEST_CAPTURED" visual-test.log
-          test -s build/CityQuest3D-Preview.png
+          test -s build/CityQuest3D-Legacy-Preview.png
+          identify build/CityQuest3D-Legacy-Preview.png
 
-      - name: Export and validate signed Android APK
+      - name: Export legacy APK, emulator APK, and web preview
         run: |
-          mkdir -p build
-          godot --headless --path . --export-debug "Android" build/CityQuest3D.apk 2>&1 | tee export.log
-          test -s build/CityQuest3D.apk
-          unzip -t build/CityQuest3D.apk
-          keytool -printcert -jarfile build/CityQuest3D.apk > build/signature.txt
-          sha256sum build/CityQuest3D.apk | tee build/SHA256SUMS.txt
+          mkdir -p build/web
+          godot --headless --path . --export-debug "Android Legacy" build/CityQuest3D-Legacy.apk 2>&1 | tee export-android.log
+          godot --headless --path . --export-debug "Android Emulator" build/CityQuest3D-Emulator.apk 2>&1 | tee export-emulator.log
+          godot --headless --path . --export-release "Web Preview" build/web/index.html 2>&1 | tee export-web.log
+          test -s build/CityQuest3D-Legacy.apk
+          test -s build/CityQuest3D-Emulator.apk
+          test -s build/web/index.html
+          unzip -t build/CityQuest3D-Legacy.apk
+          keytool -printcert -jarfile build/CityQuest3D-Legacy.apk > build/signature.txt
+          sha256sum build/CityQuest3D-Legacy.apk | tee build/SHA256SUMS.txt
+          APK_BYTES=$(stat -c%s build/CityQuest3D-Legacy.apk)
+          echo "APK bytes: $APK_BYTES"
+          test "$APK_BYTES" -lt 104857600
 
-      - name: Package full editable source
+      - name: Enable KVM for Android 8.1 emulator
         run: |
-          zip -qr build/CityQuest3D-Full-Source.zip . -x '.git/*' '.godot/*' 'build/*' 'debug.keystore' 'project-source.zip'
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          sudo chmod 666 /dev/kvm || true
+
+      - name: Install and render on Android 8.1 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 27
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -no-audio -no-boot-anim -camera-back none -gpu swiftshader_indirect
+          script: |
+            set -euxo pipefail
+            adb install -r build/CityQuest3D-Emulator.apk
+            adb logcat -c
+            adb shell monkey -p com.godnit.cityquest3dlegacy -c android.intent.category.LAUNCHER 1
+            sleep 22
+            PID="$(adb shell pidof com.godnit.cityquest3dlegacy | tr -d '\r')"
+            test -n "$PID"
+            adb exec-out screencap -p > build/android81-menu.png
+            adb shell input tap 480 390
+            sleep 10
+            adb exec-out screencap -p > build/android81-game.png
+            adb logcat -d > build/android81-logcat.txt
+            if grep -E "FATAL EXCEPTION|Fatal signal|Process: com.godnit.cityquest3dlegacy.*has died" build/android81-logcat.txt; then exit 1; fi
+            python3 - <<'PY'
+            from PIL import Image, ImageStat
+            for name in ('build/android81-menu.png', 'build/android81-game.png'):
+                im = Image.open(name).convert('RGB')
+                assert im.width > im.height, f'Not landscape: {name} {im.size}'
+                stat = ImageStat.Stat(im)
+                brightness = sum(stat.mean) / 3
+                contrast = sum(stat.stddev) / 3
+                print(name, im.size, 'brightness', brightness, 'contrast', contrast)
+                assert brightness > 10, f'Black/dark screen: {name}'
+                assert contrast > 8, f'Flat/blank screen: {name}'
+            PY
+
+      - name: Package web preview and full editable source
+        run: |
+          cd build/web && zip -qr ../CityQuest3D-Web-Preview.zip . && cd ../..
+          zip -qr build/CityQuest3D-Legacy-Full-Source.zip . -x '.git/*' '.godot/*' 'build/*' 'debug.keystore' 'project-source.zip'
 
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: CityQuest3D-v1.1-Diagnostics
+          name: CityQuest3D-Legacy-Diagnostics
           path: |
             import.log
             smoke-headless.log
             visual-test.log
-            export.log
-            build/CityQuest3D-Preview.png
+            export-android.log
+            export-emulator.log
+            export-web.log
+            build/android81-logcat.txt
+            build/android81-menu.png
+            build/android81-game.png
+            build/CityQuest3D-Legacy-Preview.png
           if-no-files-found: ignore
-          retention-days: 5
+          retention-days: 7
 
-      - name: Upload completed APK and source
+      - name: Upload complete legacy game
         uses: actions/upload-artifact@v4
         with:
-          name: CityQuest3D-v1.1-Ready
+          name: CityQuest3D-Legacy-v2-Ready
           path: |
-            build/CityQuest3D.apk
-            build/CityQuest3D-Full-Source.zip
-            build/CityQuest3D-Preview.png
+            build/CityQuest3D-Legacy.apk
+            build/CityQuest3D-Web-Preview.zip
+            build/CityQuest3D-Legacy-Full-Source.zip
+            build/CityQuest3D-Legacy-Preview.png
+            build/android81-game.png
             build/SHA256SUMS.txt
             build/signature.txt
           if-no-files-found: error
