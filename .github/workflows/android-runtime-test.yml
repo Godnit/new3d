@@ -1,4 +1,4 @@
-name: Monitor City Quest GLES2 Builds
+name: Inspect GLES2 Android 8.1 Run
 
 on:
   push:
@@ -10,25 +10,25 @@ permissions:
   contents: write
 
 jobs:
-  monitor:
+  inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Capture latest branch runs
+      - name: Capture failed emulator step
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_ID: "29521039350"
         run: |
-          sleep 25
           mkdir -p /tmp/cityquest-monitor
-          gh run list --repo "${{ github.repository }}" --branch cityquest3d-legacy-tabs-v2 --limit 30 --json databaseId,name,status,conclusion,event,headSha,createdAt,url > /tmp/cityquest-monitor/RUNS.json
-          printf '%s\n' "monitor_run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-monitor/STATUS.txt
-          cat /tmp/cityquest-monitor/RUNS.json
+          gh run view "$RUN_ID" --repo "${{ github.repository }}" > /tmp/cityquest-monitor/RUN_VIEW.txt 2>&1 || true
+          gh run view "$RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/cityquest-monitor/FAILED_LOG.txt 2>&1 || true
+          printf '%s\n' "inspected_run_id=$RUN_ID" "monitor_run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" > /tmp/cityquest-monitor/STATUS.txt
+          tail -n 300 /tmp/cityquest-monitor/FAILED_LOG.txt || true
 
-      - name: Publish monitor data
+      - name: Publish diagnostic log
         run: |
           git config user.name "City Quest Monitor"
           git config user.email "actions@users.noreply.github.com"
@@ -36,5 +36,5 @@ jobs:
           git rm -rf . || true
           cp -a /tmp/cityquest-monitor/. .
           git add -A
-          git commit -m "Publish GLES2 run monitor ${{ github.run_id }}"
+          git commit -m "Publish GLES2 emulator failure log ${{ github.run_id }}"
           git push origin HEAD:cityquest3d-monitor --force
