@@ -168,28 +168,15 @@ jobs:
             adb logcat -c
             adb shell monkey -p com.godnit.cityquest3dlegacy -c android.intent.category.LAUNCHER 1
             sleep 22
-            PID="$(adb shell pidof com.godnit.cityquest3dlegacy | tr -d '\r')"
-            test -n "$PID"
+            adb shell pidof com.godnit.cityquest3dlegacy | tr -d '\r' > /tmp/cityquest.pid
+            test -s /tmp/cityquest.pid
             adb exec-out screencap -p > build/android81-menu.png
             adb shell input tap 480 390
             sleep 10
             adb exec-out screencap -p > build/android81-game.png
             adb logcat -d > build/android81-logcat.txt
             if grep -E "FATAL EXCEPTION|Fatal signal|Process: com.godnit.cityquest3dlegacy.*has died|ANR in com.godnit.cityquest3dlegacy" build/android81-logcat.txt; then exit 1; fi
-            python3 - <<'PY'
-            from PIL import Image
-            from PIL import ImageStat
-
-            for name in ('build/android81-menu.png', 'build/android81-game.png'):
-                image = Image.open(name).convert('RGB')
-                assert image.width > image.height, f'Not landscape: {name} {image.size}'
-                statistics = ImageStat.Stat(image)
-                brightness = sum(statistics.mean) / 3
-                contrast = sum(statistics.stddev) / 3
-                print(name, image.size, 'brightness', brightness, 'contrast', contrast)
-                assert brightness > 10, f'Black/dark screen: {name}'
-                assert contrast > 8, f'Flat/blank screen: {name}'
-            PY
+            python3 tools/validate_android_screens.py
             cp build/android81-game.png build/CityQuest3D-Legacy-Preview.png
 
       - name: Upload complete tested game
