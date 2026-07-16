@@ -1,4 +1,4 @@
-name: Build City Quest 3D Direct for Android 8.1
+name: Build City Quest 3D GLES2 for Android 8.1
 
 on:
   push:
@@ -21,109 +21,90 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip zip wget git libgl1 libpulse0 python3-pil
+          sudo apt-get install -y unzip zip wget git libgl1 libpulse0 xvfb python3-pil
 
-      - name: Download one building, one car, and one character
+      - name: Add three lightweight real 3D models
         run: |
           set -euxo pipefail
-          rm -rf assets/kenney /tmp/city-models /tmp/car-models
-          mkdir -p assets/kenney/city assets/kenney/cars assets/kenney/characters
+          rm -rf godot3/assets /tmp/city-models /tmp/car-models
+          mkdir -p godot3/assets/city godot3/assets/cars godot3/assets/characters
           git clone --depth 1 https://github.com/immaculate-lift-studio/CityCrafter3D.git /tmp/city-models
           git clone --depth 1 https://github.com/Arslan12216775/kenney_car-kit.git /tmp/car-models
-          wget -q -O assets/kenney/characters/CesiumMan.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb"
+          wget -q -O godot3/assets/characters/CesiumMan.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb"
           python3 - <<'PY'
           from pathlib import Path
           import json
           import shutil
 
           city_source = Path('/tmp/city-models/addons/citycrafter/assets/example_assets/kenney_city-kit-commercial_20/Models/OBJ format')
-          city_candidates = [p for p in city_source.rglob('*.obj') if any(k in p.name.lower() for k in ('building', 'skyscraper', 'shop', 'house'))]
-          assert city_candidates, 'No building OBJ found'
-          building = max(city_candidates, key=lambda p: p.stat().st_size)
-          city_dest = Path('assets/kenney/city')
-          shutil.copy2(building, city_dest / building.name)
-          mtl = building.with_suffix('.mtl')
-          if mtl.exists():
-              shutil.copy2(mtl, city_dest / mtl.name)
-          for pattern in ('*.png', '*.jpg', '*.jpeg'):
-              for texture in city_source.glob(pattern):
-                  shutil.copy2(texture, city_dest / texture.name)
+          buildings = [p for p in city_source.rglob('*.obj') if any(k in p.name.lower() for k in ('building', 'skyscraper', 'shop', 'house'))]
+          assert buildings, 'No building model found'
+          building = min(buildings, key=lambda p: p.stat().st_size)
+          building_dest = Path('godot3/assets/city') / building.name
+          shutil.copy2(building, building_dest)
+          if building.with_suffix('.mtl').exists():
+              shutil.copy2(building.with_suffix('.mtl'), building_dest.with_suffix('.mtl'))
 
-          car_root = Path('/tmp/car-models')
-          car_glbs = [p for p in car_root.rglob('*.glb') if any(k in p.name.lower() for k in ('car', 'sedan', 'taxi', 'racer', 'vehicle'))]
-          car_objs = [p for p in car_root.rglob('*.obj') if any(k in p.name.lower() for k in ('car', 'sedan', 'taxi', 'racer', 'vehicle'))]
-          car_dest = Path('assets/kenney/cars')
-          if car_glbs:
-              car = min(car_glbs, key=lambda p: p.stat().st_size)
-              shutil.copy2(car, car_dest / car.name)
-          else:
-              assert car_objs, 'No car model found'
-              car = min(car_objs, key=lambda p: p.stat().st_size)
-              shutil.copy2(car, car_dest / car.name)
-              car_mtl = car.with_suffix('.mtl')
-              if car_mtl.exists():
-                  shutil.copy2(car_mtl, car_dest / car_mtl.name)
-              for pattern in ('*.png', '*.jpg', '*.jpeg'):
-                  for texture in car.parent.glob(pattern):
-                      shutil.copy2(texture, car_dest / texture.name)
+          car_source = Path('/tmp/car-models')
+          cars = [p for p in car_source.rglob('*.obj') if any(k in p.name.lower() for k in ('car', 'sedan', 'taxi', 'racer', 'vehicle'))]
+          assert cars, 'No car OBJ found'
+          car = min(cars, key=lambda p: p.stat().st_size)
+          car_dest = Path('godot3/assets/cars') / car.name
+          shutil.copy2(car, car_dest)
+          if car.with_suffix('.mtl').exists():
+              shutil.copy2(car.with_suffix('.mtl'), car_dest.with_suffix('.mtl'))
 
-          building_path = next(city_dest.glob('*.obj'))
-          car_files = list(car_dest.glob('*.glb')) + list(car_dest.glob('*.obj'))
-          assert car_files, 'Car copy failed'
           manifest = {
-              'city': ['res://' + building_path.as_posix()],
-              'details': [],
-              'cars': ['res://' + car_files[0].as_posix()],
-              'characters': ['res://assets/kenney/characters/CesiumMan.glb'],
+              'city': ['res://' + building_dest.relative_to('godot3').as_posix()],
+              'cars': ['res://' + car_dest.relative_to('godot3').as_posix()],
+              'characters': ['res://assets/characters/CesiumMan.glb'],
           }
-          Path('assets/model_manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
-          print(json.dumps(manifest, ensure_ascii=False, indent=2))
+          Path('godot3/assets/model_manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+          print(json.dumps(manifest, indent=2))
           PY
-          find assets -type f -printf '%p %s bytes\n'
+          find godot3/assets -type f -printf '%p %s bytes\n'
 
       - name: Write licenses
         run: |
-          printf '%s\n' '# Third-party assets' '' '- Kenney City Kit — CC0 1.0.' '- Kenney Car Kit — CC0 1.0.' '- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.' '- Godot Engine runtime — MIT License.' > THIRD_PARTY_LICENSES.md
+          printf '%s\n' '# Third-party assets' '' '- Kenney City Kit — CC0 1.0.' '- Kenney Car Kit — CC0 1.0.' '- CesiumMan from KhronosGroup glTF Sample Assets — CC-BY 4.0.' '- Godot Engine 3.5.3 runtime — MIT License.' > godot3/THIRD_PARTY_LICENSES.md
 
-      - name: Install Godot and export templates
+      - name: Install Godot 3.5.3 and export templates
         run: |
           set -euxo pipefail
-          wget -q -O /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip"
-          wget -q -O /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_export_templates.tpz"
-          unzip -q /tmp/godot.zip -d /tmp/godot
-          sudo install -m 0755 /tmp/godot/Godot_v4.6.3-stable_linux.x86_64 /usr/local/bin/godot
-          mkdir -p "$HOME/.local/share/godot/export_templates/4.6.3.stable" /tmp/godot-templates
-          unzip -q /tmp/templates.tpz -d /tmp/godot-templates
-          cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.6.3.stable/"
-          godot --version
+          wget -q -O /tmp/godot3.zip "https://github.com/godotengine/godot/releases/download/3.5.3-stable/Godot_v3.5.3-stable_x11.64.zip"
+          wget -q -O /tmp/godot3-templates.tpz "https://github.com/godotengine/godot/releases/download/3.5.3-stable/Godot_v3.5.3-stable_export_templates.tpz"
+          unzip -q /tmp/godot3.zip -d /tmp/godot3-bin
+          sudo install -m 0755 /tmp/godot3-bin/Godot_v3.5.3-stable_x11.64 /usr/local/bin/godot3
+          mkdir -p "$HOME/.local/share/godot/templates/3.5.3.stable" /tmp/godot3-templates
+          unzip -q /tmp/godot3-templates.tpz -d /tmp/godot3-templates
+          cp -a /tmp/godot3-templates/templates/. "$HOME/.local/share/godot/templates/3.5.3.stable/"
+          godot3 --version
 
-      - name: Generate signing key
+      - name: Generate Android debug signing key
         run: |
-          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=City Quest Direct,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=City Quest GLES2,C=US" -keyalg RSA -keysize 2048 -validity 10000
 
-      - name: Import and smoke-test direct start
+      - name: Import assets and smoke-test GLES2 direct start
         run: |
           set -o pipefail
-          timeout 8m godot --headless --editor --path . --rendering-method gl_compatibility --import 2>&1 | tee import.log || true
-          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" import.log; then exit 1; fi
-          timeout 50s godot --headless --path . --rendering-method gl_compatibility --quit-after 180 2>&1 | tee smoke-headless.log || true
-          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Failed loading resource" smoke-headless.log; then exit 1; fi
-          grep -q "CITYQUEST_READY direct_start" smoke-headless.log
+          timeout 7m xvfb-run -a godot3 --path godot3 --editor --quit 2>&1 | tee godot3-import.log || true
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" godot3-import.log; then exit 1; fi
+          timeout 20s xvfb-run -a godot3 --path godot3 2>&1 | tee godot3-smoke.log || true
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Failed loading resource" godot3-smoke.log; then exit 1; fi
+          grep -q "CITYQUEST_READY gles2_direct" godot3-smoke.log
 
-      - name: Export APK and browser preview
+      - name: Export phone and emulator APKs
         run: |
-          mkdir -p build/web
-          godot --headless --path . --export-debug "Android Legacy" build/CityQuest3D-Direct.apk 2>&1 | tee export-android.log
-          godot --headless --path . --export-debug "Android Emulator" build/CityQuest3D-Emulator.apk 2>&1 | tee export-emulator.log
-          godot --headless --path . --export-release "Web Preview" build/web/index.html 2>&1 | tee export-web.log
-          test -s build/CityQuest3D-Direct.apk
-          test -s build/CityQuest3D-Emulator.apk
-          test -s build/web/index.html
-          unzip -t build/CityQuest3D-Direct.apk
-          keytool -printcert -jarfile build/CityQuest3D-Direct.apk > build/signature.txt
-          sha256sum build/CityQuest3D-Direct.apk | tee build/SHA256SUMS.txt
-          cd build/web && zip -qr ../CityQuest3D-Web-Preview.zip . && cd ../..
-          zip -qr build/CityQuest3D-Direct-Source.zip . -x '.git/*' '.godot/*' 'build/*' 'debug.keystore' 'project-source.zip'
+          mkdir -p build
+          xvfb-run -a godot3 --path godot3 --export-debug "Android Phone GLES2" "$GITHUB_WORKSPACE/build/CityQuest3D-GLES2.apk" 2>&1 | tee godot3-export-phone.log
+          xvfb-run -a godot3 --path godot3 --export-debug "Android Emulator GLES2" "$GITHUB_WORKSPACE/build/CityQuest3D-GLES2-Emulator.apk" 2>&1 | tee godot3-export-emulator.log
+          test -s build/CityQuest3D-GLES2.apk
+          test -s build/CityQuest3D-GLES2-Emulator.apk
+          unzip -t build/CityQuest3D-GLES2.apk
+          keytool -printcert -jarfile build/CityQuest3D-GLES2.apk > build/signature.txt
+          sha256sum build/CityQuest3D-GLES2.apk | tee build/SHA256SUMS.txt
+          zip -qr build/CityQuest3D-GLES2-Source.zip godot3 tools/validate_android_screens.py
 
       - name: Enable KVM
         run: |
@@ -132,7 +113,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm || true
           sudo chmod 666 /dev/kvm || true
 
-      - name: Test direct gameplay on Android 8.1
+      - name: Install and play on Android 8.1 emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 27
@@ -140,19 +121,36 @@ jobs:
           profile: pixel_2
           disable-animations: true
           emulator-options: -no-snapshot -no-window -no-audio -no-boot-anim -camera-back none -gpu swiftshader_indirect
-          script: bash tools/run_android81_test.sh
+          script: |
+            set -euxo pipefail
+            adb install -r build/CityQuest3D-GLES2-Emulator.apk
+            adb shell settings put secure immersive_mode_confirmations confirmed || true
+            adb logcat -c
+            adb shell monkey -p com.godnit.cityquest3dgles2 -c android.intent.category.LAUNCHER 1
+            sleep 15
+            adb shell pidof com.godnit.cityquest3dgles2 | tr -d '\r' > /tmp/cityquest.pid
+            test -s /tmp/cityquest.pid
+            adb exec-out screencap -p > build/android81-start.png
+            adb shell input swipe 225 860 225 665 1400
+            sleep 5
+            adb exec-out screencap -p > build/android81-playing.png
+            adb logcat -d > build/android81-logcat.txt
+            if grep -E "FATAL EXCEPTION|Fatal signal|ANR in com.godnit.cityquest3dgles2|Program linking failed|GL_MAX_FRAGMENT_UNIFORM" build/android81-logcat.txt; then exit 1; fi
+            cp build/android81-start.png build/android81-menu.png
+            cp build/android81-playing.png build/android81-game.png
+            python3 tools/validate_android_screens.py
+            cp build/android81-playing.png build/CityQuest3D-GLES2-Preview.png
 
-      - name: Upload tested files
+      - name: Upload tested game
         uses: actions/upload-artifact@v4
         with:
-          name: CityQuest3D-Direct-Ready
+          name: CityQuest3D-GLES2-Ready
           path: |
-            build/CityQuest3D-Direct.apk
-            build/CityQuest3D-Web-Preview.zip
-            build/CityQuest3D-Direct-Source.zip
-            build/CityQuest3D-Legacy-Preview.png
-            build/android81-menu.png
-            build/android81-game.png
+            build/CityQuest3D-GLES2.apk
+            build/CityQuest3D-GLES2-Source.zip
+            build/CityQuest3D-GLES2-Preview.png
+            build/android81-start.png
+            build/android81-playing.png
             build/android81-logcat.txt
             build/SHA256SUMS.txt
             build/signature.txt
@@ -163,34 +161,33 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: CityQuest3D-Direct-Diagnostics
+          name: CityQuest3D-GLES2-Diagnostics
           path: |
-            import.log
-            smoke-headless.log
-            export-android.log
-            export-emulator.log
-            export-web.log
+            godot3-import.log
+            godot3-smoke.log
+            godot3-export-phone.log
+            godot3-export-emulator.log
             build/android81-logcat.txt
-            build/android81-menu.png
-            build/android81-game.png
+            build/android81-start.png
+            build/android81-playing.png
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Publish delivery branch
+      - name: Publish delivery files
         if: always()
         run: |
           set -euxo pipefail
           rm -rf /tmp/cityquest-delivery
           mkdir -p /tmp/cityquest-delivery/diagnostics
-          printf '%s\n' "run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "job_status=${{ job.status }}" 'android_test=API 27 / Android 8.1 direct start' 'renderer=OpenGL Compatibility' "completed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-delivery/STATUS.txt
-          cp build/CityQuest3D-Direct.apk /tmp/cityquest-delivery/ 2>/dev/null || true
-          cp build/CityQuest3D-Web-Preview.zip /tmp/cityquest-delivery/ 2>/dev/null || true
-          cp build/CityQuest3D-Legacy-Preview.png /tmp/cityquest-delivery/ 2>/dev/null || true
-          cp build/android81-menu.png /tmp/cityquest-delivery/ 2>/dev/null || true
-          cp build/android81-game.png /tmp/cityquest-delivery/ 2>/dev/null || true
+          printf '%s\n' "run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "job_status=${{ job.status }}" 'engine=Godot 3.5.3 GLES2' 'android_test=API 27 / Android 8.1 direct play' "completed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-delivery/STATUS.txt
+          cp build/CityQuest3D-GLES2.apk /tmp/cityquest-delivery/ 2>/dev/null || true
+          cp build/CityQuest3D-GLES2-Source.zip /tmp/cityquest-delivery/ 2>/dev/null || true
+          cp build/CityQuest3D-GLES2-Preview.png /tmp/cityquest-delivery/ 2>/dev/null || true
+          cp build/android81-start.png /tmp/cityquest-delivery/ 2>/dev/null || true
+          cp build/android81-playing.png /tmp/cityquest-delivery/ 2>/dev/null || true
           cp build/SHA256SUMS.txt /tmp/cityquest-delivery/ 2>/dev/null || true
           cp build/signature.txt /tmp/cityquest-delivery/ 2>/dev/null || true
-          cp import.log smoke-headless.log export-android.log export-emulator.log export-web.log /tmp/cityquest-delivery/diagnostics/ 2>/dev/null || true
+          cp godot3-import.log godot3-smoke.log godot3-export-phone.log godot3-export-emulator.log /tmp/cityquest-delivery/diagnostics/ 2>/dev/null || true
           cp build/android81-logcat.txt /tmp/cityquest-delivery/diagnostics/ 2>/dev/null || true
           find /tmp/cityquest-delivery -type f -printf '%P\t%s bytes\n' | sort > /tmp/cityquest-delivery/FILES.txt
           git config user.name "City Quest Build Bot"
@@ -199,5 +196,5 @@ jobs:
           git rm -rf . || true
           cp -a /tmp/cityquest-delivery/. .
           git add -A
-          git commit -m "Publish City Quest Direct run ${{ github.run_id }}"
+          git commit -m "Publish City Quest GLES2 run ${{ github.run_id }}"
           git push origin HEAD:cityquest3d-delivery --force
