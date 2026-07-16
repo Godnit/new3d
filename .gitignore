@@ -1,0 +1,5 @@
+.godot/
+build/
+debug.keystore
+assets/kenney/
+*.log
