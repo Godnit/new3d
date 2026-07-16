@@ -1,0 +1,107 @@
+name: Download Riyadh business reference images
+
+on:
+  push:
+    paths:
+      - '.github/workflows/download-business-reference-images.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  download-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download public reference images
+        shell: bash
+        run: |
+          set -u
+          ROOT="business-research/riyadh-no-website-leads-2026-07-16/businesses"
+          FAILURES="$ROOT/image-download-failures.txt"
+          : > "$FAILURES"
+
+          download() {
+            local url="$1"
+            local out="$2"
+            mkdir -p "$(dirname "$out")"
+            if curl -L --fail --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 120 \
+              -A 'Mozilla/5.0 (compatible; business-research-archiver/1.0)' \
+              "$url" -o "$out"; then
+              if [ ! -s "$out" ]; then
+                echo "$out | empty file | $url" >> "$FAILURES"
+                rm -f "$out"
+              fi
+            else
+              echo "$out | download failed | $url" >> "$FAILURES"
+              rm -f "$out"
+            fi
+          }
+
+          CRO="$ROOT/cro-bakery/reference-images"
+          download 'https://images.deliveryhero.io/image/hungerstation/restaurant/android_cover_photo/142ac562f457ef4dfe8c2731e592534d.jpg?quality=75&webp=true&width=1440' "$CRO/01-cover.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/restaurant/logo/8de57cece8a6f07e1a168ad6ef83f2ad.jpg?quality=75&webp=true&width=512' "$CRO/02-logo.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image/a8a35ac8c1f0bc68b0ad1373a3a21742?quality=75&webp=true&width=1200' "$CRO/03-plain-croissant.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image/41b14b6b4a438a96fc32364043e3eeeb?quality=75&webp=true&width=1200' "$CRO/04-chocolate-croissant.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image/7ccbf03f3a2a089ba930fa4579c114f3?quality=75&webp=true&width=1200' "$CRO/05-almond-croissant.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image/3eaaf3bdac6d1c24eb02b8064896c10e?quality=75&webp=true&width=1200' "$CRO/06-gathering-croissant-box.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image/f667c9107751f77f2a6ace7fbea8bb54?quality=75&webp=true&width=1200' "$CRO/07-spanish-latte.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image/2d89cd1d9548756edeb0770f42f4bab5?quality=75&webp=true&width=1200' "$CRO/08-hot-chocolate-box.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image_url_ref/e699a41af7d6e1f0aea488031eafb3c6.jpg?quality=75&webp=true&width=1200' "$CRO/09-halloumi-zaatar-sandwich.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image_url_ref/5ef2e12c35fe35a85c1e4fd25dd0a3d0.jpg?quality=75&webp=true&width=1200' "$CRO/10-pecan-cheesecake-slice.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image/6331510?quality=75&webp=true&width=1200' "$CRO/11-pecan-pie.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menuitem/image/48853031?quality=75&webp=true&width=1200' "$CRO/12-crunchy-pecan-cheesecake.webp"
+          download 'https://images.deliveryhero.io/image/hungerstation/menus/menuitem/hsimg-6391041?quality=75&webp=true&width=1200' "$CRO/13-small-honey-cake.webp"
+
+          SALON="$ROOT/the-salon-majas/reference-images"
+          download 'https://images.fresha.com/locations/location-profile-images/1172167/1750572/b1311474-218f-40ed-80db-052c3e795d1d-TheSalonMajas-SA-RiyadhProvince-Riyadh-AlAqiq-Fresha.jpg?class=venue-gallery-mobile&f_quality=75&f_width=1600' "$SALON/01-wash-stations.jpg"
+          download 'https://images.fresha.com/locations/location-profile-images/1172167/1750573/6895290a-5a45-4b77-a9bf-f552f7cab816-TheSalonMajas-SA-RiyadhProvince-Riyadh-AlAqiq-Fresha.jpg?class=venue-gallery-mobile&f_quality=75&f_width=1600' "$SALON/02-spa-room.jpg"
+          download 'https://images.fresha.com/locations/location-profile-images/1172167/1750574/1b5489a6-6d0f-457b-8b5c-7aaa85dbdf22-TheSalonMajas-SA-RiyadhProvince-Riyadh-AlAqiq-Fresha.jpg?class=venue-gallery-mobile&f_quality=75&f_width=1600' "$SALON/03-reception.jpg"
+          download 'https://images.fresha.com/locations/location-profile-images/1172167/1750575/679f5308-c5ca-45b5-9920-da318c4c1a34-TheSalonMajas-SA-RiyadhProvince-Riyadh-AlAqiq-Fresha.jpg?class=venue-gallery-mobile&f_quality=75&f_width=1600' "$SALON/04-copper-wash-basin.jpg"
+          download 'https://images.fresha.com/locations/location-profile-images/1172167/1750576/962d9e7f-4467-4697-9e8c-209e2fb9b6be-TheSalonMajas-SA-RiyadhProvince-Riyadh-AlAqiq-Fresha.jpg?class=venue-gallery-mobile&f_quality=75&f_width=1600' "$SALON/05-stone-basins.jpg"
+          download 'https://images.fresha.com/locations/location-profile-images/1172167/1750577/9a045dd8-957b-4fb2-a4e2-729e69d17e6f-TheSalonMajas-SA-RiyadhProvince-Riyadh-AlAqiq-Fresha.jpg?class=venue-gallery-mobile&f_quality=75&f_width=1600' "$SALON/06-exterior.jpg"
+          download 'https://images.fresha.com/locations/location-profile-images/1172167/1750578/2792d4bd-ddce-4efc-94f9-8c940373b46c-TheSalonMajas-SA-RiyadhProvince-Riyadh-AlAqiq-Fresha.jpg?class=venue-gallery-mobile&f_quality=75&f_width=1600' "$SALON/07-products-display.jpg"
+          download 'https://images.fresha.com/locations/location-profile-images/1172167/1750579/8342bd25-f5e8-4184-a53f-8f3a52430316-TheSalonMajas-SA-RiyadhProvince-Riyadh-AlAqiq-Fresha.jpg?class=venue-gallery-mobile&f_quality=75&f_width=1600' "$SALON/08-marble-sink-area.jpg"
+
+          PEACOCK="$ROOT/peacock-chocolate/reference-images"
+          download 'https://media.licdn.com/dms/image/v2/D4D22AQGkvQZCSi_HlA/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1691310169991?e=2147483647&t=fqrUM4fw62eojEmXGoKyPiwJWN5O4gci_oUINJ4gL4I&v=beta' "$PEACOCK/01-linkedin-product-post.jpg"
+          download 'https://media.licdn.com/dms/image/v2/C4D0BAQHYMF3w5LxEmQ/company-logo_100_100/company-logo_100_100/0/1676291661943?e=2147483647&t=0i-xcg8Kn8kkVdaeWFMly4KfOiZiPH2vUlxphv2VgjA&v=beta' "$PEACOCK/02-linkedin-logo.jpg"
+
+          WATER="$ROOT/water-splash/reference-images"
+          download 'https://www.almuraba.net/wp-content/uploads/2024/09/%D9%85%D8%BA%D8%A7%D8%B3%D9%84-%D8%B1%D8%B4%D8%A9-%D8%A7%D9%84%D9%85%D9%8A%D8%A7%D9%87-%D9%84%D8%AE%D8%AF%D9%85%D8%A7%D8%AA-%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%B1%D8%A7%D8%AA-Water-Splash-%D9%88%D8%B9%D9%86%D8%A7%D9%88%D9%8A%D9%86-%D9%85%D8%BA%D8%A7%D8%B3%D9%84-%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%B1%D8%A7%D8%AA-%D9%81%D9%8A-%D8%A7%D9%84%D8%B1%D9%8A%D8%A7%D8%B6.jpg' "$WATER/01-water-splash.jpg"
+          download 'https://www.almuraba.net/wp-content/uploads/2024/09/%D9%85%D8%BA%D8%A7%D8%B3%D9%84-%D8%B1%D8%B4%D8%A9-%D8%A7%D9%84%D9%85%D9%8A%D8%A7%D9%87-%D9%84%D8%AE%D8%AF%D9%85%D8%A7%D8%AA-%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%B1%D8%A7%D8%AA-%D9%88%D8%B9%D9%86%D8%A7%D9%88%D9%8A%D9%86-%D9%85%D8%BA%D8%A7%D8%B3%D9%84-%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%B1%D8%A7%D8%AA-%D9%81%D9%8A-%D8%A7%D9%84%D8%B1%D9%8A%D8%A7%D8%B6.jpg' "$WATER/02-water-splash-services.jpg"
+
+          AB="$ROOT/riyadh-symbol-ab-design/reference-images"
+          mkdir -p "$AB"
+          cat > "$AB/README.md" <<'EOF'
+          # صور رمز الرياض AB Design
+
+          الصور الأصلية موجودة مدمجة داخل ملف HTML سابق قدّمه المستخدم، وليست متاحة عبر رابط عام موثوق يمكن تنزيله آليًا. لا تُستخدم صور بديلة من الإنترنت على أنها أعمال النشاط. عند إتاحة الملف المصدر في المستودع تُستخرج الصور إلى هذا المجلد.
+          EOF
+
+          cat > "$ROOT/REFERENCE-IMAGES-NOTICE.md" <<'EOF'
+          # تنبيه استخدام الصور المرجعية
+
+          هذه نسخ مرجعية جُمعت من صفحات عامة للمساعدة في تقييم فرص تصميم المواقع. حقوق الصور تبقى لأصحابها ومنصاتها. لا تُنشر في موقع تجاري ولا تُسلّم لعميل على أنها مرخّصة قبل موافقة صاحب النشاط أو استلام النسخ الأصلية منه.
+          EOF
+
+          find "$ROOT" -path '*/reference-images/*' -type f ! -name '*.md' -print0 | while IFS= read -r -d '' image; do
+            mime=$(file -b --mime-type "$image" || true)
+            bytes=$(wc -c < "$image" || echo 0)
+            printf '%s | %s | %s bytes\n' "$image" "$mime" "$bytes"
+          done > "$ROOT/reference-images-manifest.txt"
+
+      - name: Commit downloaded images
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add business-research/riyadh-no-website-leads-2026-07-16/businesses
+          if git diff --cached --quiet; then
+            echo 'No images were downloaded.'
+          else
+            git commit -m 'Add public reference images for Riyadh business leads'
+            git push
+          fi
