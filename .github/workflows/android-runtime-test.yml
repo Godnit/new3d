@@ -1,0 +1,90 @@
+name: Android runtime test for City Quest 3D
+
+on:
+  push:
+    branches: [cityquest3d-build]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  runtime-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Download the verified APK artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p build
+          curl -fL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/Godnit/new3d/actions/artifacts/8372561481/zip" \
+            -o /tmp/ready.zip
+          unzip -q /tmp/ready.zip -d /tmp/ready
+          cp /tmp/ready/CityQuest3D.apk build/CityQuest3D.apk
+          test -s build/CityQuest3D.apk
+          unzip -t build/CityQuest3D.apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          sudo chmod 666 /dev/kvm || true
+          ls -l /dev/kvm || true
+
+      - name: Install Android emulator image
+        run: |
+          set -euxo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "system-images;android-29;google_apis;x86_64"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name cityquest-test --package "system-images;android-29;google_apis;x86_64" --device "pixel_2"
+
+      - name: Boot emulator, install APK, and launch game
+        run: |
+          set -euxo pipefail
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd cityquest-test \
+            -no-window -no-audio -no-boot-anim -no-snapshot \
+            -gpu swiftshader_indirect -camera-back none \
+            > build/emulator-console.log 2>&1 &
+          echo $! > build/emulator.pid
+          adb start-server
+          timeout 360 bash -c 'until adb devices | grep -q "emulator-.*device"; do sleep 5; done'
+          timeout 360 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
+          adb shell input keyevent 82 || true
+          adb install -r build/CityQuest3D.apk | tee build/install-output.txt
+          adb logcat -c
+          adb shell monkey -p com.godnit.cityquest3d -c android.intent.category.LAUNCHER 1 | tee build/launch-output.txt
+          sleep 35
+          PID="$(adb shell pidof com.godnit.cityquest3d | tr -d '\r')"
+          echo "$PID" | tee build/app-pid.txt
+          test -n "$PID"
+          adb exec-out screencap -p > build/android-emulator-screenshot.png
+          adb logcat -d > build/android-logcat.txt
+          if grep -E "FATAL EXCEPTION|Fatal signal|Process: com.godnit.cityquest3d.*has died|ANR in com.godnit.cityquest3d" build/android-logcat.txt; then
+            exit 1
+          fi
+          echo success > build/android-runtime-status.txt
+
+      - name: Upload Android runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CityQuest3D-Android-Runtime-Evidence
+          path: |
+            build/android-runtime-status.txt
+            build/android-emulator-screenshot.png
+            build/android-logcat.txt
+            build/emulator-console.log
+            build/install-output.txt
+            build/launch-output.txt
+            build/app-pid.txt
+          if-no-files-found: warn
+          retention-days: 30
