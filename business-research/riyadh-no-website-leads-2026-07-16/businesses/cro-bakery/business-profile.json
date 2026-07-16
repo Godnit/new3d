@@ -1,0 +1,47 @@
+{
+  "name": "Cro Bakery",
+  "name_ar": "كرو بيكري",
+  "category": ["bakery", "desserts", "cafe"],
+  "city": "Riyadh",
+  "rating": 4.7,
+  "review_count": null,
+  "phone": null,
+  "whatsapp": null,
+  "address": null,
+  "website_status": "no independent business-owned domain found; provisional",
+  "platform_presence": [
+    {
+      "platform": "HungerStation",
+      "url": "https://hungerstation.com/sa-en/restaurant/riyadh/riyadh/58749"
+    }
+  ],
+  "products_and_services": [
+    "croissants",
+    "cakes and cheesecake",
+    "hot and cold drinks",
+    "sandwiches",
+    "dessert bites and gathering boxes"
+  ],
+  "sample_prices_sar": {
+    "plain_croissant": 13,
+    "chocolate_croissant": 14,
+    "almond_croissant": 18,
+    "espresso": 10,
+    "spanish_latte": 24,
+    "pecan_cheesecake_slice": 24
+  },
+  "image_reference_pages": [
+    "https://hungerstation.com/sa-en/restaurant/riyadh/riyadh/58749"
+  ],
+  "image_usage": "Do not copy platform images into a commercial site until the owner supplies originals or grants permission.",
+  "recommended_site_goal": "Direct orders, visual menu, occasion boxes, branch/contact details and WhatsApp conversion.",
+  "missing_information": [
+    "direct phone and WhatsApp",
+    "full address and map link",
+    "opening hours",
+    "official social accounts",
+    "original logo and product photos",
+    "final menu and prices"
+  ],
+  "verified_at": "2026-07-16"
+}
