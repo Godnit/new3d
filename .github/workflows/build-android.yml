@@ -3,6 +3,8 @@ name: Build and test City Quest 3D APK
 on:
   push:
     branches: [cityquest3d-build]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
