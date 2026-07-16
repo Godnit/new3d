@@ -17,6 +17,7 @@ jobs:
     timeout-minutes: 35
     env:
       ANDROID_AVD_HOME: /home/runner/.android/avd
+      QT_QPA_PLATFORM: offscreen
     steps:
       - name: Download the verified APK artifact
         env:
@@ -35,14 +36,6 @@ jobs:
           test -s build/CityQuest3D.apk
           unzip -t build/CityQuest3D.apk
 
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm || true
-          sudo chmod 666 /dev/kvm || true
-          ls -l /dev/kvm || true
-
       - name: Install Android emulator image
         run: |
           set -euxo pipefail
@@ -50,27 +43,29 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "system-images;android-29;google_apis;x86_64"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name cityquest-test --package "system-images;android-29;google_apis;x86_64" --device "pixel_2"
-          "$ANDROID_HOME/emulator/emulator" -list-avds
-          find /home/runner -maxdepth 5 -type f -name 'cityquest-test.ini' -print
+          "$ANDROID_HOME/emulator/emulator" -list-avds | grep -q '^cityquest-test$'
 
-      - name: Boot emulator, install APK, and launch game
+      - name: Boot software emulator, install APK, and launch game
         run: |
           set -euxo pipefail
-          "$ANDROID_HOME/emulator/emulator" -list-avds | grep -q '^cityquest-test$'
           nohup "$ANDROID_HOME/emulator/emulator" \
             -avd cityquest-test \
-            -no-window -no-audio -no-boot-anim -no-snapshot \
-            -gpu swiftshader_indirect -camera-back none \
+            -accel off -gpu swiftshader \
+            -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics \
+            -camera-back none -verbose \
             > build/emulator-console.log 2>&1 &
-          echo $! > build/emulator.pid
+          EMU_PID=$!
+          echo "$EMU_PID" > build/emulator.pid
+          sleep 12
+          ps -p "$EMU_PID"
           adb start-server
-          timeout 360 bash -c 'until adb devices | grep -q "emulator-.*device"; do sleep 5; done'
-          timeout 360 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
+          timeout 600 bash -c 'until adb devices | grep -q "emulator-.*device"; do sleep 5; done'
+          timeout 600 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
           adb shell input keyevent 82 || true
           adb install -r build/CityQuest3D.apk | tee build/install-output.txt
           adb logcat -c
           adb shell monkey -p com.godnit.cityquest3d -c android.intent.category.LAUNCHER 1 | tee build/launch-output.txt
-          sleep 35
+          sleep 40
           PID="$(adb shell pidof com.godnit.cityquest3d | tr -d '\r')"
           echo "$PID" | tee build/app-pid.txt
           test -n "$PID"
