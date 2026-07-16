@@ -1,100 +1,10 @@
-name: Deliver City Quest 3D Legacy Build
+name: Obsolete City Quest Legacy Dispatcher
 
 on:
-  push:
-    branches: [cityquest3d-legacy-tabs-v2]
   workflow_dispatch:
 
-permissions:
-  actions: write
-  contents: write
-
 jobs:
-  build-and-deliver:
+  disabled:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Dispatch full Android 8.1 and Web validation
-        id: dispatch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euxo pipefail
-          BEFORE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          gh workflow run build-android.yml --repo "${{ github.repository }}" --ref cityquest3d-legacy-tabs-v2
-          RUN_ID=""
-          for attempt in $(seq 1 30); do
-            RUN_ID="$(gh run list --repo "${{ github.repository }}" --workflow build-android.yml --branch cityquest3d-legacy-tabs-v2 --event workflow_dispatch --limit 10 --json databaseId,createdAt --jq '[.[] | select(.createdAt >= "'"$BEFORE"'")][0].databaseId // empty')"
-            if [ -n "$RUN_ID" ]; then break; fi
-            sleep 5
-          done
-          test -n "$RUN_ID"
-          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "$RUN_ID" > /tmp/full-build-run-id.txt
-
-      - name: Wait for full validation
-        id: wait
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ steps.dispatch.outputs.run_id }}
-        run: gh run watch "$RUN_ID" --repo "${{ github.repository }}" --exit-status --interval 15
-
-      - name: Download build products and diagnostics
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ steps.dispatch.outputs.run_id }}
-        run: |
-          set +e
-          mkdir -p /tmp/delivery
-          if [ -n "$RUN_ID" ]; then
-            gh run download "$RUN_ID" --repo "${{ github.repository }}" --name CityQuest3D-Legacy-v2-Ready --dir /tmp/delivery/ready
-            READY_CODE=$?
-            gh run download "$RUN_ID" --repo "${{ github.repository }}" --name CityQuest3D-Legacy-Diagnostics --dir /tmp/delivery/diagnostics
-            DIAG_CODE=$?
-            CONCLUSION="$(gh run view "$RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
-          else
-            READY_CODE=1
-            DIAG_CODE=1
-            CONCLUSION="dispatch_failed"
-          fi
-          {
-            echo "run_id=$RUN_ID"
-            echo "conclusion=$CONCLUSION"
-            echo "ready_download_code=$READY_CODE"
-            echo "diagnostics_download_code=$DIAG_CODE"
-            echo "head_sha=${{ github.sha }}"
-            echo "completed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } > /tmp/delivery/STATUS.txt
-          find /tmp/delivery -maxdepth 3 -type f -printf '%P\t%s bytes\n' | sort > /tmp/delivery/FILES.txt
-          cat /tmp/delivery/STATUS.txt
-          cat /tmp/delivery/FILES.txt
-
-      - name: Publish files to delivery branch
-        if: always()
-        run: |
-          set -euxo pipefail
-          git config user.name "City Quest Build Bot"
-          git config user.email "actions@users.noreply.github.com"
-          git checkout --orphan delivery-work
-          git rm -rf . || true
-          cp -a /tmp/delivery/. .
-          git add -A
-          git commit -m "Publish City Quest 3D Legacy validation ${{ steps.dispatch.outputs.run_id }}"
-          git push origin HEAD:cityquest3d-delivery --force
-
-      - name: Fail when validation failed
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ steps.dispatch.outputs.run_id }}
-        run: |
-          test -n "$RUN_ID"
-          CONCLUSION="$(gh run view "$RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
-          test "$CONCLUSION" = "success"
+      - run: echo "The legacy build now runs directly from build-android.yml."
