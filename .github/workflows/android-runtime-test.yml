@@ -1,0 +1,41 @@
+name: Inspect Latest City Quest Android 8.1 Failure
+
+on:
+  push:
+    branches: [cityquest3d-legacy-tabs-v2]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  inspect-failure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download failed run logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FAILED_RUN_ID: "29508848385"
+        run: |
+          mkdir -p /tmp/cityquest-monitor
+          gh run view "$FAILED_RUN_ID" --repo "${{ github.repository }}" > /tmp/cityquest-monitor/LATEST_BUILD_VIEW.txt 2>&1 || true
+          gh run view "$FAILED_RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt 2>&1 || true
+          printf '%s\n' "failed_run_id=$FAILED_RUN_ID" "monitor_run_id=${{ github.run_id }}" "head_sha=${{ github.sha }}" "captured_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/cityquest-monitor/STATUS.txt
+          tail -n 300 /tmp/cityquest-monitor/LATEST_BUILD_FAILED_LOG.txt || true
+
+      - name: Publish failure logs
+        run: |
+          git config user.name "City Quest Monitor"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan monitor-work
+          git rm -rf . || true
+          cp -a /tmp/cityquest-monitor/. .
+          git add -A
+          git commit -m "Publish latest Android 8.1 failure logs ${{ github.run_id }}"
+          git push origin HEAD:cityquest3d-monitor --force
