@@ -20,10 +20,14 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Download verified offline assets
+      - name: Download and verify offline assets
         run: |
           set -euxo pipefail
           mkdir -p quran-offline/app/src/main/assets
@@ -36,6 +40,7 @@ jobs:
           assert isinstance(d,list) and len(d)==114, f'Expected 114 surahs, got {len(d)}'
           count=sum(len(s.get('verses',[])) for s in d)
           assert count==6236, f'Expected 6236 verses, got {count}'
+          assert d[0]['name']=='الفاتحة' and d[-1]['name']=='الناس'
           print('Validated:',len(d),'surahs and',count,'verses')
           PY
       - name: Build APK
