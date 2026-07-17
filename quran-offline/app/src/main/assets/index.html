@@ -2,143 +2,140 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <meta name="theme-color" content="#071b17">
-  <title>القرآن الكريم</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#0f5f4a">
+  <title>رفيق الهدى</title>
+  <link rel="stylesheet" href="app-v2.css">
   <script src="adhan.umd.min.js"></script>
-  <style>
-    :root{--bg:#f4f1e8;--card:#fffdf7;--text:#17352c;--muted:#6f7e78;--primary:#0d5b46;--primary2:#083d31;--gold:#c89a3a;--line:#d9d2bf;--danger:#b33737;--reader:#fffaf0;--shadow:0 8px 24px rgba(6,41,32,.12);--font:26px}
-    :root[data-theme="dark"]{--bg:#061713;--card:#0b241e;--text:#f5eddb;--muted:#a9bbb5;--primary:#2a9d76;--primary2:#071f1a;--gold:#e3b85f;--line:#284239;--danger:#ff7777;--reader:#071b17;--shadow:0 8px 28px rgba(0,0,0,.35)}
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Tahoma,Arial,sans-serif}button,input,select{font:inherit}.hidden{display:none!important}
-    .app{min-height:100vh;padding-bottom:76px}.topbar{position:sticky;top:0;z-index:20;height:60px;display:flex;align-items:center;gap:12px;padding:0 14px;background:linear-gradient(135deg,var(--primary2),var(--primary));color:#fff;border-bottom:1px solid rgba(255,255,255,.12)}.topbar h1{font-size:18px;margin:0;flex:1}.icon-btn{border:0;background:rgba(255,255,255,.12);color:#fff;width:40px;height:40px;border-radius:12px}.offline{font-size:11px;padding:5px 8px;border-radius:20px;background:rgba(255,255,255,.12)}
-    main{padding:14px;max-width:760px;margin:auto}.page-title{font-size:22px;margin:6px 0 14px}.hero{background:linear-gradient(145deg,var(--primary2),var(--primary));color:#fff;border-radius:24px;padding:20px;box-shadow:var(--shadow);position:relative;overflow:hidden}.hero:after{content:'۞';position:absolute;left:-18px;bottom:-40px;font-size:130px;color:rgba(255,255,255,.07)}.hero h2{margin:0 0 8px;font-size:26px}.hero p{margin:0;color:#d8eee7}.next-box{margin-top:18px;padding:14px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.12);border-radius:16px;display:flex;justify-content:space-between;align-items:center}.next-time{font-size:24px;font-weight:bold;color:#ffe2a1}
-    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:14px}.feature{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:18px;padding:17px;text-align:right;box-shadow:var(--shadow)}.feature .emoji{font-size:28px;display:block;margin-bottom:10px}.feature strong{display:block;font-size:16px}.feature small{color:var(--muted)}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;margin-bottom:12px;box-shadow:var(--shadow)}.row{display:flex;align-items:center;gap:10px}.space{justify-content:space-between}.btn{border:0;border-radius:13px;padding:11px 14px;background:var(--primary);color:#fff}.btn.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}.btn.danger{background:var(--danger)}.input,.select{width:100%;border:1px solid var(--line);background:var(--card);color:var(--text);padding:13px;border-radius:13px;outline:none}.search-wrap{position:sticky;top:70px;z-index:8;background:var(--bg);padding-bottom:10px}
-    .surah{display:flex;align-items:center;gap:12px;padding:13px;border-bottom:1px solid var(--line)}.surah:last-child{border-bottom:0}.surah-no{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:rgba(13,91,70,.11);color:var(--primary);font-weight:bold}.surah-info{flex:1}.surah-info strong{display:block;font-size:18px}.surah-info small{color:var(--muted)}.tag{font-size:11px;border:1px solid var(--line);padding:5px 8px;border-radius:20px;color:var(--muted)}
-    .reader-head{position:sticky;top:60px;z-index:10;background:var(--bg);padding:8px 0}.reader-title{text-align:center;background:linear-gradient(135deg,var(--primary2),var(--primary));color:#fff;padding:15px;border-radius:17px}.verse{font-family:"Traditional Arabic",Tahoma,serif;font-size:var(--font);line-height:2.05;background:var(--reader);border:1px solid var(--line);border-radius:16px;padding:16px;margin:10px 0;box-shadow:var(--shadow)}.ayah-no{display:inline-grid;place-items:center;min-width:34px;height:34px;border:1px solid var(--gold);border-radius:50%;font-family:Tahoma;font-size:13px;color:var(--gold);margin:0 5px}.verse-actions{margin-top:10px;display:flex;justify-content:flex-end}.bookmark{border:0;background:transparent;color:var(--gold);font-size:21px}
-    .prayer-main{text-align:center;padding:20px}.prayer-main .big{font-size:40px;font-weight:bold;color:var(--gold)}.prayer-row{display:flex;align-items:center;justify-content:space-between;padding:13px 4px;border-bottom:1px solid var(--line)}.prayer-row:last-child{border-bottom:0}.qibla-wrap{text-align:center;padding:24px}.compass{width:230px;height:230px;border-radius:50%;margin:20px auto;position:relative;border:8px double var(--gold);background:radial-gradient(circle,var(--card) 0 58%,var(--primary2) 59% 100%);box-shadow:var(--shadow)}.compass:before{content:'N';position:absolute;top:8px;left:0;right:0;color:#fff}.arrow{position:absolute;left:50%;top:50%;width:8px;height:92px;background:linear-gradient(var(--gold) 0 68%,var(--primary) 68%);transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(0deg);border-radius:9px;transition:transform .25s}.arrow:before{content:'';position:absolute;top:-16px;left:-8px;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:22px solid var(--gold)}
-    .dhikr-text{font-size:20px;line-height:1.8}.counter{width:54px;height:54px;border-radius:50%;border:0;background:var(--primary);color:#fff;font-size:20px}.setting{padding:12px 0;border-bottom:1px solid var(--line)}.setting:last-child{border-bottom:0}.setting label{display:block;margin-bottom:8px;font-weight:bold}.muted{color:var(--muted);font-size:13px}.empty{text-align:center;padding:35px;color:var(--muted)}
-    .bottom{position:fixed;bottom:0;right:0;left:0;z-index:25;height:68px;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom)}.nav{border:0;background:transparent;color:var(--muted);font-size:11px}.nav span{display:block;font-size:21px;margin-bottom:3px}.nav.active{color:var(--primary);font-weight:bold}
-    .drawer{position:fixed;top:0;bottom:0;right:0;width:82%;max-width:330px;z-index:50;background:var(--card);transform:translateX(105%);transition:.25s;box-shadow:-10px 0 35px rgba(0,0,0,.25);padding:22px}.drawer.open{transform:none}.drawer-head{padding:18px;background:linear-gradient(135deg,var(--primary2),var(--primary));color:#fff;border-radius:18px;margin-bottom:14px}.drawer button{width:100%;display:flex;gap:12px;border:0;background:transparent;color:var(--text);padding:13px;border-bottom:1px solid var(--line);text-align:right}.overlay{position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.45)}.toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%);z-index:70;background:#111;color:#fff;padding:10px 16px;border-radius:20px;font-size:13px}
-    @media(min-width:650px){.grid{grid-template-columns:repeat(3,1fr)}.bottom{right:50%;transform:translateX(50%);max-width:760px;border-radius:18px 18px 0 0}.verse{padding:22px}}
-  </style>
 </head>
 <body>
 <div class="app">
-  <header class="topbar"><button class="icon-btn" onclick="toggleDrawer(true)">☰</button><h1 id="topTitle">القرآن الكريم</h1><span class="offline">● دون إنترنت</span><button class="icon-btn" onclick="toggleTheme()">◐</button></header>
+  <header class="topbar">
+    <button class="icon-btn" aria-label="القائمة" onclick="toggleDrawer(true)">☰</button>
+    <div class="brand"><strong id="topTitle">رفيق الهدى</strong><small>يعمل دون إنترنت</small></div>
+    <button class="icon-btn" aria-label="الوضع الليلي" onclick="cycleTheme()">◐</button>
+  </header>
+
   <main>
     <section id="page-home" class="page">
-      <div class="hero"><h2>القرآن الكريم</h2><p>مصحف كامل، مواقيت الصلاة والقبلة دون إنترنت</p><div class="next-box"><div><small>الصلاة القادمة</small><div id="homeNextName">—</div></div><div class="next-time" id="homeNextTime">--:--</div></div></div>
-      <div id="lastReadCard" class="card hidden" style="margin-top:14px"></div>
-      <div class="grid">
-        <button class="feature" onclick="showPage('quran',true)"><span class="emoji">📖</span><strong>المصحف</strong><small>١١٤ سورة كاملة</small></button>
-        <button class="feature" onclick="showPage('prayer',true)"><span class="emoji">🕌</span><strong>مواقيت الصلاة</strong><small>حساب محلي دقيق</small></button>
-        <button class="feature" onclick="showPage('qibla',true)"><span class="emoji">🧭</span><strong>القبلة</strong><small>الاتجاه حسب موقعك</small></button>
-        <button class="feature" onclick="showPage('adhkar',true)"><span class="emoji">📿</span><strong>الأذكار</strong><small>عداد تسبيح وأذكار</small></button>
-        <button class="feature" onclick="showPage('bookmarks',true)"><span class="emoji">🔖</span><strong>العلامات</strong><small>آياتك المحفوظة</small></button>
-        <button class="feature" onclick="showPage('settings',true)"><span class="emoji">⚙️</span><strong>الإعدادات</strong><small>الخط والمظهر</small></button>
+      <div class="hero">
+        <span class="hero-mark">۞</span>
+        <p class="eyebrow">رفيقك اليومي</p>
+        <h1>رفيق الهدى</h1>
+        <p>مصحف بالصفحات، أذكار، أحاديث، صلاة وقبلة — دون إنترنت.</p>
+        <div class="hero-next"><div><small>الصلاة القادمة</small><strong id="homeNextName">—</strong></div><b id="homeNextTime">--:--</b></div>
+      </div>
+      <div id="lastReadCard" class="continue-card hidden"></div>
+      <div class="quick-grid">
+        <button class="quick" onclick="showPage('quran',true)"><span>📖</span><b>المصحف</b><small>صفحات تفاعلية</small></button>
+        <button class="quick" onclick="showPage('hadith',true)"><span>📜</span><b>الأحاديث</b><small>بحث ذكي محلي</small></button>
+        <button class="quick" onclick="showPage('adhkar',true)"><span>📿</span><b>الأذكار</b><small>تصنيفات وعدادات</small></button>
+        <button class="quick" onclick="showPage('prayer',true)"><span>🕌</span><b>الصلاة</b><small>المواقيت والقبلة</small></button>
+      </div>
+      <div class="section-head"><h2>الوصول السريع</h2></div>
+      <div class="mini-grid">
+        <button class="mini" onclick="showPage('bookmarks',true)">🔖 العلامات</button>
+        <button class="mini" onclick="showPage('qibla',true)">🧭 القبلة</button>
+        <button class="mini" onclick="showPage('settings',true)">⚙️ الإعدادات</button>
       </div>
     </section>
 
-    <section id="page-quran" class="page hidden"><h2 class="page-title">فهرس السور والبحث</h2><div class="search-wrap"><input id="quranSearch" class="input" placeholder="ابحث باسم سورة أو كلمة من آية..."></div><div id="surahList" class="card"><div class="empty">جارٍ تحميل المصحف...</div></div></section>
-    <section id="page-reader" class="page hidden"><div class="reader-head"><div id="readerTitle" class="reader-title"></div></div><div id="verseList"></div></section>
+    <section id="page-quran" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">المصحف الشريف</p><h2>السور والبحث</h2></div><button class="soft-btn" onclick="openMushafPage(Number(localStorage.getItem('lastPage')||1))">متابعة الصفحة</button></div>
+      <div class="search-box"><span>⌕</span><input id="quranSearch" placeholder="اسم سورة، كلمة أو جزء من آية..."></div>
+      <div class="segmented"><button class="active" data-quran-tab="surahs" onclick="setQuranTab('surahs')">السور</button><button data-quran-tab="pages" onclick="setQuranTab('pages')">الصفحات</button><button data-quran-tab="juz" onclick="setQuranTab('juz')">الأجزاء</button></div>
+      <div id="surahList" class="list-card"><div class="empty">جارٍ تحميل المصحف...</div></div>
+    </section>
 
-    <section id="page-prayer" class="page hidden"><h2 class="page-title">مواقيت الصلاة</h2><div class="card"><div class="row"><select id="citySelect" class="select" onchange="selectCity(this.value)"><option value="15.3694,44.1910,صنعاء">صنعاء</option><option value="12.7855,45.0187,عدن">عدن</option><option value="21.4225,39.8262,مكة المكرمة">مكة المكرمة</option><option value="24.7136,46.6753,الرياض">الرياض</option><option value="30.0444,31.2357,القاهرة">القاهرة</option></select><button class="btn" onclick="locateMe()">موقعي</button></div><p class="muted" id="locationLabel"></p></div><div class="card prayer-main"><div class="muted">الصلاة القادمة</div><h3 id="nextPrayerName">—</h3><div class="big" id="nextPrayerClock">--:--</div><div id="countdown" class="muted">--:--:--</div></div><div id="prayerList" class="card"></div><p class="muted">قد تختلف المواقيت دقائق قليلة بحسب اعتماد الجهة المحلية؛ يمكنك تغيير طريقة الحساب من الإعدادات.</p></section>
+    <section id="page-reader" class="page hidden reader-page">
+      <div class="reader-tools">
+        <button class="tool" onclick="readerPrev()">‹</button>
+        <div><strong id="readerTitle">المصحف</strong><small id="readerSubtitle">الصفحة ١</small></div>
+        <button class="tool" onclick="readerNext()">›</button>
+      </div>
+      <div id="mushafStage" class="mushaf-stage">
+        <article id="mushafPage" class="mushaf-page">
+          <div class="page-curl"></div>
+          <header><span id="pageSurah">سورة الفاتحة</span><span id="pageJuz">الجزء ١</span></header>
+          <div id="pageText" class="page-text"></div>
+          <footer><button id="pageBookmark" onclick="togglePageBookmark()">☆</button><b id="pageNumber">١</b><button onclick="showReaderSettings()">Aa</button></footer>
+        </article>
+      </div>
+      <p class="gesture-hint">اسحب طرف الصفحة وأبقِ إصبعك عليها، ثم أفلتها لإتمام التقليب.</p>
+      <div id="readerSettings" class="reader-sheet hidden">
+        <div class="sheet-head"><strong>مظهر المصحف</strong><button onclick="showReaderSettings(false)">✕</button></div>
+        <label>حجم الخط <input id="readerFontRange" type="range" min="20" max="38" oninput="setFontSize(this.value)"></label>
+        <div class="swatches" id="readerSwatches"></div>
+        <label class="switch-row"><span>تأثير تقليب الصفحة</span><input id="pageTurnToggle" type="checkbox" onchange="setPageTurn(this.checked)"></label>
+      </div>
+    </section>
 
-    <section id="page-qibla" class="page hidden"><h2 class="page-title">اتجاه القبلة</h2><div class="card qibla-wrap"><div id="qiblaLocation" class="muted"></div><div class="compass"><div id="qiblaArrow" class="arrow"></div></div><h3><span id="qiblaDegrees">—</span>° من الشمال</h3><p class="muted">ضع الهاتف بشكل أفقي وابتعد عن المعادن. إن لم يعمل حساس البوصلة، استخدم الدرجة المعروضة.</p><button class="btn" onclick="locateMe()">تحديث الموقع</button></div></section>
+    <section id="page-hadith" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">السنة النبوية</p><h2>موسوعة الأحاديث</h2></div><span id="hadithCount" class="pill">جارٍ التحميل</span></div>
+      <div class="search-box"><span>⌕</span><input id="hadithSearch" placeholder="ابحث بالمعنى أو كلمة تقريبية..."></div>
+      <div class="filter-scroll">
+        <button class="chip active" data-book="all" onclick="setHadithBook('all')">الكل</button>
+        <button class="chip" data-book="صحيح البخاري" onclick="setHadithBook('صحيح البخاري')">البخاري</button>
+        <button class="chip" data-book="صحيح مسلم" onclick="setHadithBook('صحيح مسلم')">مسلم</button>
+        <button class="chip" data-book="الأربعون النووية" onclick="setHadithBook('الأربعون النووية')">النووية</button>
+        <button class="chip" data-book="الأربعون القدسية" onclick="setHadithBook('الأربعون القدسية')">القدسية</button>
+      </div>
+      <div id="hadithResults"><div class="empty card">جارٍ تجهيز مكتبة الأحاديث...</div></div>
+      <button id="loadMoreHadith" class="wide-btn hidden" onclick="loadMoreHadith()">عرض المزيد</button>
+    </section>
 
-    <section id="page-adhkar" class="page hidden"><h2 class="page-title">الأذكار والتسبيح</h2><div id="adhkarList"></div><button class="btn secondary" onclick="resetDhikr()">تصفير العدادات</button></section>
-    <section id="page-bookmarks" class="page hidden"><h2 class="page-title">العلامات المحفوظة</h2><div id="bookmarksList"></div></section>
+    <section id="page-adhkar" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">ذكر الله</p><h2>الأذكار والتسبيح</h2></div><button class="soft-btn" onclick="resetDhikr()">تصفير اليوم</button></div>
+      <div id="adhkarCategories" class="filter-scroll"></div>
+      <div id="adhkarList"></div>
+    </section>
 
-    <section id="page-settings" class="page hidden"><h2 class="page-title">الإعدادات</h2><div class="card"><div class="setting"><label>المظهر</label><select id="themeSelect" class="select" onchange="setTheme(this.value)"><option value="system">حسب الهاتف</option><option value="light">فاتح</option><option value="dark">ليلي</option></select></div><div class="setting"><label>حجم خط الآيات: <span id="fontValue"></span></label><input id="fontRange" type="range" min="21" max="40" value="26" style="width:100%" oninput="setFontSize(this.value)"></div><div class="setting"><label>طريقة حساب الصلاة</label><select id="methodSelect" class="select" onchange="setPrayerMethod(this.value)"><option value="MWL">رابطة العالم الإسلامي</option><option value="UmmAlQura">أم القرى</option><option value="Egyptian">الهيئة المصرية</option><option value="Karachi">كراتشي</option></select></div><div class="setting"><label>البيانات</label><button class="btn danger" onclick="clearAppData()">مسح العلامات والإعدادات</button></div><div class="setting"><strong>حول التطبيق</strong><p class="muted">الإصدار 1.0 — يعمل دون إنترنت. يحتوي النص القرآني كاملًا، مواقيت الصلاة، القبلة، البحث والعلامات. مصدر النص المضمّن: مشروع quran-json.</p></div></div></section>
+    <section id="page-prayer" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">مواقيت اليوم</p><h2>الصلاة</h2></div><button class="soft-btn" onclick="showPage('qibla',true)">القبلة</button></div>
+      <div class="card row"><select id="citySelect" class="select" onchange="selectCity(this.value)"><option value="15.3694,44.1910,صنعاء">صنعاء</option><option value="12.7855,45.0187,عدن">عدن</option><option value="21.4225,39.8262,مكة المكرمة">مكة المكرمة</option><option value="24.7136,46.6753,الرياض">الرياض</option><option value="30.0444,31.2357,القاهرة">القاهرة</option></select><button class="primary-btn" onclick="locateMe()">موقعي</button></div>
+      <p id="locationLabel" class="muted"></p>
+      <div class="next-prayer"><small>الصلاة القادمة</small><h3 id="nextPrayerName">—</h3><strong id="nextPrayerClock">--:--</strong><span id="countdown">--:--:--</span></div>
+      <div id="prayerList" class="prayer-list"></div>
+    </section>
+
+    <section id="page-qibla" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">اتجاه مكة</p><h2>القبلة</h2></div></div>
+      <div class="card qibla-card"><p id="qiblaLocation" class="muted"></p><div class="compass"><div id="qiblaArrow" class="qibla-arrow"></div><span>الكعبة</span></div><h3><span id="qiblaDegrees">—</span>° من الشمال</h3><button class="primary-btn" onclick="locateMe()">تحديث الموقع</button></div>
+    </section>
+
+    <section id="page-bookmarks" class="page hidden"><div class="section-head"><div><p class="eyebrow">محفوظاتك</p><h2>العلامات</h2></div></div><div id="bookmarksList"></div></section>
+
+    <section id="page-settings" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">تخصيص التطبيق</p><h2>الإعدادات</h2></div></div>
+      <div class="settings-card">
+        <div class="setting"><label>مظهر التطبيق</label><select id="themeSelect" class="select" onchange="setTheme(this.value)"><option value="system">حسب الهاتف</option><option value="light">فاتح</option><option value="dark">ليلي</option><option value="sepia">ورقي دافئ</option></select></div>
+        <div class="setting"><label>لون التطبيق</label><div id="accentSwatches" class="swatches"></div></div>
+        <div class="setting"><label>لون صفحات المصحف</label><div id="mushafSwatches" class="swatches"></div></div>
+        <div class="setting"><label>حجم خط المصحف: <span id="fontValue"></span></label><input id="fontRange" type="range" min="20" max="38" oninput="setFontSize(this.value)"></div>
+        <div class="setting"><label class="switch-row"><span>تقليب صفحات واقعي</span><input id="settingsTurnToggle" type="checkbox" onchange="setPageTurn(this.checked)"></label></div>
+        <div class="setting"><label class="switch-row"><span>تقليل الحركة</span><input id="reduceMotionToggle" type="checkbox" onchange="setReduceMotion(this.checked)"></label></div>
+        <div class="setting"><label>طريقة حساب الصلاة</label><select id="methodSelect" class="select" onchange="setPrayerMethod(this.value)"><option value="MWL">رابطة العالم الإسلامي</option><option value="UmmAlQura">أم القرى</option><option value="Egyptian">الهيئة المصرية</option><option value="Karachi">كراتشي</option></select></div>
+        <div class="setting danger-zone"><label>البيانات</label><button class="danger-btn" onclick="clearAppData()">مسح العلامات والإعدادات</button></div>
+        <div class="setting"><strong>حول رفيق الهدى</strong><p class="muted">الإصدار 2.0 — مصحف بالصفحات، بحث قرآن وأحاديث، أذكار، صلاة وقبلة. يعمل دون إنترنت بعد التثبيت.</p></div>
+      </div>
+    </section>
   </main>
 
-  <nav class="bottom"><button class="nav active" data-page="home" onclick="showPage('home',true)"><span>⌂</span>الرئيسية</button><button class="nav" data-page="quran" onclick="showPage('quran',true)"><span>📖</span>المصحف</button><button class="nav" data-page="prayer" onclick="showPage('prayer',true)"><span>🕌</span>الصلاة</button><button class="nav" data-page="adhkar" onclick="showPage('adhkar',true)"><span>📿</span>الأذكار</button><button class="nav" data-page="settings" onclick="showPage('settings',true)"><span>•••</span>المزيد</button></nav>
+  <nav class="bottom-nav">
+    <button class="nav active" data-page="home" onclick="showPage('home',true)"><span>⌂</span>الرئيسية</button>
+    <button class="nav" data-page="quran" onclick="showPage('quran',true)"><span>📖</span>المصحف</button>
+    <button class="nav" data-page="hadith" onclick="showPage('hadith',true)"><span>📜</span>الحديث</button>
+    <button class="nav" data-page="adhkar" onclick="showPage('adhkar',true)"><span>📿</span>الأذكار</button>
+    <button class="nav" data-page="prayer" onclick="showPage('prayer',true)"><span>🕌</span>الصلاة</button>
+  </nav>
 </div>
 
-<aside id="drawer" class="drawer"><div class="drawer-head"><h2 style="margin:0">القرآن الكريم</h2><small>رفيقك اليومي دون إنترنت</small></div><button onclick="drawerGo('home')">⌂ الرئيسية</button><button onclick="drawerGo('quran')">📖 المصحف والبحث</button><button onclick="drawerGo('prayer')">🕌 مواقيت الصلاة</button><button onclick="drawerGo('qibla')">🧭 اتجاه القبلة</button><button onclick="drawerGo('adhkar')">📿 الأذكار</button><button onclick="drawerGo('bookmarks')">🔖 العلامات</button><button onclick="drawerGo('settings')">⚙️ الإعدادات</button></aside><div id="overlay" class="overlay hidden" onclick="toggleDrawer(false)"></div><div id="toast" class="toast hidden"></div>
-
-<script>
-var state={quran:[],page:'home',coords:{lat:15.3694,lon:44.1910,name:'صنعاء'},bookmarks:[],schedule:null,qibla:0};
-var titles={home:'القرآن الكريم',quran:'المصحف والبحث',reader:'قراءة السورة',prayer:'مواقيت الصلاة',qibla:'اتجاه القبلة',adhkar:'الأذكار',bookmarks:'العلامات',settings:'الإعدادات'};
-var prayerNames={fajr:'الفجر',sunrise:'الشروق',dhuhr:'الظهر',asr:'العصر',maghrib:'المغرب',isha:'العشاء'};
-var dhikrData=[
- {text:'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',target:100},
- {text:'سُبْحَانَ اللَّهِ، وَالْحَمْدُ لِلَّهِ، وَاللَّهُ أَكْبَرُ',target:33},
- {text:'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',target:10},
- {text:'أَسْتَغْفِرُ اللَّهَ وَأَتُوبُ إِلَيْهِ',target:100}
-];
-
-function init(){
-  loadPrefs(); applyTheme(); renderAdhkar(); renderBookmarks(); bindSearch(); loadQuran(); calculatePrayers(); renderQibla();
-  window.addEventListener('popstate',function(e){showPage((e.state&&e.state.page)||'home',false)});
-  window.addEventListener('deviceorientationabsolute',orientationHandler,true);window.addEventListener('deviceorientation',orientationHandler,true);
-  setInterval(updateCountdown,1000); history.replaceState({page:'home'},'','#home'); showPage('home',false);
-}
-function loadPrefs(){
-  try{state.bookmarks=JSON.parse(localStorage.getItem('bookmarks')||'[]')}catch(e){state.bookmarks=[]}
-  try{var c=JSON.parse(localStorage.getItem('coords')||'null');if(c)state.coords=c}catch(e){}
-  document.getElementById('themeSelect').value=localStorage.getItem('theme')||'system';
-  var f=localStorage.getItem('fontSize')||'26';document.getElementById('fontRange').value=f;setFontSize(f);
-  document.getElementById('methodSelect').value=localStorage.getItem('prayerMethod')||'MWL';
-}
-function loadQuran(){fetch('quran.json').then(function(r){if(!r.ok)throw new Error('load');return r.json()}).then(function(d){state.quran=d;renderSurahList('');renderLastRead()}).catch(function(){document.getElementById('surahList').innerHTML='<div class="empty">تعذر تحميل بيانات المصحف.</div>'})}
-function bindSearch(){document.getElementById('quranSearch').addEventListener('input',function(){renderSurahList(this.value)})}
-function normalizeArabic(s){return String(s||'').replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').toLowerCase()}
-function renderSurahList(query){
-  var box=document.getElementById('surahList');if(!state.quran.length)return;var q=normalizeArabic(query.trim()),html='';
-  if(!q){for(var i=0;i<state.quran.length;i++)html+=surahRow(state.quran[i]);box.innerHTML=html;return}
-  var hits=0;for(var s=0;s<state.quran.length;s++){var surah=state.quran[s];if(normalizeArabic(surah.name+' '+surah.transliteration+' '+surah.id).indexOf(q)>=0){html+=surahRow(surah);hits++}}
-  if(q.length>=2){for(var a=0;a<state.quran.length&&hits<80;a++){var su=state.quran[a];for(var v=0;v<su.verses.length&&hits<80;v++){var ay=su.verses[v];if(normalizeArabic(ay.text).indexOf(q)>=0){html+='<div class="surah" onclick="openSurah('+su.id+','+ay.id+')"><div class="surah-no">'+ay.id+'</div><div class="surah-info"><strong>'+su.name+' — آية '+ay.id+'</strong><small>'+ay.text.substring(0,95)+'...</small></div></div>';hits++}}}}
-  box.innerHTML=html||'<div class="empty">لا توجد نتائج</div>';
-}
-function surahRow(s){return '<div class="surah" onclick="openSurah('+s.id+',0)"><div class="surah-no">'+s.id+'</div><div class="surah-info"><strong>'+s.name+'</strong><small>'+s.transliteration+' • '+s.total_verses+' آية</small></div><span class="tag">'+(s.type==='meccan'?'مكية':'مدنية')+'</span></div>'}
-function openSurah(id,verseId){
-  var s=null;for(var i=0;i<state.quran.length;i++)if(Number(state.quran[i].id)===Number(id)){s=state.quran[i];break}if(!s)return;
-  document.getElementById('readerTitle').innerHTML='<strong>سورة '+s.name+'</strong><br><small>'+s.total_verses+' آية • '+(s.type==='meccan'?'مكية':'مدنية')+'</small>';
-  var html='';for(var v=0;v<s.verses.length;v++){var ay=s.verses[v],marked=isBookmarked(s.id,ay.id);html+='<article class="verse" id="ayah-'+ay.id+'">'+ay.text+' <span class="ayah-no">'+ay.id+'</span><div class="verse-actions"><button class="bookmark" onclick="toggleBookmark('+s.id+','+ay.id+',this)">'+(marked?'★':'☆')+'</button></div></article>'}
-  document.getElementById('verseList').innerHTML=html;localStorage.setItem('lastRead',JSON.stringify({surahId:s.id,surahName:s.name,verseId:verseId||1}));renderLastRead();showPage('reader',true);
-  if(verseId)setTimeout(function(){var e=document.getElementById('ayah-'+verseId);if(e)e.scrollIntoView({behavior:'smooth',block:'center'})},150);else window.scrollTo(0,0);
-}
-function isBookmarked(s,a){for(var i=0;i<state.bookmarks.length;i++)if(state.bookmarks[i].surahId==s&&state.bookmarks[i].verseId==a)return true;return false}
-function toggleBookmark(sid,aid,btn){var idx=-1;for(var i=0;i<state.bookmarks.length;i++)if(state.bookmarks[i].surahId==sid&&state.bookmarks[i].verseId==aid){idx=i;break}if(idx>=0){state.bookmarks.splice(idx,1);btn.textContent='☆';toast('تم حذف العلامة')}else{var s=state.quran[sid-1],ay=s.verses[aid-1];state.bookmarks.push({surahId:sid,surahName:s.name,verseId:aid,text:ay.text});btn.textContent='★';toast('تم حفظ الآية')}localStorage.setItem('bookmarks',JSON.stringify(state.bookmarks));renderBookmarks()}
-function renderBookmarks(){var box=document.getElementById('bookmarksList');if(!box)return;if(!state.bookmarks.length){box.innerHTML='<div class="card empty">لا توجد علامات محفوظة بعد.</div>';return}var h='';for(var i=state.bookmarks.length-1;i>=0;i--){var b=state.bookmarks[i];h+='<div class="card" onclick="openSurah('+b.surahId+','+b.verseId+')"><strong>سورة '+b.surahName+' — آية '+b.verseId+'</strong><p>'+b.text+'</p></div>'}box.innerHTML=h}
-function renderLastRead(){var box=document.getElementById('lastReadCard'),l=null;try{l=JSON.parse(localStorage.getItem('lastRead')||'null')}catch(e){}if(!l){box.classList.add('hidden');return}box.classList.remove('hidden');box.innerHTML='<div class="row space"><div><small class="muted">تابع القراءة</small><strong style="display:block">سورة '+l.surahName+' — آية '+l.verseId+'</strong></div><button class="btn" onclick="openSurah('+l.surahId+','+l.verseId+')">متابعة</button></div>'}
-
-function prayerParams(){var m=localStorage.getItem('prayerMethod')||'MWL';if(m==='UmmAlQura')return adhan.CalculationMethod.UmmAlQura();if(m==='Egyptian')return adhan.CalculationMethod.Egyptian();if(m==='Karachi')return adhan.CalculationMethod.Karachi();return adhan.CalculationMethod.MuslimWorldLeague()}
-function calculatePrayers(){
-  document.getElementById('locationLabel').textContent='الموقع: '+state.coords.name;document.getElementById('qiblaLocation').textContent='الموقع: '+state.coords.name;
-  if(typeof adhan==='undefined'){document.getElementById('prayerList').innerHTML='<div class="empty">تعذر تشغيل حاسبة المواقيت.</div>';return}
-  var c=new adhan.Coordinates(state.coords.lat,state.coords.lon),pt=new adhan.PrayerTimes(c,new Date(),prayerParams());state.schedule=pt;
-  var keys=['fajr','sunrise','dhuhr','asr','maghrib','isha'],h='';for(var i=0;i<keys.length;i++){var k=keys[i];h+='<div class="prayer-row"><strong>'+prayerNames[k]+'</strong><span>'+formatTime(pt[k])+'</span></div>'}document.getElementById('prayerList').innerHTML=h;updateCountdown();renderQibla();
-}
-function formatTime(d){if(!d||isNaN(d.getTime()))return '—';return d.toLocaleTimeString('ar-YE',{hour:'2-digit',minute:'2-digit',hour12:true})}
-function getNextPrayer(){if(!state.schedule)return null;var now=new Date(),keys=['fajr','dhuhr','asr','maghrib','isha'];for(var i=0;i<keys.length;i++){var d=state.schedule[keys[i]];if(d>now)return {key:keys[i],date:d}}var tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);var c=new adhan.Coordinates(state.coords.lat,state.coords.lon),pt=new adhan.PrayerTimes(c,tomorrow,prayerParams());return {key:'fajr',date:pt.fajr}}
-function updateCountdown(){var n=getNextPrayer();if(!n)return;var diff=Math.max(0,n.date-new Date()),sec=Math.floor(diff/1000),hh=Math.floor(sec/3600),mm=Math.floor((sec%3600)/60),ss=sec%60;var count=pad(hh)+':'+pad(mm)+':'+pad(ss);document.getElementById('nextPrayerName').textContent=prayerNames[n.key];document.getElementById('nextPrayerClock').textContent=formatTime(n.date);document.getElementById('countdown').textContent='متبقي '+count;document.getElementById('homeNextName').textContent=prayerNames[n.key];document.getElementById('homeNextTime').textContent=formatTime(n.date)}
-function pad(n){return String(n).length<2?'0'+n:String(n)}
-function selectCity(v){var p=v.split(',');state.coords={lat:Number(p[0]),lon:Number(p[1]),name:p.slice(2).join(',')};localStorage.setItem('coords',JSON.stringify(state.coords));calculatePrayers()}
-function locateMe(){if(!navigator.geolocation){toast('الموقع غير متاح');return}toast('جارٍ تحديد الموقع...');navigator.geolocation.getCurrentPosition(function(pos){state.coords={lat:pos.coords.latitude,lon:pos.coords.longitude,name:'موقعي الحالي'};localStorage.setItem('coords',JSON.stringify(state.coords));calculatePrayers();toast('تم تحديث الموقع')},function(){toast('تعذر تحديد الموقع؛ تحقق من الإذن')},{enableHighAccuracy:true,timeout:12000,maximumAge:300000})}
-function qiblaDirection(lat,lon){var kaabaLat=21.4225*Math.PI/180,kaabaLon=39.8262*Math.PI/180,phi=lat*Math.PI/180,lambda=lon*Math.PI/180,d=kaabaLon-lambda,y=Math.sin(d),x=Math.cos(phi)*Math.tan(kaabaLat)-Math.sin(phi)*Math.cos(d);return (Math.atan2(y,x)*180/Math.PI+360)%360}
-function renderQibla(){state.qibla=qiblaDirection(state.coords.lat,state.coords.lon);document.getElementById('qiblaDegrees').textContent=Math.round(state.qibla);document.getElementById('qiblaArrow').style.transform='translate(-50%,-100%) rotate('+state.qibla+'deg)';document.getElementById('qiblaLocation').textContent='الموقع: '+state.coords.name}
-function orientationHandler(e){var heading=null;if(typeof e.webkitCompassHeading==='number')heading=e.webkitCompassHeading;else if(typeof e.alpha==='number')heading=360-e.alpha;if(heading!==null)document.getElementById('qiblaArrow').style.transform='translate(-50%,-100%) rotate('+(state.qibla-heading)+'deg)'}
-
-function renderAdhkar(){var counts=[];try{counts=JSON.parse(localStorage.getItem('dhikrCounts')||'[]')}catch(e){}var h='';for(var i=0;i<dhikrData.length;i++){var c=counts[i]||0;h+='<div class="card"><div class="dhikr-text">'+dhikrData[i].text+'</div><div class="row space" style="margin-top:12px"><span class="muted">الهدف: '+dhikrData[i].target+'</span><button id="counter-'+i+'" class="counter" onclick="countDhikr('+i+')">'+c+'</button></div></div>'}document.getElementById('adhkarList').innerHTML=h}
-function countDhikr(i){var counts=[];try{counts=JSON.parse(localStorage.getItem('dhikrCounts')||'[]')}catch(e){}counts[i]=(counts[i]||0)+1;localStorage.setItem('dhikrCounts',JSON.stringify(counts));document.getElementById('counter-'+i).textContent=counts[i];if(counts[i]===dhikrData[i].target)toast('بارك الله فيك، أتممت العدد')}
-function resetDhikr(){localStorage.removeItem('dhikrCounts');renderAdhkar();toast('تم تصفير العدادات')}
-
-function applyTheme(){var t=localStorage.getItem('theme')||'system';var dark=t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',dark?'dark':'light')}
-function setTheme(t){localStorage.setItem('theme',t);applyTheme()}
-function toggleTheme(){var dark=document.documentElement.getAttribute('data-theme')==='dark';setTheme(dark?'light':'dark');document.getElementById('themeSelect').value=dark?'light':'dark'}
-function setFontSize(v){document.documentElement.style.setProperty('--font',v+'px');localStorage.setItem('fontSize',v);var el=document.getElementById('fontValue');if(el)el.textContent=v+'px'}
-function setPrayerMethod(v){localStorage.setItem('prayerMethod',v);calculatePrayers();toast('تم تحديث طريقة الحساب')}
-function clearAppData(){if(confirm('هل تريد مسح العلامات والإعدادات؟')){localStorage.clear();location.reload()}}
-
-function showPage(name,push){var pages=document.querySelectorAll('.page');for(var i=0;i<pages.length;i++)pages[i].classList.add('hidden');var p=document.getElementById('page-'+name);if(!p){name='home';p=document.getElementById('page-home')}p.classList.remove('hidden');state.page=name;document.getElementById('topTitle').textContent=titles[name]||'القرآن الكريم';var navs=document.querySelectorAll('.nav');for(var n=0;n<navs.length;n++){navs[n].classList.toggle('active',navs[n].getAttribute('data-page')===name||(name==='reader'&&navs[n].getAttribute('data-page')==='quran'))}if(name==='bookmarks')renderBookmarks();if(name==='prayer')calculatePrayers();if(name==='qibla')renderQibla();if(push)history.pushState({page:name},'','#'+name);window.scrollTo(0,0);toggleDrawer(false)}
-function toggleDrawer(open){document.getElementById('drawer').classList.toggle('open',open);document.getElementById('overlay').classList.toggle('hidden',!open)}
-function drawerGo(p){showPage(p,true)}
-function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(function(){t.classList.add('hidden')},2200)}
-
-document.addEventListener('DOMContentLoaded',init);
-</script>
+<aside id="drawer" class="drawer">
+  <div class="drawer-brand"><span>۞</span><div><strong>رفيق الهدى</strong><small>رفيقك اليومي دون إنترنت</small></div></div>
+  <button onclick="drawerGo('home')">⌂ الرئيسية</button><button onclick="drawerGo('quran')">📖 المصحف والبحث</button><button onclick="drawerGo('hadith')">📜 موسوعة الأحاديث</button><button onclick="drawerGo('adhkar')">📿 الأذكار</button><button onclick="drawerGo('prayer')">🕌 مواقيت الصلاة</button><button onclick="drawerGo('qibla')">🧭 اتجاه القبلة</button><button onclick="drawerGo('bookmarks')">🔖 العلامات</button><button onclick="drawerGo('settings')">⚙️ الإعدادات</button>
+</aside>
+<div id="overlay" class="overlay hidden" onclick="toggleDrawer(false)"></div>
+<div id="toast" class="toast hidden"></div>
+<script src="app-v2.js"></script>
 </body>
 </html>
