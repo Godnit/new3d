@@ -5,7 +5,9 @@
 
     <application
         android:allowBackup="true"
-        android:label="القرآن الكريم"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="رفيق الهدى"
         android:supportsRtl="true"
         android:theme="@style/Theme.QuranOffline">
         <activity
