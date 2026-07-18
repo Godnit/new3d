@@ -10,8 +10,8 @@ android {
         applicationId 'com.mastermedia.quranoffline.lite'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '3.1.0-lite'
+        versionCode 2
+        versionName '3.2.0-lite'
         resourceConfigurations += ['ar']
     }
 
