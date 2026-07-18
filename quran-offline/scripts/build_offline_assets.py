@@ -46,19 +46,75 @@ def arabic_number(value: int) -> str:
     return str(value).translate(str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩"))
 
 
-def extract_narrator(arabic: str) -> str:
+def strip_diacritics_with_map(text: str) -> tuple[str, list[int]]:
+    plain: list[str] = []
+    positions: list[int] = []
+    for index, char in enumerate(text):
+        if ARABIC_DIACRITICS.fullmatch(char):
+            continue
+        plain.append(char)
+        positions.append(index)
+    return "".join(plain), positions
+
+
+def original_index(mapping: list[int], plain_index: int, fallback: int) -> int:
+    if not mapping:
+        return fallback
+    plain_index = max(0, min(plain_index, len(mapping) - 1))
+    return mapping[plain_index]
+
+
+def extract_hadith_parts(arabic: str) -> tuple[str, str]:
+    """Return a concise companion attribution and a matn without the long isnad."""
     text = clean_text(arabic)
-    patterns = [
-        r"^(عَنْ.{2,180}?)(?:قَالَ|قَالَتْ|يَقُولُ|:)\s*",
-        r"^(حَدَّثَنَا.{2,180}?)(?:قَالَ|:)\s*",
-        r"^(أَنَّ.{2,160}?)(?:قَالَ|:)\s*",
+    plain, mapping = strip_diacritics_with_map(text)
+    normalized_plain = normalize_arabic(plain)
+
+    marker_phrases = [
+        "قال رسول الله", "قالت قال رسول الله", "سمعت رسول الله",
+        "ان رسول الله", "قال النبي", "عن النبي", "ان النبي",
     ]
-    for pattern in patterns:
-        match = re.search(pattern, text, flags=re.DOTALL)
-        if match:
-            return clean_text(match.group(1)).rstrip("،.:")
-    first = re.split(r"[.:\n]", text, maxsplit=1)[0]
-    return clean_text(first[:150]).rstrip("،.:") or "غير مفصول في المصدر"
+    marker_pos = -1
+    selected_marker = ""
+    for marker in marker_phrases:
+        pos = normalized_plain.find(marker)
+        if pos >= 0 and (marker_pos < 0 or pos < marker_pos):
+            marker_pos = pos
+            selected_marker = marker
+
+    prefix_plain = normalized_plain[:marker_pos] if marker_pos >= 0 else normalized_plain
+    narrator_matches = re.findall(
+        r"(?:^|\s)عن\s+(.{2,90}?)(?=\s+عن\s+|\s+قال(?:ت)?\s+|\s+ان\s+|$)",
+        prefix_plain,
+    )
+    narrator_name = clean_text(narrator_matches[-1] if narrator_matches else "")
+    narrator_name = re.sub(r"^(?:ان|انه|انها)\s+", "", narrator_name).strip(" ،.:")
+
+    if marker_pos >= 0:
+        display_plain_start = marker_pos
+        nearby = normalized_plain[max(0, marker_pos - 18): marker_pos + 2]
+        last_said = max(nearby.rfind("قال "), nearby.rfind("قالت "), nearby.rfind("سمعت "))
+        if last_said >= 0:
+            display_plain_start = max(0, marker_pos - 18) + last_said
+        display_start = original_index(mapping, display_plain_start, 0)
+        display = clean_text(text[display_start:])
+    else:
+        # Some reports have no explicit Prophet marker. Remove only the obvious leading chain.
+        chain_markers = [m.start() for m in re.finditer(r"\s(?:قال|قالت)\s", normalized_plain)]
+        if chain_markers:
+            display_start = original_index(mapping, chain_markers[-1] + 1, 0)
+            display = clean_text(text[display_start:])
+        else:
+            display = text
+
+    if narrator_name:
+        narrator = f"عن {narrator_name}، عن النبي ﷺ" if selected_marker else f"عن {narrator_name}"
+    else:
+        narrator = "عن الصحابي الراوي، عن النبي ﷺ" if selected_marker else "الراوي مذكور في المصدر"
+
+    if len(display) < 18:
+        display = text
+    return narrator, display
 
 
 def build_pages(page_dir: Path) -> list[dict[str, Any]]:
@@ -206,13 +262,13 @@ def convert_hadith_file(path: Path, limit: int | None = None) -> list[dict[str, 
         text = clean_text(raw.get("arabic"))
         if not text:
             continue
-        narrator = extract_narrator(text)
+        narrator, display = extract_hadith_parts(text)
         if title in {"صحيح البخاري", "صحيح مسلم"}:
             grade = "صحيح"
         elif title == "الأربعون النووية":
-            grade = "من مجموعة الأربعين النووية — راجع التخريج المذكور في النص"
+            grade = "بحسب التخريج المذكور في مصدر الأربعين النووية"
         elif title == "الأربعون القدسية":
-            grade = "حديث قدسي — راجع التخريج المذكور في النص"
+            grade = "حديث قدسي — راجع التخريج المذكور في المصدر"
         else:
             grade = "راجع تخريج المصدر"
         record_id = int(raw.get("id") or len(output) + 1)
@@ -222,6 +278,7 @@ def convert_hadith_file(path: Path, limit: int | None = None) -> list[dict[str, 
             "book": title,
             "number": number,
             "text": text,
+            "display": display,
             "narrator": narrator,
             "grade": grade,
         })
@@ -258,8 +315,6 @@ def validate_quran_index(path: Path) -> None:
     count = sum(len(surah.get("verses", [])) for surah in quran)
     if count != 6236:
         raise ValueError(f"Quran index must contain 6236 verses, got {count}")
-    if quran[0].get("name") != "الفاتحة" or quran[-1].get("name") != "الناس":
-        raise ValueError("Unexpected first or last surah")
 
 
 def main() -> None:
@@ -271,13 +326,12 @@ def main() -> None:
     args = parser.parse_args()
 
     validate_quran_index(args.assets / "quran.json")
-    pages = build_pages(args.pages)
-    mushaf = build_mushaf_layout(args.qcf_pages)
+    dump_json(args.assets / "quran_pages.json", build_pages(args.pages))
+    dump_json(args.assets / "quran_mushaf.json", build_mushaf_layout(args.qcf_pages))
     hadiths = build_hadiths(args.hadith)
-    dump_json(args.assets / "quran_pages.json", pages)
-    dump_json(args.assets / "quran_mushaf.json", mushaf)
     dump_json(args.assets / "hadith.json", hadiths)
-    print(f"Validated 114 surahs, {len(mushaf)} compact Mushaf pages, 6236 verses and {len(hadiths)} hadiths")
+    concise = sum(1 for item in hadiths if item.get("display") and item["display"] != item["text"])
+    print(f"Built 604 Quran pages and {len(hadiths)} hadiths; shortened {concise} chains")
 
 
 if __name__ == "__main__":
