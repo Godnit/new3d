@@ -1,0 +1,116 @@
+name: Build Rafiq Al-Huda Image Mushaf APK
+
+on:
+  push:
+    branches: ["agent/rafiq-alhuda-official-v4"]
+    paths:
+      - ".github/workflows/quran-apk-images.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sudo apt-get update -qq
+          sudo apt-get install -y webp
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Prepare all offline assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ASSETS="quran-offline/app/src/main/assets"
+          PAGES="quran-offline/build-data/pages"
+          QCF="quran-offline/build-data/qcf-pages"
+          HADITH="quran-offline/build-data/hadith"
+          MUSHAF="$ASSETS/mushaf-pages"
+          TMP="quran-offline/build-data/mushaf-png"
+          mkdir -p "$ASSETS/fonts" "$PAGES" "$QCF" "$HADITH" "$MUSHAF" "$TMP"
+          rm -f "$PAGES"/*.json "$QCF"/*.json "$MUSHAF"/* "$TMP"/*
+
+          curl -fsSL --retry 5 "https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json" -o "$ASSETS/quran.json"
+          curl -fsSL --retry 5 "https://unpkg.com/adhan@4.4.4/lib/bundles/adhan.umd.min.js" -o "$ASSETS/adhan.umd.min.js"
+
+          export PAGES
+          seq 1 604 | xargs -P 24 -I{} bash -c 'curl -fsSL --retry 5 "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara-quranacademy/pages/{}.json" -o "$PAGES/{}.json"'
+          test "$(find "$PAGES" -name "*.json" | wc -l)" -eq 604
+
+          export QCF
+          seq 1 604 | xargs -P 16 -I{} bash -c 'curl -fsSL --retry 5 "https://api.quran.com/api/v4/verses/by_page/{}?language=ar&words=true&word_fields=text_qpc_hafs,text_uthmani&fields=juz_number&per_page=50" -o "$QCF/{}.json"'
+          test "$(find "$QCF" -name "*.json" | wc -l)" -eq 604
+
+          export MUSHAF TMP
+          seq 1 604 | xargs -P 24 -I{} bash -c '
+            set -e
+            n=$(printf "%03d" {})
+            png="$TMP/page${n}.png"
+            curl -fsSL --retry 5 --retry-all-errors "https://quran.islam-db.com/data/pages/quranpages_1024/images/page${n}.png" -o "$png"
+            test -s "$png"
+            cwebp -quiet -q 84 -m 6 "$png" -o "$MUSHAF/page${n}.webp"
+            test -s "$MUSHAF/page${n}.webp"
+          '
+          test "$(find "$MUSHAF" -name "page*.webp" | wc -l)" -eq 604
+
+          curl -fsSL --retry 5 "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf" -o "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
+          BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
+          curl -fsSL --retry 5 "$BASE/the_9_books/bukhari.json" -o "$HADITH/bukhari.json"
+          curl -fsSL --retry 5 "$BASE/the_9_books/muslim.json" -o "$HADITH/muslim.json"
+          curl -fsSL --retry 5 "$BASE/forties/nawawi40.json" -o "$HADITH/nawawi40.json"
+          curl -fsSL --retry 5 "$BASE/forties/qudsi40.json" -o "$HADITH/qudsi40.json"
+
+          python3 quran-offline/scripts/build_offline_assets.py --assets "$ASSETS" --pages "$PAGES" --qcf-pages "$QCF" --hadith "$HADITH"
+          node --check "$ASSETS/app-v11.js"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a=Path('quran-offline/app/src/main/assets')
+          imgs=sorted((a/'mushaf-pages').glob('page*.webp'))
+          assert len(imgs)==604
+          assert imgs[0].name=='page001.webp' and imgs[-1].name=='page604.webp'
+          assert min(x.stat().st_size for x in imgs)>4000
+          assert sum(x.stat().st_size for x in imgs)<95*1024*1024
+          assert len(json.load(open(a/'hadith.json',encoding='utf-8')))>=6000
+          print('Validated',len(imgs),'real Mushaf page images; bytes',sum(x.stat().st_size for x in imgs))
+          PY
+      - name: Build APK
+        working-directory: quran-offline
+        run: gradle :app:assembleRelease --stacktrace
+      - name: Verify APK
+        run: |
+          APK="quran-offline/app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -f "$APK"
+          unzip -t "$APK" >/dev/null
+          test "$(stat -c%s "$APK")" -lt 104857600
+          cp "$APK" Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
+          sha256sum Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rafiq-AlHuda-v4.4-Image-Mushaf-Unsigned-APK
+          path: Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
+          retention-days: 30
+      - name: Package signing tools
+        run: |
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          mkdir -p android-sign-tools/lib android-sign-tools/lib64
+          cp "$BT/apksigner" "$BT/zipalign" android-sign-tools/
+          cp "$BT/lib/apksigner.jar" android-sign-tools/lib/
+          if [ -f "$BT/lib64/libc++.so" ]; then cp "$BT/lib64/libc++.so" android-sign-tools/lib64/; fi
+          chmod +x android-sign-tools/apksigner android-sign-tools/zipalign
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-Build-Tools-35-Signing
+          path: android-sign-tools
+          retention-days: 7
