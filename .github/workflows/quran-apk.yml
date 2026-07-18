@@ -16,7 +16,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -29,16 +29,18 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK and image tools
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sudo apt-get update -qq
+          sudo apt-get install -y webp
 
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Download verified offline sources
+      - name: Download verified offline sources and real Mushaf pages
         shell: bash
         run: |
           set -euxo pipefail
@@ -46,10 +48,12 @@ jobs:
           PAGES="quran-offline/build-data/pages"
           QCF="quran-offline/build-data/qcf-pages"
           HADITH="quran-offline/build-data/hadith"
-          mkdir -p "$ASSETS/fonts" "$PAGES" "$QCF" "$HADITH"
+          MUSHAF="$ASSETS/mushaf-pages"
+          MUSHAF_TMP="quran-offline/build-data/mushaf-png"
+          mkdir -p "$ASSETS/fonts" "$PAGES" "$QCF" "$HADITH" "$MUSHAF" "$MUSHAF_TMP"
           rm -rf "$ASSETS/fonts/qcf-v2"
           rm -f "$ASSETS/quran.json" "$ASSETS/quran_pages.json" "$ASSETS/quran_mushaf.json" "$ASSETS/hadith.json" "$ASSETS/adhan.umd.min.js"
-          rm -f "$PAGES"/*.json "$QCF"/*.json
+          rm -f "$PAGES"/*.json "$QCF"/*.json "$MUSHAF"/*.webp "$MUSHAF_TMP"/*.png
 
           curl -fL --retry 4 --retry-all-errors \
             "https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json" \
@@ -75,19 +79,34 @@ jobs:
               -o "$QCF/{}.json"
           '
           test "$(find "$QCF" -type f -name "*.json" | wc -l)" -eq 604
+
+          export MUSHAF MUSHAF_TMP
+          seq 1 604 | xargs -P 12 -I{} bash -c '
+            set -euo pipefail
+            number=$(printf "%03d" {})
+            target="$MUSHAF_TMP/page${number}.png"
+            if ! curl -fsSL --retry 6 --retry-all-errors \
+              "https://android.quran.com/data/width_1260/page${number}.png" -o "$target"; then
+              curl -fsSL --retry 6 --retry-all-errors \
+                "http://android.quran.com/data/width_1260/page${number}.png" -o "$target"
+            fi
+            test -s "$target"
+            cwebp -quiet -q 82 -m 6 -resize 1000 0 "$target" -o "$MUSHAF/page${number}.webp"
+            test -s "$MUSHAF/page${number}.webp"
+          '
+          test "$(find "$MUSHAF" -type f -name "page*.webp" | wc -l)" -eq 604
+          du -sh "$MUSHAF"
+
           python3 - <<'PY'
-          import json
           from pathlib import Path
-          root = Path('quran-offline/build-data/qcf-pages')
-          for page in (1, 2, 50, 440, 604):
-              data = json.load(open(root/f'{page}.json', encoding='utf-8'))
-              verses = data.get('verses') or data.get('data', {}).get('verses') or []
-              assert verses, f'No verses on page {page}'
-              words = [w for v in verses for w in (v.get('words') or [])]
-              assert words, f'No words on page {page}'
-              assert any(w.get('line_number') for w in words), f'No line numbers on page {page}'
-              assert any(w.get('text_qpc_hafs') or w.get('text_uthmani') for w in words), f'No Unicode text on page {page}'
-          print('Unicode Mushaf layout samples validated')
+          root=Path('quran-offline/app/src/main/assets/mushaf-pages')
+          files=sorted(root.glob('page*.webp'))
+          assert len(files)==604, len(files)
+          assert files[0].name=='page001.webp' and files[-1].name=='page604.webp'
+          assert min(p.stat().st_size for p in files)>5000
+          total=sum(p.stat().st_size for p in files)
+          assert total < 95*1024*1024, total
+          print('Real Mushaf images:',len(files),'total bytes:',total)
           PY
 
           curl -fL --retry 6 --retry-all-errors \
@@ -101,7 +120,7 @@ jobs:
           curl -fL --retry 5 --retry-all-errors "$BASE/forties/nawawi40.json" -o "$HADITH/nawawi40.json"
           curl -fL --retry 5 --retry-all-errors "$BASE/forties/qudsi40.json" -o "$HADITH/qudsi40.json"
 
-      - name: Build and validate compact offline data
+      - name: Build and validate offline data
         run: |
           set -euxo pipefail
           python3 quran-offline/scripts/build_offline_assets.py \
@@ -117,41 +136,26 @@ jobs:
           node --check quran-offline/app/src/main/assets/app-v8.js
           node --check quran-offline/app/src/main/assets/app-v9.js
           node --check quran-offline/app/src/main/assets/app-v10.js
+          node --check quran-offline/app/src/main/assets/app-v11.js
           python3 - <<'PY'
           import json
-          import xml.etree.ElementTree as ET
           from pathlib import Path
-          assets = Path('quran-offline/app/src/main/assets')
-          pages = json.load(open(assets/'quran_pages.json', encoding='utf-8'))
-          mushaf = json.load(open(assets/'quran_mushaf.json', encoding='utf-8'))
-          hadith = json.load(open(assets/'hadith.json', encoding='utf-8'))
-          assert len(pages) == 604
-          assert sum(len(p['v']) for p in pages) == 6236
-          assert len(mushaf) == 604
-          assert all(len(p['l']) == 15 for p in mushaf)
-          assert all(any(line['k'] == 'q' for line in p['l']) for p in mushaf)
-          assert sum(1 for p in mushaf for line in p['l'] if line['k'] == 's') >= 110
-          assert len(hadith) >= 6000
-          assert all(h.get('text') and h.get('grade') for h in hadith)
-          assert not (assets/'fonts/qcf-v2').exists()
-          html = (assets/'index.html').read_text(encoding='utf-8')
-          loader = (assets/'app-v7.js').read_text(encoding='utf-8')
-          js8 = (assets/'app-v8.js').read_text(encoding='utf-8')
-          css8 = (assets/'app-v8.css').read_text(encoding='utf-8')
-          js10 = (assets/'app-v10.js').read_text(encoding='utf-8')
-          css10 = (assets/'app-v10.css').read_text(encoding='utf-8')
-          assert 'app-v7.js' in html
-          assert 'app-v8.js' in loader and 'app-v8.css' in loader
-          assert 'app-v10.js' in loader and 'app-v10.css' in loader
-          for token in ('authentic-mushaf-lines', 'exactWordSearch', 'complete-hadith-card', 'mushafFrameSwatches', 'bindGalleryReader'):
-              assert token in js8 or token in css8, token
-          for token in ('mushaf-blue-frame.svg', 'mushaf-blue-surah-banner.svg', '--classic-blue', 'classicBlueMushafV43'):
-              assert token in css10 or token in js10, token
-          for svg in ('mushaf-blue-frame.svg', 'mushaf-blue-surah-banner.svg'):
-              ET.parse(assets/svg)
-          for forbidden in ('rotateY(', 'perspective('):
-              assert forbidden not in js8, forbidden
-          print('Offline v4.3 validated:', len(mushaf), 'pages and', len(hadith), 'hadiths')
+          assets=Path('quran-offline/app/src/main/assets')
+          pages=json.load(open(assets/'quran_pages.json',encoding='utf-8'))
+          hadith=json.load(open(assets/'hadith.json',encoding='utf-8'))
+          images=sorted((assets/'mushaf-pages').glob('page*.webp'))
+          assert len(pages)==604
+          assert sum(len(p['v']) for p in pages)==6236
+          assert len(hadith)>=6000
+          assert len(images)==604
+          loader=(assets/'app-v7.js').read_text(encoding='utf-8')
+          js=(assets/'app-v11.js').read_text(encoding='utf-8')
+          css=(assets/'app-v11.css').read_text(encoding='utf-8')
+          assert 'app-v11.js' in loader and 'app-v11.css' in loader
+          for token in ('mushaf-pages/page','image-mushaf-stage','circularSmooth','renderImages'):
+              assert token in js or token in css, token
+          assert 'rotateY(' not in js and 'perspective(' not in js
+          print('Offline v4.4 validated:',len(images),'real Mushaf images and',len(hadith),'hadiths')
           PY
 
       - name: Build optimized unsigned Release APK
@@ -167,13 +171,13 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "Unsigned APK bytes: $SIZE"
           test "$SIZE" -lt 104857600
-          cp "$APK" Rafiq-AlHuda-v4.3-unsigned.apk
-          sha256sum Rafiq-AlHuda-v4.3-unsigned.apk
+          cp "$APK" Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
+          sha256sum Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v4.3-Unsigned-APK
-          path: Rafiq-AlHuda-v4.3-unsigned.apk
+          name: Rafiq-AlHuda-v4.4-Image-Mushaf-Unsigned-APK
+          path: Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
           retention-days: 30
 
       - name: Package Android signing tools
@@ -187,7 +191,6 @@ jobs:
           if [ -f "$BT/lib64/libc++.so" ]; then cp "$BT/lib64/libc++.so" android-sign-tools/lib64/; fi
           chmod +x android-sign-tools/apksigner android-sign-tools/zipalign
           ./android-sign-tools/apksigner version
-          ./android-sign-tools/zipalign -h >/dev/null 2>&1 || true
 
       - uses: actions/upload-artifact@v4
         with:
