@@ -165,3 +165,22 @@ jobs:
           name: Rafiq-AlHuda-v4.1-Unsigned-APK
           path: Rafiq-AlHuda-v4.1-unsigned.apk
           retention-days: 30
+
+      - name: Package Android signing tools
+        run: |
+          set -euxo pipefail
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          mkdir -p android-sign-tools/lib android-sign-tools/lib64
+          cp "$BT/apksigner" android-sign-tools/
+          cp "$BT/zipalign" android-sign-tools/
+          cp "$BT/lib/apksigner.jar" android-sign-tools/lib/
+          if [ -f "$BT/lib64/libc++.so" ]; then cp "$BT/lib64/libc++.so" android-sign-tools/lib64/; fi
+          chmod +x android-sign-tools/apksigner android-sign-tools/zipalign
+          ./android-sign-tools/apksigner version
+          ./android-sign-tools/zipalign -h >/dev/null 2>&1 || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-Build-Tools-35-Signing
+          path: android-sign-tools
+          retention-days: 7
