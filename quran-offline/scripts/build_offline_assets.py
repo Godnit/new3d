@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build compact offline Quran, Madani Mushaf and hadith assets for Rafiq Al-Huda."""
+"""Build compact offline Quran, Mushaf layout and hadith assets for Rafiq Al-Huda Lite."""
 from __future__ import annotations
 
 import argparse
@@ -42,6 +42,10 @@ def normalize_arabic(value: Any) -> str:
     return WHITESPACE.sub(" ", text).strip().lower()
 
 
+def arabic_number(value: int) -> str:
+    return str(value).translate(str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩"))
+
+
 def extract_narrator(arabic: str) -> str:
     text = clean_text(arabic)
     patterns = [
@@ -58,6 +62,7 @@ def extract_narrator(arabic: str) -> str:
 
 
 def build_pages(page_dir: Path) -> list[dict[str, Any]]:
+    """Store only chapter/verse pairs; the searchable text already exists in quran.json."""
     pages: list[dict[str, Any]] = []
     total_verses = 0
     for page_number in range(1, 605):
@@ -66,19 +71,11 @@ def build_pages(page_dir: Path) -> list[dict[str, Any]]:
             raise FileNotFoundError(f"Missing Quran page: {source}")
         data = load_json(source)
         raw_verses = data.get("pages", data.get("verses", []))
-        verses = []
-        for item in raw_verses:
-            verses.append({
-                "chapter": int(item["chapter"]),
-                "verse": int(item["verse"]),
-                "text": clean_text(item["text"]),
-            })
-        total_verses += len(verses)
-        pages.append({"page": page_number, "verses": verses})
-    if len(pages) != 604:
-        raise ValueError(f"Expected 604 Quran pages, got {len(pages)}")
-    if total_verses != 6236:
-        raise ValueError(f"Expected 6236 Quran verses across pages, got {total_verses}")
+        pairs = [[int(item["chapter"]), int(item["verse"])] for item in raw_verses]
+        total_verses += len(pairs)
+        pages.append({"v": pairs})
+    if len(pages) != 604 or total_verses != 6236:
+        raise ValueError(f"Invalid Quran pages: {len(pages)} pages, {total_verses} verses")
     return pages
 
 
@@ -89,13 +86,11 @@ def _api_verses(payload: Any) -> list[dict[str, Any]]:
         nested = payload.get("data")
         if isinstance(nested, dict) and isinstance(nested.get("verses"), list):
             return nested["verses"]
-    raise ValueError("QCF page response does not contain a verses array")
+    raise ValueError("Quran page response does not contain a verses array")
 
 
 def _word_line(word: dict[str, Any], fallback: int | None) -> int | None:
-    raw = word.get("line_number")
-    if raw is None:
-        raw = word.get("line")
+    raw = word.get("line_number", word.get("line"))
     try:
         line = int(raw)
     except (TypeError, ValueError):
@@ -114,17 +109,17 @@ def _choose_free_line(preferred: int, before: int, occupied: set[int]) -> int | 
 
 
 def build_mushaf_layout(qcf_dir: Path) -> list[dict[str, Any]]:
-    """Create the exact 15-line Madani page structure using QCF V2 glyph codes."""
+    """Keep the 15-line Madani page layout but use one Unicode Uthmanic font."""
     result: list[dict[str, Any]] = []
     total_words = 0
-    verse_ends: set[str] = set()
+    verse_ends = 0
 
     for page_number in range(1, 605):
         source = qcf_dir / f"{page_number}.json"
         if not source.exists():
-            raise FileNotFoundError(f"Missing QCF page response: {source}")
+            raise FileNotFoundError(f"Missing Quran layout page: {source}")
         verses = _api_verses(load_json(source))
-        line_words: dict[int, list[dict[str, str]]] = defaultdict(list)
+        line_words: dict[int, list[str]] = defaultdict(list)
         first_verse_lines: dict[int, int] = {}
         surahs: list[int] = []
         juz = 1
@@ -152,20 +147,19 @@ def build_mushaf_layout(qcf_dir: Path) -> list[dict[str, Any]]:
                 if line is None:
                     continue
                 last_line = line
-                glyph = clean_text(word.get("code_v2") or word.get("code_v1"))
+                kind = clean_text(word.get("char_type_name") or word.get("char_type") or "word")
                 text = clean_text(
                     word.get("text_qpc_hafs")
                     or word.get("text_uthmani")
                     or word.get("text")
                 )
-                if not glyph:
-                    glyph = text
-                kind = clean_text(word.get("char_type_name") or word.get("char_type") or "word")
-                record = {"c": glyph, "t": text, "k": kind, "v": verse_key}
-                line_words[line].append(record)
-                total_words += 1
                 if kind == "end":
-                    verse_ends.add(verse_key)
+                    verse_ends += 1
+                    if not text:
+                        text = f"﴿{arabic_number(verse_number)}﴾"
+                if text:
+                    line_words[line].append(text)
+                    total_words += 1
             if verse_number == 1 and verse_line is not None:
                 first_verse_lines[chapter] = verse_line
 
@@ -175,36 +169,29 @@ def build_mushaf_layout(qcf_dir: Path) -> list[dict[str, Any]]:
             title_preferred = first_line - (1 if chapter in {1, 9} else 2)
             title_line = _choose_free_line(title_preferred, first_line, occupied | set(special))
             if title_line is not None:
-                special[title_line] = {"line": title_line, "kind": "surah", "chapter": chapter}
+                special[title_line] = {"n": title_line, "k": "s", "c": chapter}
             if chapter not in {1, 9}:
                 basmala_line = _choose_free_line(first_line - 1, first_line, occupied | set(special))
                 if basmala_line is not None:
-                    special[basmala_line] = {"line": basmala_line, "kind": "basmala", "chapter": chapter}
+                    special[basmala_line] = {"n": basmala_line, "k": "b", "c": chapter}
 
         lines: list[dict[str, Any]] = []
         for line_number in range(1, 16):
             if line_number in special:
                 lines.append(special[line_number])
             elif line_words.get(line_number):
-                lines.append({"line": line_number, "kind": "quran", "words": line_words[line_number]})
+                lines.append({"n": line_number, "k": "q", "t": " ".join(line_words[line_number])})
             else:
-                lines.append({"line": line_number, "kind": "blank"})
+                lines.append({"n": line_number, "k": "x"})
 
-        if not any(line["kind"] == "quran" for line in lines):
+        if not any(line["k"] == "q" for line in lines):
             raise ValueError(f"Page {page_number} has no Quran lines")
-        result.append({
-            "page": page_number,
-            "juz": juz,
-            "surahs": surahs,
-            "lines": lines,
-        })
+        result.append({"j": juz, "s": surahs, "l": lines})
 
     if len(result) != 604:
         raise ValueError(f"Expected 604 Mushaf pages, got {len(result)}")
-    if total_words < 70_000:
-        raise ValueError(f"Unexpectedly low QCF word count: {total_words}")
-    if len(verse_ends) < 6_200:
-        raise ValueError(f"Expected at least 6200 verse endings, got {len(verse_ends)}")
+    if total_words < 70_000 or verse_ends < 6_200:
+        raise ValueError(f"Unexpected Quran layout counts: {total_words} words, {verse_ends} endings")
     return result
 
 
@@ -230,7 +217,6 @@ def convert_hadith_file(path: Path, limit: int | None = None) -> list[dict[str, 
             grade = "راجع تخريج المصدر"
         record_id = int(raw.get("id") or len(output) + 1)
         number = int(raw.get("idInBook") or raw.get("id") or len(output) + 1)
-        search = normalize_arabic(f"{text} {narrator} {title} {number}")
         output.append({
             "id": record_id,
             "book": title,
@@ -238,7 +224,6 @@ def convert_hadith_file(path: Path, limit: int | None = None) -> list[dict[str, 
             "text": text,
             "narrator": narrator,
             "grade": grade,
-            "search": search,
         })
     return output
 
@@ -292,10 +277,7 @@ def main() -> None:
     dump_json(args.assets / "quran_pages.json", pages)
     dump_json(args.assets / "quran_mushaf.json", mushaf)
     dump_json(args.assets / "hadith.json", hadiths)
-    print(
-        f"Validated 114 surahs, {len(mushaf)} authentic Mushaf pages, "
-        f"6236 verses and {len(hadiths)} hadiths"
-    )
+    print(f"Validated 114 surahs, {len(mushaf)} compact Mushaf pages, 6236 verses and {len(hadiths)} hadiths")
 
 
 if __name__ == "__main__":
