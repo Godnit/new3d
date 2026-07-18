@@ -115,8 +115,11 @@ jobs:
           node --check quran-offline/app/src/main/assets/app-v6.js
           node --check quran-offline/app/src/main/assets/app-v7.js
           node --check quran-offline/app/src/main/assets/app-v8.js
+          node --check quran-offline/app/src/main/assets/app-v9.js
+          node --check quran-offline/app/src/main/assets/app-v10.js
           python3 - <<'PY'
           import json
+          import xml.etree.ElementTree as ET
           from pathlib import Path
           assets = Path('quran-offline/app/src/main/assets')
           pages = json.load(open(assets/'quran_pages.json', encoding='utf-8'))
@@ -135,13 +138,20 @@ jobs:
           loader = (assets/'app-v7.js').read_text(encoding='utf-8')
           js8 = (assets/'app-v8.js').read_text(encoding='utf-8')
           css8 = (assets/'app-v8.css').read_text(encoding='utf-8')
+          js10 = (assets/'app-v10.js').read_text(encoding='utf-8')
+          css10 = (assets/'app-v10.css').read_text(encoding='utf-8')
           assert 'app-v7.js' in html
           assert 'app-v8.js' in loader and 'app-v8.css' in loader
+          assert 'app-v10.js' in loader and 'app-v10.css' in loader
           for token in ('authentic-mushaf-lines', 'exactWordSearch', 'complete-hadith-card', 'mushafFrameSwatches', 'bindGalleryReader'):
               assert token in js8 or token in css8, token
+          for token in ('mushaf-blue-frame.svg', 'mushaf-blue-surah-banner.svg', '--classic-blue', 'classicBlueMushafV43'):
+              assert token in css10 or token in js10, token
+          for svg in ('mushaf-blue-frame.svg', 'mushaf-blue-surah-banner.svg'):
+              ET.parse(assets/svg)
           for forbidden in ('rotateY(', 'perspective('):
               assert forbidden not in js8, forbidden
-          print('Offline v4.2 validated:', len(mushaf), 'pages and', len(hadith), 'hadiths')
+          print('Offline v4.3 validated:', len(mushaf), 'pages and', len(hadith), 'hadiths')
           PY
 
       - name: Build optimized unsigned Release APK
@@ -157,13 +167,13 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "Unsigned APK bytes: $SIZE"
           test "$SIZE" -lt 104857600
-          cp "$APK" Rafiq-AlHuda-v4.2-unsigned.apk
-          sha256sum Rafiq-AlHuda-v4.2-unsigned.apk
+          cp "$APK" Rafiq-AlHuda-v4.3-unsigned.apk
+          sha256sum Rafiq-AlHuda-v4.3-unsigned.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v4.2-Unsigned-APK
-          path: Rafiq-AlHuda-v4.2-unsigned.apk
+          name: Rafiq-AlHuda-v4.3-Unsigned-APK
+          path: Rafiq-AlHuda-v4.3-unsigned.apk
           retention-days: 30
 
       - name: Package Android signing tools
