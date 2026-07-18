@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Build compact offline Quran-page and hadith assets for Rafiq Al-Huda."""
+"""Build compact offline Quran, Madani Mushaf and hadith assets for Rafiq Al-Huda."""
 from __future__ import annotations
 
 import argparse
 import json
 import re
 import unicodedata
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +82,132 @@ def build_pages(page_dir: Path) -> list[dict[str, Any]]:
     return pages
 
 
+def _api_verses(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, dict):
+        if isinstance(payload.get("verses"), list):
+            return payload["verses"]
+        nested = payload.get("data")
+        if isinstance(nested, dict) and isinstance(nested.get("verses"), list):
+            return nested["verses"]
+    raise ValueError("QCF page response does not contain a verses array")
+
+
+def _word_line(word: dict[str, Any], fallback: int | None) -> int | None:
+    raw = word.get("line_number")
+    if raw is None:
+        raw = word.get("line")
+    try:
+        line = int(raw)
+    except (TypeError, ValueError):
+        return fallback
+    return line if 1 <= line <= 15 else fallback
+
+
+def _choose_free_line(preferred: int, before: int, occupied: set[int]) -> int | None:
+    candidates = [preferred]
+    for distance in range(1, 16):
+        candidates.extend((preferred - distance, preferred + distance))
+    for line in candidates:
+        if 1 <= line < before and line not in occupied:
+            return line
+    return None
+
+
+def build_mushaf_layout(qcf_dir: Path) -> list[dict[str, Any]]:
+    """Create the exact 15-line Madani page structure using QCF V2 glyph codes."""
+    result: list[dict[str, Any]] = []
+    total_words = 0
+    verse_ends: set[str] = set()
+
+    for page_number in range(1, 605):
+        source = qcf_dir / f"{page_number}.json"
+        if not source.exists():
+            raise FileNotFoundError(f"Missing QCF page response: {source}")
+        verses = _api_verses(load_json(source))
+        line_words: dict[int, list[dict[str, str]]] = defaultdict(list)
+        first_verse_lines: dict[int, int] = {}
+        surahs: list[int] = []
+        juz = 1
+
+        for verse in verses:
+            verse_key = clean_text(verse.get("verse_key"))
+            chapter_raw = verse.get("chapter_id")
+            verse_number_raw = verse.get("verse_number")
+            if not chapter_raw and ":" in verse_key:
+                chapter_raw = verse_key.split(":", 1)[0]
+            if not verse_number_raw and ":" in verse_key:
+                verse_number_raw = verse_key.split(":", 1)[1]
+            chapter = int(chapter_raw or 1)
+            verse_number = int(verse_number_raw or 1)
+            juz = int(verse.get("juz_number") or juz)
+            if chapter not in surahs:
+                surahs.append(chapter)
+
+            words = verse.get("words") or []
+            known_lines = [_word_line(word, None) for word in words]
+            verse_line = next((line for line in known_lines if line is not None), None)
+            last_line = verse_line
+            for word in words:
+                line = _word_line(word, last_line or verse_line)
+                if line is None:
+                    continue
+                last_line = line
+                glyph = clean_text(word.get("code_v2") or word.get("code_v1"))
+                text = clean_text(
+                    word.get("text_qpc_hafs")
+                    or word.get("text_uthmani")
+                    or word.get("text")
+                )
+                if not glyph:
+                    glyph = text
+                kind = clean_text(word.get("char_type_name") or word.get("char_type") or "word")
+                record = {"c": glyph, "t": text, "k": kind, "v": verse_key}
+                line_words[line].append(record)
+                total_words += 1
+                if kind == "end":
+                    verse_ends.add(verse_key)
+            if verse_number == 1 and verse_line is not None:
+                first_verse_lines[chapter] = verse_line
+
+        special: dict[int, dict[str, Any]] = {}
+        occupied = set(line_words)
+        for chapter, first_line in sorted(first_verse_lines.items(), key=lambda item: item[1]):
+            title_preferred = first_line - (1 if chapter in {1, 9} else 2)
+            title_line = _choose_free_line(title_preferred, first_line, occupied | set(special))
+            if title_line is not None:
+                special[title_line] = {"line": title_line, "kind": "surah", "chapter": chapter}
+            if chapter not in {1, 9}:
+                basmala_line = _choose_free_line(first_line - 1, first_line, occupied | set(special))
+                if basmala_line is not None:
+                    special[basmala_line] = {"line": basmala_line, "kind": "basmala", "chapter": chapter}
+
+        lines: list[dict[str, Any]] = []
+        for line_number in range(1, 16):
+            if line_number in special:
+                lines.append(special[line_number])
+            elif line_words.get(line_number):
+                lines.append({"line": line_number, "kind": "quran", "words": line_words[line_number]})
+            else:
+                lines.append({"line": line_number, "kind": "blank"})
+
+        if not any(line["kind"] == "quran" for line in lines):
+            raise ValueError(f"Page {page_number} has no Quran lines")
+        result.append({
+            "page": page_number,
+            "juz": juz,
+            "surahs": surahs,
+            "lines": lines,
+        })
+
+    if len(result) != 604:
+        raise ValueError(f"Expected 604 Mushaf pages, got {len(result)}")
+    if total_words < 70_000:
+        raise ValueError(f"Unexpectedly low QCF word count: {total_words}")
+    if len(verse_ends) < 6_200:
+        raise ValueError(f"Expected at least 6200 verse endings, got {len(verse_ends)}")
+    return result
+
+
 def convert_hadith_file(path: Path, limit: int | None = None) -> list[dict[str, Any]]:
     data = load_json(path)
     title = clean_text(data.get("metadata", {}).get("arabic", {}).get("title") or path.stem)
@@ -154,15 +281,21 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--assets", type=Path, required=True)
     parser.add_argument("--pages", type=Path, required=True)
+    parser.add_argument("--qcf-pages", type=Path, required=True)
     parser.add_argument("--hadith", type=Path, required=True)
     args = parser.parse_args()
 
     validate_quran_index(args.assets / "quran.json")
     pages = build_pages(args.pages)
+    mushaf = build_mushaf_layout(args.qcf_pages)
     hadiths = build_hadiths(args.hadith)
     dump_json(args.assets / "quran_pages.json", pages)
+    dump_json(args.assets / "quran_mushaf.json", mushaf)
     dump_json(args.assets / "hadith.json", hadiths)
-    print(f"Validated 114 surahs, 604 pages, 6236 verses and {len(hadiths)} hadiths")
+    print(
+        f"Validated 114 surahs, {len(mushaf)} authentic Mushaf pages, "
+        f"6236 verses and {len(hadiths)} hadiths"
+    )
 
 
 if __name__ == "__main__":
