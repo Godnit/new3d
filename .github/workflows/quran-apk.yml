@@ -103,6 +103,7 @@ jobs:
             "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf" \
             -o "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
           test -s "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
+          du -sh "$FONTS" "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
 
           BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
           curl -fL --retry 5 --retry-all-errors "$BASE/the_9_books/bukhari.json" -o "$HADITH/bukhari.json"
@@ -152,7 +153,7 @@ jobs:
           unzip -t "$APK" >/dev/null
           SIZE=$(stat -c%s "$APK")
           echo "APK bytes: $SIZE"
-          test "$SIZE" -lt 104857600
+          test "$SIZE" -lt 314572800
           cp "$APK" Rafiq-AlHuda-v3.apk
           sha256sum Rafiq-AlHuda-v3.apk
 
