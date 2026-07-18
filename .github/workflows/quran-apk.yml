@@ -137,9 +137,11 @@ jobs:
         run: |
           set -euxo pipefail
           APK="quran-offline/app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           test -f "$APK"
+          test -x "$APKSIGNER"
           unzip -t "$APK" >/dev/null
-          apksigner verify --verbose "$APK"
+          "$APKSIGNER" verify --verbose "$APK"
           SIZE=$(stat -c%s "$APK")
           echo "Lite APK bytes: $SIZE"
           test "$SIZE" -lt 104857600
