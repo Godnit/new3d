@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0f5f4a">
   <title>رفيق الهدى</title>
   <link rel="stylesheet" href="app-v2.css">
+  <link rel="stylesheet" href="app-v3.css">
   <script src="adhan.umd.min.js"></script>
 </head>
 <body>
@@ -22,12 +23,12 @@
         <span class="hero-mark">۞</span>
         <p class="eyebrow">رفيقك اليومي</p>
         <h1>رفيق الهدى</h1>
-        <p>مصحف بالصفحات، أذكار، أحاديث، صلاة وقبلة — دون إنترنت.</p>
+        <p>مصحف المدينة بتخطيطه الحقيقي، أذكار، أحاديث، صلاة وقبلة — دون إنترنت.</p>
         <div class="hero-next"><div><small>الصلاة القادمة</small><strong id="homeNextName">—</strong></div><b id="homeNextTime">--:--</b></div>
       </div>
       <div id="lastReadCard" class="continue-card hidden"></div>
       <div class="quick-grid">
-        <button class="quick" onclick="showPage('quran',true)"><span>📖</span><b>المصحف</b><small>صفحات تفاعلية</small></button>
+        <button class="quick" onclick="showPage('quran',true)"><span>📖</span><b>المصحف</b><small>صفحات مصحف حقيقية</small></button>
         <button class="quick" onclick="showPage('hadith',true)"><span>📜</span><b>الأحاديث</b><small>بحث ذكي محلي</small></button>
         <button class="quick" onclick="showPage('adhkar',true)"><span>📿</span><b>الأذكار</b><small>تصنيفات وعدادات</small></button>
         <button class="quick" onclick="showPage('prayer',true)"><span>🕌</span><b>الصلاة</b><small>المواقيت والقبلة</small></button>
@@ -50,21 +51,21 @@
     <section id="page-reader" class="page hidden reader-page">
       <div class="reader-tools">
         <button class="tool" onclick="readerPrev()">‹</button>
-        <div><strong id="readerTitle">المصحف</strong><small id="readerSubtitle">الصفحة ١</small></div>
+        <div><strong id="readerTitle">مصحف المدينة</strong><small id="readerSubtitle">الصفحة ١</small></div>
         <button class="tool" onclick="readerNext()">›</button>
       </div>
       <div id="mushafStage" class="mushaf-stage">
         <article id="mushafPage" class="mushaf-page">
           <div class="page-curl"></div>
           <header><span id="pageSurah">سورة الفاتحة</span><span id="pageJuz">الجزء ١</span></header>
-          <div id="pageText" class="page-text"></div>
+          <div id="pageText" class="page-text mushaf-lines"></div>
           <footer><button id="pageBookmark" onclick="togglePageBookmark()">☆</button><b id="pageNumber">١</b><button onclick="showReaderSettings()">Aa</button></footer>
         </article>
       </div>
       <p class="gesture-hint">اسحب طرف الصفحة وأبقِ إصبعك عليها، ثم أفلتها لإتمام التقليب.</p>
       <div id="readerSettings" class="reader-sheet hidden">
         <div class="sheet-head"><strong>مظهر المصحف</strong><button onclick="showReaderSettings(false)">✕</button></div>
-        <label>حجم الخط <input id="readerFontRange" type="range" min="20" max="38" oninput="setFontSize(this.value)"></label>
+        <label>حجم خط الصفحة <input id="readerFontRange" type="range" min="20" max="38" oninput="setFontSize(this.value)"></label>
         <div class="swatches" id="readerSwatches"></div>
         <label class="switch-row"><span>تأثير تقليب الصفحة</span><input id="pageTurnToggle" type="checkbox" onchange="setPageTurn(this.checked)"></label>
       </div>
@@ -116,7 +117,7 @@
         <div class="setting"><label class="switch-row"><span>تقليل الحركة</span><input id="reduceMotionToggle" type="checkbox" onchange="setReduceMotion(this.checked)"></label></div>
         <div class="setting"><label>طريقة حساب الصلاة</label><select id="methodSelect" class="select" onchange="setPrayerMethod(this.value)"><option value="MWL">رابطة العالم الإسلامي</option><option value="UmmAlQura">أم القرى</option><option value="Egyptian">الهيئة المصرية</option><option value="Karachi">كراتشي</option></select></div>
         <div class="setting danger-zone"><label>البيانات</label><button class="danger-btn" onclick="clearAppData()">مسح العلامات والإعدادات</button></div>
-        <div class="setting"><strong>حول رفيق الهدى</strong><p class="muted">الإصدار 2.0 — مصحف بالصفحات، بحث قرآن وأحاديث، أذكار، صلاة وقبلة. يعمل دون إنترنت بعد التثبيت.</p></div>
+        <div class="setting"><strong>حول رفيق الهدى</strong><p class="muted">الإصدار 3.0 — مصحف المدينة بتخطيط الصفحات الحقيقي، بحث قرآن وأحاديث، أذكار، صلاة وقبلة. يعمل دون إنترنت بعد التثبيت.</p></div>
       </div>
     </section>
   </main>
@@ -137,5 +138,6 @@
 <div id="overlay" class="overlay hidden" onclick="toggleDrawer(false)"></div>
 <div id="toast" class="toast hidden"></div>
 <script src="app-v2.js"></script>
+<script src="app-v3.js"></script>
 </body>
 </html>
