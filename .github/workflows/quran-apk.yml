@@ -125,6 +125,10 @@ jobs:
           assert all(any(line['k'] == 'q' for line in p['l']) for p in mushaf)
           assert len(hadith) >= 6000
           assert not (assets/'fonts/qcf-v2').exists()
+          js = (assets/'app-v3.js').read_text(encoding='utf-8')
+          css = (assets/'app-v3.css').read_text(encoding='utf-8')
+          for token in ('reader-mode','turn-to-right','opening-mushaf-page','hadith-featured'):
+              assert token in js or token in css, token
           sizes = {p.name: p.stat().st_size for p in [assets/'quran.json', assets/'quran_pages.json', assets/'quran_mushaf.json', assets/'hadith.json', assets/'fonts/UthmanicHafs1Ver18.ttf']}
           print('Compact assets:', sizes, 'total=', sum(sizes.values()))
           PY
@@ -145,12 +149,12 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "Lite APK bytes: $SIZE"
           test "$SIZE" -lt 104857600
-          cp "$APK" Rafiq-AlHuda-Lite-v3.1.apk
-          sha256sum Rafiq-AlHuda-Lite-v3.1.apk
+          cp "$APK" Rafiq-AlHuda-Lite-v3.2.apk
+          sha256sum Rafiq-AlHuda-Lite-v3.2.apk
           unzip -l "$APK" | sort -nr -k1 | head -25 || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-Lite-v3.1-APK
-          path: Rafiq-AlHuda-Lite-v3.1.apk
+          name: Rafiq-AlHuda-Lite-v3.2-APK
+          path: Rafiq-AlHuda-Lite-v3.2.apk
           retention-days: 30
