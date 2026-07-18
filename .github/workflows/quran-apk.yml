@@ -26,17 +26,17 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - name: Install Android SDK and image tools
+      - name: Install Android SDK
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
           sudo apt-get update -qq
-          sudo apt-get install -y webp unzip
+          sudo apt-get install -y unzip
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Prepare offline Quran, hadith and real Mushaf images
+      - name: Prepare offline Quran, hadith and original Mushaf images
         shell: bash
         run: |
           set -euxo pipefail
@@ -62,19 +62,18 @@ jobs:
           test "$(find "$QCF" -name "*.json" | wc -l)" -eq 604
 
           curl -fsSL --retry 6 --retry-all-errors \
-            "https://quran.islam-db.com/public/data/pages/quranpages_1024.zip" \
+            "https://quran.islam-db.com/public/data/pages/quranpages_800.zip" \
             -o "$TMP/mushaf.zip"
           unzip -q "$TMP/mushaf.zip" -d "$TMP/extracted"
           SRC=$(dirname "$(find "$TMP/extracted" -type f -name page001.png | head -1)")
           test -n "$SRC"
-          export SRC MUSHAF
-          seq 1 604 | xargs -P 24 -I{} bash -c '
-            set -e
-            n=$(printf "%03d" {})
-            test -s "$SRC/page${n}.png"
-            cwebp -quiet -q 84 -m 6 "$SRC/page${n}.png" -o "$MUSHAF/page${n}.webp"
-          '
-          test "$(find "$MUSHAF" -name "page*.webp" | wc -l)" -eq 604
+          for page in $(seq -w 1 604); do
+            src="$SRC/page$(printf '%03d' "$((10#$page))").png"
+            dst="$MUSHAF/page$(printf '%03d' "$((10#$page))").png"
+            test -s "$src"
+            cp "$src" "$dst"
+          done
+          test "$(find "$MUSHAF" -name "page*.png" | wc -l)" -eq 604
 
           curl -fsSL --retry 5 "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf" -o "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
           BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
@@ -91,14 +90,16 @@ jobs:
           import json
           from pathlib import Path
           assets=Path('quran-offline/app/src/main/assets')
-          images=sorted((assets/'mushaf-pages').glob('page*.webp'))
+          images=sorted((assets/'mushaf-pages').glob('page*.png'))
           assert len(images)==604
-          assert images[0].name=='page001.webp' and images[-1].name=='page604.webp'
+          assert images[0].name=='page001.png' and images[-1].name=='page604.png'
           total=sum(p.stat().st_size for p in images)
-          assert min(p.stat().st_size for p in images)>4000
-          assert total<95*1024*1024, total
+          assert min(p.stat().st_size for p in images)>3000
+          assert total<75*1024*1024, total
           assert len(json.load(open(assets/'hadith.json',encoding='utf-8')))>=6000
-          print('Validated 604 real Mushaf pages; image bytes:',total)
+          source=(assets/'app-v11.js').read_text(encoding='utf-8')
+          assert "'.png'" in source
+          print('Validated 604 original Mushaf PNG pages; image bytes:',total)
           PY
 
       - name: Build optimized APK
