@@ -79,7 +79,7 @@ jobs:
           import json
           from pathlib import Path
           root = Path('quran-offline/build-data/qcf-pages')
-          for page in (1, 2, 50, 604):
+          for page in (1, 2, 50, 440, 604):
               data = json.load(open(root/f'{page}.json', encoding='utf-8'))
               verses = data.get('verses') or data.get('data', {}).get('verses') or []
               assert verses, f'No verses on page {page}'
@@ -114,6 +114,7 @@ jobs:
           node --check quran-offline/app/src/main/assets/app-v4.js
           node --check quran-offline/app/src/main/assets/app-v6.js
           node --check quran-offline/app/src/main/assets/app-v7.js
+          node --check quran-offline/app/src/main/assets/app-v8.js
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -126,22 +127,21 @@ jobs:
           assert len(mushaf) == 604
           assert all(len(p['l']) == 15 for p in mushaf)
           assert all(any(line['k'] == 'q' for line in p['l']) for p in mushaf)
+          assert sum(1 for p in mushaf for line in p['l'] if line['k'] == 's') >= 110
           assert len(hadith) >= 6000
-          assert sum(1 for h in hadith if h.get('display') and h['display'] != h['text']) > 1000
-          assert all(h.get('grade') for h in hadith)
+          assert all(h.get('text') and h.get('grade') for h in hadith)
           assert not (assets/'fonts/qcf-v2').exists()
           html = (assets/'index.html').read_text(encoding='utf-8')
-          assert 'app-v5.css' in html
-          assert 'app-v6.js' in html
+          loader = (assets/'app-v7.js').read_text(encoding='utf-8')
+          js8 = (assets/'app-v8.js').read_text(encoding='utf-8')
+          css8 = (assets/'app-v8.css').read_text(encoding='utf-8')
           assert 'app-v7.js' in html
-          js6 = (assets/'app-v6.js').read_text(encoding='utf-8')
-          js7 = (assets/'app-v7.js').read_text(encoding='utf-8')
-          css = (assets/'app-v5.css').read_text(encoding='utf-8')
-          for token in ('mushaf-side-page', 'bindStableReader', 'compassUpdate', 'عرض النص الكامل'):
-              assert token in js6 or token in css, token
-          for token in ('searchHit', 'highlighted', 'endsWith'):
-              assert token in js7, token
-          print('Offline content validated:', len(mushaf), 'pages and', len(hadith), 'hadiths')
+          assert 'app-v8.js' in loader and 'app-v8.css' in loader
+          for token in ('authentic-mushaf-lines', 'exactWordSearch', 'complete-hadith-card', 'mushafFrameSwatches', 'bindGalleryReader'):
+              assert token in js8 or token in css8, token
+          for forbidden in ('rotateY(', 'perspective('):
+              assert forbidden not in js8, forbidden
+          print('Offline v4.2 validated:', len(mushaf), 'pages and', len(hadith), 'hadiths')
           PY
 
       - name: Build optimized unsigned Release APK
@@ -157,13 +157,13 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "Unsigned APK bytes: $SIZE"
           test "$SIZE" -lt 104857600
-          cp "$APK" Rafiq-AlHuda-v4.1-unsigned.apk
-          sha256sum Rafiq-AlHuda-v4.1-unsigned.apk
+          cp "$APK" Rafiq-AlHuda-v4.2-unsigned.apk
+          sha256sum Rafiq-AlHuda-v4.2-unsigned.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v4.1-Unsigned-APK
-          path: Rafiq-AlHuda-v4.1-unsigned.apk
+          name: Rafiq-AlHuda-v4.2-Unsigned-APK
+          path: Rafiq-AlHuda-v4.2-unsigned.apk
           retention-days: 30
 
       - name: Package Android signing tools
