@@ -1,9 +1,9 @@
-name: Build Rafiq Al-Huda v3 APK
+name: Build Rafiq Al-Huda Lite APK
 
 on:
   workflow_dispatch:
   push:
-    branches: ["agent/offline-quran-apk-v3-mushaf-layout"]
+    branches: ["agent/offline-quran-apk-v3-lite"]
     paths:
       - "quran-offline/**"
       - ".github/workflows/quran-apk.yml"
@@ -16,7 +16,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -46,10 +46,10 @@ jobs:
           PAGES="quran-offline/build-data/pages"
           QCF="quran-offline/build-data/qcf-pages"
           HADITH="quran-offline/build-data/hadith"
-          FONTS="$ASSETS/fonts/qcf-v2"
-          mkdir -p "$ASSETS" "$PAGES" "$QCF" "$HADITH" "$FONTS"
+          mkdir -p "$ASSETS/fonts" "$PAGES" "$QCF" "$HADITH"
+          rm -rf "$ASSETS/fonts/qcf-v2"
           rm -f "$ASSETS/quran.json" "$ASSETS/quran_pages.json" "$ASSETS/quran_mushaf.json" "$ASSETS/hadith.json" "$ASSETS/adhan.umd.min.js"
-          rm -f "$PAGES"/*.json "$QCF"/*.json "$FONTS"/*.woff2
+          rm -f "$PAGES"/*.json "$QCF"/*.json
 
           curl -fL --retry 4 --retry-all-errors \
             "https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json" \
@@ -71,7 +71,7 @@ jobs:
           seq 1 604 | xargs -P 12 -I{} bash -c '
             set -e
             curl -fsSL --retry 6 --retry-all-errors \
-              "https://api.quran.com/api/v4/verses/by_page/{}?language=ar&words=true&word_fields=code_v2,text_qpc_hafs,text_uthmani&fields=juz_number&per_page=50" \
+              "https://api.quran.com/api/v4/verses/by_page/{}?language=ar&words=true&word_fields=text_qpc_hafs,text_uthmani&fields=juz_number&per_page=50" \
               -o "$QCF/{}.json"
           '
           test "$(find "$QCF" -type f -name "*.json" | wc -l)" -eq 604
@@ -86,24 +86,14 @@ jobs:
               words = [w for v in verses for w in (v.get('words') or [])]
               assert words, f'No words on page {page}'
               assert any(w.get('line_number') for w in words), f'No line numbers on page {page}'
-              assert any(w.get('code_v2') for w in words), f'No QCF V2 glyphs on page {page}'
-          print('QCF API samples validated')
+              assert any(w.get('text_qpc_hafs') or w.get('text_uthmani') for w in words), f'No Unicode text on page {page}'
+          print('Unicode Mushaf layout samples validated')
           PY
 
-          export FONTS
-          seq 1 604 | xargs -P 20 -I{} bash -c '
-            set -e
-            curl -fsSL --retry 6 --retry-all-errors \
-              "https://verses.quran.foundation/fonts/quran/hafs/v2/woff2/p{}.woff2" \
-              -o "$FONTS/p{}.woff2"
-            test -s "$FONTS/p{}.woff2"
-          '
-          test "$(find "$FONTS" -type f -name "*.woff2" | wc -l)" -eq 604
           curl -fL --retry 6 --retry-all-errors \
             "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf" \
             -o "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
           test -s "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
-          du -sh "$FONTS" "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
 
           BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
           curl -fL --retry 5 --retry-all-errors "$BASE/the_9_books/bukhari.json" -o "$HADITH/bukhari.json"
@@ -111,7 +101,7 @@ jobs:
           curl -fL --retry 5 --retry-all-errors "$BASE/forties/nawawi40.json" -o "$HADITH/nawawi40.json"
           curl -fL --retry 5 --retry-all-errors "$BASE/forties/qudsi40.json" -o "$HADITH/qudsi40.json"
 
-      - name: Build and validate offline data
+      - name: Build and validate compact offline data
         run: |
           set -euxo pipefail
           python3 quran-offline/scripts/build_offline_assets.py \
@@ -129,36 +119,36 @@ jobs:
           mushaf = json.load(open(assets/'quran_mushaf.json', encoding='utf-8'))
           hadith = json.load(open(assets/'hadith.json', encoding='utf-8'))
           assert len(pages) == 604
-          assert sum(len(p['verses']) for p in pages) == 6236
+          assert sum(len(p['v']) for p in pages) == 6236
           assert len(mushaf) == 604
-          assert all(len(p['lines']) == 15 for p in mushaf)
-          assert all(any(line['kind'] == 'quran' for line in p['lines']) for p in mushaf)
-          assert len(list((assets/'fonts/qcf-v2').glob('p*.woff2'))) == 604
+          assert all(len(p['l']) == 15 for p in mushaf)
+          assert all(any(line['k'] == 'q' for line in p['l']) for p in mushaf)
           assert len(hadith) >= 6000
-          html = (assets/'index.html').read_text(encoding='utf-8')
-          for name in ('app-v2.css', 'app-v3.css', 'app-v2.js', 'app-v3.js', 'quran_mushaf.json'):
-              assert name in html or (assets/name).exists(), name
-          print('Offline assets:', len(mushaf), 'authentic Mushaf pages and', len(hadith), 'hadiths')
+          assert not (assets/'fonts/qcf-v2').exists()
+          sizes = {p.name: p.stat().st_size for p in [assets/'quran.json', assets/'quran_pages.json', assets/'quran_mushaf.json', assets/'hadith.json', assets/'fonts/UthmanicHafs1Ver18.ttf']}
+          print('Compact assets:', sizes, 'total=', sum(sizes.values()))
           PY
 
-      - name: Build APK
+      - name: Build optimized signed Release APK
         working-directory: quran-offline
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:assembleRelease --stacktrace
 
-      - name: Verify APK and size
+      - name: Verify APK, identity and size
         run: |
           set -euxo pipefail
-          APK="quran-offline/app/build/outputs/apk/debug/app-debug.apk"
+          APK="quran-offline/app/build/outputs/apk/release/app-release.apk"
           test -f "$APK"
           unzip -t "$APK" >/dev/null
+          apksigner verify --verbose "$APK"
           SIZE=$(stat -c%s "$APK")
-          echo "APK bytes: $SIZE"
-          test "$SIZE" -lt 314572800
-          cp "$APK" Rafiq-AlHuda-v3.apk
-          sha256sum Rafiq-AlHuda-v3.apk
+          echo "Lite APK bytes: $SIZE"
+          test "$SIZE" -lt 104857600
+          cp "$APK" Rafiq-AlHuda-Lite-v3.1.apk
+          sha256sum Rafiq-AlHuda-Lite-v3.1.apk
+          unzip -l "$APK" | sort -nr -k1 | head -25 || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v3-APK
-          path: Rafiq-AlHuda-v3.apk
+          name: Rafiq-AlHuda-Lite-v3.1-APK
+          path: Rafiq-AlHuda-Lite-v3.1.apk
           retention-days: 30
