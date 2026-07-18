@@ -31,8 +31,7 @@ body{background:linear-gradient(180deg,var(--v5-deeper),#05271f 46%,#061f1a);}
 #page-home .v5-dashboard .quick span{font-size:27px;color:var(--v5-gold-soft)}
 #page-home .v5-dashboard .quick b{color:var(--v5-gold-soft)!important;font-size:14px}
 #page-home .v5-dashboard .quick small{color:#b8c8c2!important;font-size:10px;line-height:1.45}
-#page-home .mini-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
-#page-home .mini{background:#07352b!important;border:1px solid var(--v5-line)!important;color:var(--v5-gold-soft)!important}
+#page-home>.section-head,#page-home>.mini-grid{display:none!important}
 .continue-card{background:linear-gradient(145deg,#0b493b,#07352b)!important;border-color:var(--v5-line)!important;color:var(--v5-ink)!important}
 
 /* القوائم والبحث */
@@ -51,7 +50,7 @@ body.reader-mode{background:#eef1ee!important}
 body.reader-mode #page-reader{background:radial-gradient(circle at 50% 42%,#ffffff 0,#eef1ee 62%,#dde5e1 100%)!important}
 body.reader-mode .mushaf-stage{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;padding:max(54px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom))!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;touch-action:none!important;perspective:none!important;contain:layout paint}
 body.reader-mode .mushaf-page{position:relative!important;flex:0 0 auto!important;width:min(calc(100vw - 16px),calc((100dvh - 68px)*.685))!important;max-height:calc(100dvh - 68px)!important;margin:0!important;transform:none;transform-style:flat!important;backface-visibility:visible!important;will-change:transform;touch-action:none!important;z-index:3;border-radius:13px!important;box-shadow:0 18px 42px rgba(36,45,40,.20)!important;background:radial-gradient(circle at 50% 43%,rgba(255,255,255,.56),transparent 62%),repeating-linear-gradient(8deg,rgba(110,83,40,.018) 0 1px,transparent 1px 8px),var(--paper)!important}
-body.reader-mode .mushaf-side-page{position:absolute!important;top:50%!important;left:50%!important;margin:0!important;translate:-50% -50%;z-index:2;pointer-events:none!important}
+body.reader-mode .mushaf-side-page{position:absolute!important;inset:0!important;margin:auto!important;z-index:2;pointer-events:none!important}
 body.reader-mode #mushafPage{z-index:4}
 body.reader-mode .mushaf-page:before{inset:8px!important;border:3px double var(--paper-edge)!important;border-radius:9px!important;opacity:.84!important}
 body.reader-mode .mushaf-page:after{inset:15px!important;border-radius:7px!important}
