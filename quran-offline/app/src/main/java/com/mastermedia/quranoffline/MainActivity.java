@@ -4,8 +4,14 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.view.Surface;
 import android.webkit.GeolocationPermissions;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -21,10 +27,20 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements SensorEventListener {
     private static final int LOCATION_REQUEST = 1001;
     private static final String APP_HOST = "app.local";
     private WebView webView;
+    private SensorManager sensorManager;
+    private Sensor accelerometer;
+    private Sensor magnetometer;
+    private final float[] gravity = new float[3];
+    private final float[] geomagnetic = new float[3];
+    private boolean hasGravity;
+    private boolean hasGeomagnetic;
+    private int compassAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE;
+    private long lastCompassDispatch;
+    private float filteredHeading = Float.NaN;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +72,12 @@ public class MainActivity extends Activity {
             }
         });
 
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        if (sensorManager != null) {
+            accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        }
+
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{
@@ -65,6 +87,107 @@ public class MainActivity extends Activity {
         }
 
         webView.loadUrl("https://" + APP_HOST + "/index.html");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (sensorManager != null) {
+            if (accelerometer != null) {
+                sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+            }
+            if (magnetometer != null) {
+                sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME);
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
+        }
+        super.onPause();
+    }
+
+    private static void lowPass(float[] source, float[] target) {
+        final float alpha = 0.18f;
+        for (int i = 0; i < 3; i++) {
+            target[i] += alpha * (source[i] - target[i]);
+        }
+    }
+
+    private float smoothHeading(float heading) {
+        if (Float.isNaN(filteredHeading)) {
+            filteredHeading = heading;
+            return heading;
+        }
+        float delta = ((heading - filteredHeading + 540f) % 360f) - 180f;
+        filteredHeading = (filteredHeading + delta * 0.16f + 360f) % 360f;
+        return filteredHeading;
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            lowPass(event.values, gravity);
+            hasGravity = true;
+        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+            lowPass(event.values, geomagnetic);
+            hasGeomagnetic = true;
+            compassAccuracy = event.accuracy;
+        }
+        if (!hasGravity || !hasGeomagnetic || webView == null) {
+            return;
+        }
+
+        float[] rotation = new float[9];
+        float[] remapped = new float[9];
+        float[] orientation = new float[3];
+        if (!SensorManager.getRotationMatrix(rotation, null, gravity, geomagnetic)) {
+            return;
+        }
+
+        int axisX = SensorManager.AXIS_X;
+        int axisY = SensorManager.AXIS_Y;
+        int displayRotation = getWindowManager().getDefaultDisplay().getRotation();
+        if (displayRotation == Surface.ROTATION_90) {
+            axisX = SensorManager.AXIS_Y;
+            axisY = SensorManager.AXIS_MINUS_X;
+        } else if (displayRotation == Surface.ROTATION_180) {
+            axisX = SensorManager.AXIS_MINUS_X;
+            axisY = SensorManager.AXIS_MINUS_Y;
+        } else if (displayRotation == Surface.ROTATION_270) {
+            axisX = SensorManager.AXIS_MINUS_Y;
+            axisY = SensorManager.AXIS_X;
+        }
+        if (!SensorManager.remapCoordinateSystem(rotation, axisX, axisY, remapped)) {
+            return;
+        }
+        SensorManager.getOrientation(remapped, orientation);
+        float heading = (float) Math.toDegrees(orientation[0]);
+        heading = (heading + 360f) % 360f;
+        heading = smoothHeading(heading);
+
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastCompassDispatch < 70L) {
+            return;
+        }
+        lastCompassDispatch = now;
+        final float finalHeading = heading;
+        final int finalAccuracy = compassAccuracy;
+        webView.post(() -> webView.evaluateJavascript(
+                "window.onNativeHeading&&window.onNativeHeading(" +
+                        String.format(Locale.US, "%.2f", finalHeading) + "," + finalAccuracy + ")",
+                null
+        ));
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        if (sensor != null && sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+            compassAccuracy = accuracy;
+        }
     }
 
     private final class LocalAssetClient extends WebViewClient {
@@ -139,6 +262,9 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
+        }
         if (webView != null) {
             webView.loadUrl("about:blank");
             webView.stopLoading();
