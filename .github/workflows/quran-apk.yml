@@ -112,6 +112,8 @@ jobs:
           node --check quran-offline/app/src/main/assets/app-v2.js
           node --check quran-offline/app/src/main/assets/app-v3.js
           node --check quran-offline/app/src/main/assets/app-v4.js
+          node --check quran-offline/app/src/main/assets/app-v6.js
+          node --check quran-offline/app/src/main/assets/app-v7.js
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -129,7 +131,16 @@ jobs:
           assert all(h.get('grade') for h in hadith)
           assert not (assets/'fonts/qcf-v2').exists()
           html = (assets/'index.html').read_text(encoding='utf-8')
-          assert 'app-v4.css' in html and 'app-v4.js' in html
+          assert 'app-v5.css' in html
+          assert 'app-v6.js' in html
+          assert 'app-v7.js' in html
+          js6 = (assets/'app-v6.js').read_text(encoding='utf-8')
+          js7 = (assets/'app-v7.js').read_text(encoding='utf-8')
+          css = (assets/'app-v5.css').read_text(encoding='utf-8')
+          for token in ('mushaf-side-page', 'bindStableReader', 'compassUpdate', 'عرض النص الكامل'):
+              assert token in js6 or token in css, token
+          for token in ('searchHit', 'highlighted', 'endsWith'):
+              assert token in js7, token
           print('Offline content validated:', len(mushaf), 'pages and', len(hadith), 'hadiths')
           PY
 
@@ -146,11 +157,11 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "Unsigned APK bytes: $SIZE"
           test "$SIZE" -lt 104857600
-          cp "$APK" Rafiq-AlHuda-v4-unsigned.apk
-          sha256sum Rafiq-AlHuda-v4-unsigned.apk
+          cp "$APK" Rafiq-AlHuda-v4.1-unsigned.apk
+          sha256sum Rafiq-AlHuda-v4.1-unsigned.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v4-Unsigned-APK
-          path: Rafiq-AlHuda-v4-unsigned.apk
+          name: Rafiq-AlHuda-v4.1-Unsigned-APK
+          path: Rafiq-AlHuda-v4.1-unsigned.apk
           retention-days: 30
