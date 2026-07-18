@@ -7,6 +7,11 @@ on:
     paths:
       - "quran-offline/**"
       - ".github/workflows/quran-apk.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "quran-offline/**"
+      - ".github/workflows/quran-apk.yml"
 
 jobs:
   build:
