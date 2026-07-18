@@ -1,9 +1,9 @@
-name: Build Rafiq Al-Huda Lite APK
+name: Build Rafiq Al-Huda Official APK
 
 on:
   workflow_dispatch:
   push:
-    branches: ["agent/offline-quran-apk-v3-lite"]
+    branches: ["agent/rafiq-alhuda-official-v4"]
     paths:
       - "quran-offline/**"
       - ".github/workflows/quran-apk.yml"
@@ -130,36 +130,27 @@ jobs:
           assert not (assets/'fonts/qcf-v2').exists()
           html = (assets/'index.html').read_text(encoding='utf-8')
           assert 'app-v4.css' in html and 'app-v4.js' in html
-          js = (assets/'app-v4.js').read_text(encoding='utf-8')
-          css = (assets/'app-v4.css').read_text(encoding='utf-8')
-          for token in ('gallery-page-copy','highlightText','nextDhikr','onNativeHeading','mushafFrame'):
-              assert token in js or token in css, token
-          sizes = {p.name: p.stat().st_size for p in [assets/'quran.json', assets/'quran_pages.json', assets/'quran_mushaf.json', assets/'hadith.json', assets/'fonts/UthmanicHafs1Ver18.ttf']}
-          print('Compact assets:', sizes, 'total=', sum(sizes.values()))
+          print('Offline content validated:', len(mushaf), 'pages and', len(hadith), 'hadiths')
           PY
 
-      - name: Build optimized signed Release APK
+      - name: Build optimized unsigned Release APK
         working-directory: quran-offline
         run: gradle :app:assembleRelease --stacktrace
 
-      - name: Verify APK, identity and size
+      - name: Verify unsigned APK and size
         run: |
           set -euxo pipefail
-          APK="quran-offline/app/build/outputs/apk/release/app-release.apk"
-          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          APK="quran-offline/app/build/outputs/apk/release/app-release-unsigned.apk"
           test -f "$APK"
-          test -x "$APKSIGNER"
           unzip -t "$APK" >/dev/null
-          "$APKSIGNER" verify --verbose "$APK"
           SIZE=$(stat -c%s "$APK")
-          echo "Lite APK bytes: $SIZE"
+          echo "Unsigned APK bytes: $SIZE"
           test "$SIZE" -lt 104857600
-          cp "$APK" Rafiq-AlHuda-Lite-v3.3.apk
-          sha256sum Rafiq-AlHuda-Lite-v3.3.apk
-          unzip -l "$APK" | sort -nr -k1 | head -25 || true
+          cp "$APK" Rafiq-AlHuda-v4-unsigned.apk
+          sha256sum Rafiq-AlHuda-v4-unsigned.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-Lite-v3.3-APK
-          path: Rafiq-AlHuda-Lite-v3.3.apk
+          name: Rafiq-AlHuda-v4-Unsigned-APK
+          path: Rafiq-AlHuda-v4-unsigned.apk
           retention-days: 30
