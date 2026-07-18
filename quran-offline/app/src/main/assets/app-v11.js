@@ -9,7 +9,7 @@
 
   function clamp(value,min,max){return Math.max(min,Math.min(max,value))}
   function pad3(value){return String(value).padStart(3,'0')}
-  function pageSource(page){return 'mushaf-pages/page'+pad3(page)+'.webp'}
+  function pageSource(page){return 'mushaf-pages/page'+pad3(page)+'.png'}
   function pageAlt(page){return 'صفحة '+arabicNumber(page)+' من المصحف الشريف'}
 
   function buildStage(){
