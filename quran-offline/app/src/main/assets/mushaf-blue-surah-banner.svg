@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 120" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#0f3a5b"/><stop offset="1" stop-color="#1c5b82"/></linearGradient>
+    <g id="flower">
+      <path fill="#c8ddea" d="M50 2c12 13 16 25 11 37 14-5 28-2 40 10-12 13-26 16-40 11 5 13 1 26-11 39-12-13-16-26-11-39-14 5-28 2-40-11 12-12 26-15 40-10C34 27 38 15 50 2Z"/>
+      <path fill="#31769f" d="M50 13c7 9 9 18 6 27 10-4 19-2 27 6-8 8-17 10-27 6 3 9 1 18-6 27-7-9-9-18-6-27-10 4-19 2-27-6 8-8 17-10 27-6-3-9-1-18 6-27Z"/>
+      <circle cx="50" cy="46" r="10" fill="#cf7e53"/><circle cx="50" cy="46" r="4" fill="#123e5f"/>
+    </g>
+  </defs>
+  <rect x="2" y="2" width="996" height="116" rx="5" fill="url(#bg)" stroke="#0b2c46" stroke-width="4"/>
+  <rect x="12" y="12" width="976" height="96" rx="3" fill="none" stroke="#86aec3" stroke-width="2"/>
+  <g opacity=".95">
+    <use href="#flower" transform="translate(22 10) scale(.95)"/>
+    <use href="#flower" transform="translate(112 10) scale(.95)"/>
+    <use href="#flower" transform="translate(202 10) scale(.95)"/>
+    <use href="#flower" transform="translate(688 10) scale(.95)"/>
+    <use href="#flower" transform="translate(778 10) scale(.95)"/>
+    <use href="#flower" transform="translate(868 10) scale(.95)"/>
+  </g>
+  <path d="M300 10h400l-34 50 34 50H300l34-50Z" fill="#eef1ec" stroke="#86aec3" stroke-width="2"/>
+  <path d="M322 19h356" stroke="#d8e1df" stroke-width="2"/>
+  <path d="M322 101h356" stroke="#d8e1df" stroke-width="2"/>
+</svg>
