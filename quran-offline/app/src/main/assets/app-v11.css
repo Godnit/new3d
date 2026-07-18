@@ -1,0 +1,60 @@
+/* v4.4 — قارئ مصحف مصوّر بصفحات حقيقية، سحب 2D، وواجهة أبسط. */
+body.reader-mode .mushaf-stage.image-mushaf-stage{
+  position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;
+  overflow:hidden!important;background:#e8ece9!important;touch-action:none!important;contain:layout paint!important;
+}
+body.reader-mode .image-page-layer{
+  position:absolute!important;inset:0!important;width:100vw!important;height:100dvh!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  padding:max(62px,calc(env(safe-area-inset-top) + 52px)) 0 max(8px,env(safe-area-inset-bottom))!important;
+  background:#e8ece9!important;will-change:transform!important;transform:translate3d(0,0,0);
+}
+body.reader-mode .image-page-layer img{
+  display:block!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;
+  object-fit:contain!important;object-position:center!important;user-select:none!important;-webkit-user-drag:none!important;
+  background:white!important;box-shadow:none!important;border:0!important;border-radius:0!important;
+}
+body.reader-mode .image-page-layer.empty-image-page{visibility:hidden!important}
+body.reader-mode .image-loading{
+  position:absolute;z-index:20;left:50%;top:50%;transform:translate(-50%,-50%);
+  padding:10px 16px;border-radius:18px;background:rgba(3,31,25,.88);color:#fff;font-size:14px;
+}
+body.reader-mode .image-loading.hidden{display:none!important}
+body.reader-mode .reader-floating-chrome{z-index:40!important}
+body.reader-mode .reader-font-button{display:none!important}
+body.reader-mode .reader-page-chip{background:rgba(255,255,255,.94)!important;box-shadow:0 3px 16px rgba(0,0,0,.12)!important}
+body.reader-mode .reader-menu-button{background:#073d31!important;color:#e4bd68!important;border:1px solid rgba(228,189,104,.45)!important}
+body.reader-mode .gesture-hint{display:none!important}
+
+/* إخفاء الصفحة المرسومة القديمة بالكامل عند وجود القارئ المصوّر */
+body.reader-mode .mushaf-page,body.reader-mode .mushaf-side-page{display:none!important}
+
+/* واجهة رئيسية أهدأ وأقرب لتطبيق حقيقي */
+body:not(.reader-mode){background:#071f1a!important;color:#f5f1e7!important}
+body:not(.reader-mode) .app{background:linear-gradient(180deg,#06271f 0,#0a3328 34%,#f4f3ee 34%,#f4f3ee 100%)!important}
+body:not(.reader-mode) .topbar{
+  min-height:76px!important;padding:12px 16px!important;background:rgba(5,45,35,.96)!important;border-bottom:1px solid rgba(223,183,93,.22)!important;
+}
+body:not(.reader-mode) .topbar .icon-btn{width:48px!important;height:48px!important;border-radius:15px!important;background:#0d4a3b!important;color:#e1b85a!important;border:1px solid rgba(225,184,90,.3)!important}
+body:not(.reader-mode) .brand strong{font-size:24px!important;color:#fff9e9!important}.brand small{color:#c8d8d2!important}
+#page-home.official-home{padding-top:12px!important}
+#page-home.official-home .hero{
+  border:1px solid rgba(223,183,93,.25)!important;border-radius:24px!important;padding:22px!important;
+  background:linear-gradient(145deg,#0b4a39,#062b22)!important;box-shadow:0 14px 36px rgba(0,0,0,.2)!important;
+}
+#page-home.official-home .hero h1{font-size:34px!important;margin:4px 0 8px!important;color:#f4cf7a!important}
+#page-home.official-home .hero p{color:#e1ece7!important}.hero-mark{color:#e7bd5f!important}
+#page-home.official-home .quick-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;margin-top:16px!important}
+#page-home.official-home .quick{
+  min-height:118px!important;border-radius:20px!important;border:1px solid #d9ded8!important;background:#fff!important;color:#123c32!important;
+  box-shadow:0 6px 18px rgba(18,48,40,.08)!important;padding:16px!important;
+}
+#page-home.official-home .quick span{font-size:28px!important}.quick b{font-size:17px!important}.quick small{color:#6f827b!important}
+body:not(.reader-mode) main{color:#173c32!important}
+body:not(.reader-mode) .bottom-nav{background:#062a22!important;border-top:1px solid rgba(225,184,90,.3)!important;box-shadow:0 -8px 20px rgba(0,0,0,.14)!important}
+body:not(.reader-mode) .bottom-nav .nav{color:#b9cbc4!important}.bottom-nav .nav.active{color:#e6bd61!important}
+
+@media(max-width:390px){
+  body.reader-mode .image-page-layer{padding-top:max(58px,calc(env(safe-area-inset-top) + 48px))!important}
+  #page-home.official-home .quick-grid{gap:9px!important}
+}
