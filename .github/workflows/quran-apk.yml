@@ -111,6 +111,7 @@ jobs:
             --hadith quran-offline/build-data/hadith
           node --check quran-offline/app/src/main/assets/app-v2.js
           node --check quran-offline/app/src/main/assets/app-v3.js
+          node --check quran-offline/app/src/main/assets/app-v4.js
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -124,10 +125,14 @@ jobs:
           assert all(len(p['l']) == 15 for p in mushaf)
           assert all(any(line['k'] == 'q' for line in p['l']) for p in mushaf)
           assert len(hadith) >= 6000
+          assert sum(1 for h in hadith if h.get('display') and h['display'] != h['text']) > 1000
+          assert all(h.get('grade') for h in hadith)
           assert not (assets/'fonts/qcf-v2').exists()
-          js = (assets/'app-v3.js').read_text(encoding='utf-8')
-          css = (assets/'app-v3.css').read_text(encoding='utf-8')
-          for token in ('reader-mode','turn-to-right','opening-mushaf-page','hadith-featured'):
+          html = (assets/'index.html').read_text(encoding='utf-8')
+          assert 'app-v4.css' in html and 'app-v4.js' in html
+          js = (assets/'app-v4.js').read_text(encoding='utf-8')
+          css = (assets/'app-v4.css').read_text(encoding='utf-8')
+          for token in ('gallery-page-copy','highlightText','nextDhikr','onNativeHeading','mushafFrame'):
               assert token in js or token in css, token
           sizes = {p.name: p.stat().st_size for p in [assets/'quran.json', assets/'quran_pages.json', assets/'quran_mushaf.json', assets/'hadith.json', assets/'fonts/UthmanicHafs1Ver18.ttf']}
           print('Compact assets:', sizes, 'total=', sum(sizes.values()))
@@ -149,12 +154,12 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "Lite APK bytes: $SIZE"
           test "$SIZE" -lt 104857600
-          cp "$APK" Rafiq-AlHuda-Lite-v3.2.apk
-          sha256sum Rafiq-AlHuda-Lite-v3.2.apk
+          cp "$APK" Rafiq-AlHuda-Lite-v3.3.apk
+          sha256sum Rafiq-AlHuda-Lite-v3.3.apk
           unzip -l "$APK" | sort -nr -k1 | head -25 || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-Lite-v3.2-APK
-          path: Rafiq-AlHuda-Lite-v3.2.apk
+          name: Rafiq-AlHuda-Lite-v3.3-APK
+          path: Rafiq-AlHuda-Lite-v3.3.apk
           retention-days: 30
