@@ -30,10 +30,14 @@ import java.util.Map;
 public class MainActivity extends Activity implements SensorEventListener {
     private static final int LOCATION_REQUEST = 1001;
     private static final String APP_HOST = "app.local";
+    private static final long COMPASS_DISPATCH_INTERVAL_MS = 75L;
+
     private WebView webView;
     private SensorManager sensorManager;
+    private Sensor rotationVector;
     private Sensor accelerometer;
     private Sensor magnetometer;
+
     private final float[] gravity = new float[3];
     private final float[] geomagnetic = new float[3];
     private boolean hasGravity;
@@ -74,6 +78,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         if (sensorManager != null) {
+            rotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
             accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         }
@@ -92,12 +97,18 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     protected void onResume() {
         super.onResume();
-        if (sensorManager != null) {
+        filteredHeading = Float.NaN;
+        if (sensorManager == null) {
+            return;
+        }
+        if (rotationVector != null) {
+            sensorManager.registerListener(this, rotationVector, SensorManager.SENSOR_DELAY_UI);
+        } else {
             if (accelerometer != null) {
-                sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+                sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI);
             }
             if (magnetometer != null) {
-                sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME);
+                sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_UI);
             }
         }
     }
@@ -111,7 +122,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     }
 
     private static void lowPass(float[] source, float[] target) {
-        final float alpha = 0.18f;
+        final float alpha = 0.16f;
         for (int i = 0; i < 3; i++) {
             target[i] += alpha * (source[i] - target[i]);
         }
@@ -123,30 +134,42 @@ public class MainActivity extends Activity implements SensorEventListener {
             return heading;
         }
         float delta = ((heading - filteredHeading + 540f) % 360f) - 180f;
-        filteredHeading = (filteredHeading + delta * 0.16f + 360f) % 360f;
+        delta = Math.max(-48f, Math.min(48f, delta));
+        filteredHeading = (filteredHeading + delta * 0.38f + 360f) % 360f;
         return filteredHeading;
     }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            lowPass(event.values, gravity);
-            hasGravity = true;
-        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            lowPass(event.values, geomagnetic);
-            hasGeomagnetic = true;
-            compassAccuracy = event.accuracy;
-        }
-        if (!hasGravity || !hasGeomagnetic || webView == null) {
+        if (webView == null) {
             return;
         }
 
-        float[] rotation = new float[9];
+        float[] rotationMatrix = new float[9];
+        if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
+            compassAccuracy = event.accuracy;
+        } else {
+            if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+                lowPass(event.values, gravity);
+                hasGravity = true;
+            } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+                lowPass(event.values, geomagnetic);
+                hasGeomagnetic = true;
+                compassAccuracy = event.accuracy;
+            }
+            if (!hasGravity || !hasGeomagnetic
+                    || !SensorManager.getRotationMatrix(rotationMatrix, null, gravity, geomagnetic)) {
+                return;
+            }
+        }
+
+        dispatchHeading(rotationMatrix);
+    }
+
+    private void dispatchHeading(float[] rotationMatrix) {
         float[] remapped = new float[9];
         float[] orientation = new float[3];
-        if (!SensorManager.getRotationMatrix(rotation, null, gravity, geomagnetic)) {
-            return;
-        }
 
         int axisX = SensorManager.AXIS_X;
         int axisY = SensorManager.AXIS_Y;
@@ -161,7 +184,8 @@ public class MainActivity extends Activity implements SensorEventListener {
             axisX = SensorManager.AXIS_MINUS_Y;
             axisY = SensorManager.AXIS_X;
         }
-        if (!SensorManager.remapCoordinateSystem(rotation, axisX, axisY, remapped)) {
+
+        if (!SensorManager.remapCoordinateSystem(rotationMatrix, axisX, axisY, remapped)) {
             return;
         }
         SensorManager.getOrientation(remapped, orientation);
@@ -170,10 +194,11 @@ public class MainActivity extends Activity implements SensorEventListener {
         heading = smoothHeading(heading);
 
         long now = SystemClock.elapsedRealtime();
-        if (now - lastCompassDispatch < 70L) {
+        if (now - lastCompassDispatch < COMPASS_DISPATCH_INTERVAL_MS) {
             return;
         }
         lastCompassDispatch = now;
+
         final float finalHeading = heading;
         final int finalAccuracy = compassAccuracy;
         webView.post(() -> webView.evaluateJavascript(
@@ -185,7 +210,8 @@ public class MainActivity extends Activity implements SensorEventListener {
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        if (sensor != null && sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+        if (sensor != null && (sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD
+                || sensor.getType() == Sensor.TYPE_ROTATION_VECTOR)) {
             compassAccuracy = accuracy;
         }
     }
