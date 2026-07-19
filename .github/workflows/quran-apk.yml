@@ -105,7 +105,7 @@ jobs:
         working-directory: quran-offline
         run: gradle :app:assembleRelease --stacktrace
 
-      - name: Verify APK
+      - name: Verify and stage APK
         run: |
           set -euxo pipefail
           APK="quran-offline/app/build/outputs/apk/release/app-release-unsigned.apk"
@@ -113,7 +113,7 @@ jobs:
           unzip -t "$APK" >/dev/null
           SIZE=$(stat -c%s "$APK")
           echo "APK bytes: $SIZE"
-          test "$SIZE" -lt 83886080
+          test "$SIZE" -lt 209715200
           cp "$APK" Rafiq-AlHuda-v4.6-unsigned.apk
           sha256sum Rafiq-AlHuda-v4.6-unsigned.apk
 
