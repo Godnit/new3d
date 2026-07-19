@@ -26,17 +26,18 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - name: Install Android SDK
+      - name: Install Android SDK and lossless PNG optimizer
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
           sudo apt-get update -qq
           sudo apt-get install -y unzip
+          python3 -m pip install --disable-pip-version-check zopfli
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Prepare offline Quran, hadith and original Mushaf images
+      - name: Prepare offline Quran, hadith and losslessly optimized Mushaf images
         shell: bash
         run: |
           set -euxo pipefail
@@ -75,6 +76,39 @@ jobs:
           done
           test "$(find "$MUSHAF" -name "page*.png" | wc -l)" -eq 604
 
+          export MUSHAF
+          python3 - <<'PY'
+          import os
+          from concurrent.futures import ProcessPoolExecutor
+          from pathlib import Path
+          from zopfli.png import optimize
+
+          root = Path(os.environ['MUSHAF'])
+          files = sorted(root.glob('page*.png'))
+          before = sum(path.stat().st_size for path in files)
+
+          def optimize_one(path_string):
+              path = Path(path_string)
+              original = path.read_bytes()
+              compressed = optimize(
+                  original,
+                  num_iterations=3,
+                  num_iterations_large=1,
+              )
+              if len(compressed) < len(original):
+                  path.write_bytes(compressed)
+                  return len(original), len(compressed)
+              return len(original), len(original)
+
+          workers = min(8, os.cpu_count() or 2)
+          with ProcessPoolExecutor(max_workers=workers) as pool:
+              results = list(pool.map(optimize_one, map(str, files), chunksize=4))
+
+          after = sum(item[1] for item in results)
+          print(f'Lossless Mushaf PNG optimization: {before} -> {after} bytes; saved {before-after} bytes')
+          assert after < before
+          PY
+
           curl -fsSL --retry 5 "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf" -o "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
           BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
           curl -fsSL --retry 5 "$BASE/the_9_books/bukhari.json" -o "$HADITH/bukhari.json"
@@ -94,12 +128,12 @@ jobs:
           assert len(images)==604
           assert images[0].name=='page001.png' and images[-1].name=='page604.png'
           total=sum(p.stat().st_size for p in images)
-          assert min(p.stat().st_size for p in images)>3000
-          assert total<75*1024*1024, total
+          assert min(p.stat().st_size for p in images)>2500
+          assert total<50*1024*1024, total
           assert len(json.load(open(assets/'hadith.json',encoding='utf-8')))>=6000
           source=(assets/'app-v11.js').read_text(encoding='utf-8')
           assert "'.png'" in source
-          print('Validated 604 original Mushaf PNG pages; image bytes:',total)
+          print('Validated 604 losslessly optimized Mushaf PNG pages; image bytes:',total)
           PY
 
       - name: Build optimized APK
@@ -114,14 +148,14 @@ jobs:
           unzip -t "$APK" >/dev/null
           SIZE=$(stat -c%s "$APK")
           echo "APK bytes: $SIZE"
-          test "$SIZE" -lt 104857600
-          cp "$APK" Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
-          sha256sum Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
+          test "$SIZE" -lt 52428800
+          cp "$APK" Rafiq-AlHuda-v4.4-Compact-Lossless-unsigned.apk
+          sha256sum Rafiq-AlHuda-v4.4-Compact-Lossless-unsigned.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v4.4-Image-Mushaf-Unsigned-APK
-          path: Rafiq-AlHuda-v4.4-Image-Mushaf-unsigned.apk
+          name: Rafiq-AlHuda-v4.4-Compact-Lossless-Unsigned-APK
+          path: Rafiq-AlHuda-v4.4-Compact-Lossless-unsigned.apk
           retention-days: 30
 
       - name: Package signing tools
