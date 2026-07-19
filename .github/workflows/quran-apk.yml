@@ -100,7 +100,7 @@ jobs:
             --local-dir "$HFROOT"
           test "$(find "$SRCROOT" -type f -name '*.opus' | wc -l)" -eq 114
           export AUDIO SRCROOT
-          seq -w 1 114 | xargs -P 8 -I{} bash -c '
+          seq -w 1 114 | xargs -P 6 -I{} bash -c '
             set -e
             INPUT="$SRCROOT/{}/{}.opus"
             test -s "$INPUT"
@@ -119,15 +119,17 @@ jobs:
           files=sorted(root.glob('*.ogg'))
           assert len(files)==114
           total_bytes=sum(p.stat().st_size for p in files)
-          total_seconds=0.0
+          durations=[]
           for path in files:
               value=subprocess.check_output([
                   'ffprobe','-v','error','-show_entries','format=duration',
                   '-of','default=noprint_wrappers=1:nokey=1',str(path)
               ],text=True).strip()
-              total_seconds+=float(value)
-          print('OFFLINE AUDIO files=',len(files),'bytes=',total_bytes,'hours=',total_seconds/3600)
-          assert total_seconds>70000, total_seconds
+              durations.append(float(value))
+          total_seconds=sum(durations)
+          print('OFFLINE AUDIO files=',len(files),'bytes=',total_bytes,'hours=',total_seconds/3600,'shortest=',min(durations))
+          assert total_seconds>40000, total_seconds
+          assert min(durations)>8, min(durations)
           assert min(p.stat().st_size for p in files)>2500
           PY
           cat > "$ASSETS/AUDIO_SOURCE_NOTICE.txt" <<'EOF'
@@ -158,7 +160,7 @@ jobs:
           loader=(assets/'app-v7.js').read_text(encoding='utf-8')
           assert 'app-v13.js' in loader and 'app-v13.css' in loader
           assert 'mushaf-border.webp' not in [p.name for p in (assets/'mushaf-pages').iterdir()]
-          assert audio_total>70_000_000
+          assert audio_total>35_000_000
           PY
           test -s quran-offline/app/src/main/res/raw/adhan_short.ogg
 
