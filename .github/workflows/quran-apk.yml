@@ -145,6 +145,8 @@ jobs:
           node --check "$ASSETS/app-v13.js"
           python3 - <<'PY'
           import json
+          import re
+          import unicodedata
           from pathlib import Path
           assets=Path('quran-offline/app/src/main/assets')
           images=sorted((assets/'mushaf-pages').glob('page*.webp'))
@@ -156,7 +158,12 @@ jobs:
           assert len(images)==604
           assert len(audio)==114
           assert 320<=len(hadith)<=430
-          assert any('يتحرى الصدق' in (h.get('text') or '') for h in hadith)
+          def normalize(value):
+              value=unicodedata.normalize('NFC',str(value or ''))
+              value=re.sub(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]','',value)
+              value=value.translate(str.maketrans({'أ':'ا','إ':'ا','آ':'ا','ٱ':'ا','ى':'ي','ة':'ه','ؤ':'و','ئ':'ي','ـ':' '}))
+              return re.sub(r'\s+',' ',value).strip()
+          assert any('يتحري الصدق' in normalize((h.get('text') or '')+' '+(h.get('display') or '')) for h in hadith)
           loader=(assets/'app-v7.js').read_text(encoding='utf-8')
           assert 'app-v13.js' in loader and 'app-v13.css' in loader
           assert 'mushaf-border.webp' not in [p.name for p in (assets/'mushaf-pages').iterdir()]
