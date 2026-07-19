@@ -1,7 +1,7 @@
 (function(){
   'use strict';
 
-  /* v4.4: use real Madani Mushaf page images instead of recreating pages with HTML. */
+  /* v4.6: real Madani Mushaf page images with the ornament baked into each image. */
   var reader={stage:null,current:null,previous:null,next:null,drag:null,animating:false,duration:220};
   var compass={heading:null,target:null,display:null,raf:0,lastTime:0};
   var oldShowPage=showPage;
@@ -9,7 +9,7 @@
 
   function clamp(value,min,max){return Math.max(min,Math.min(max,value))}
   function pad3(value){return String(value).padStart(3,'0')}
-  function pageSource(page){return 'mushaf-pages/page'+pad3(page)+'.png'}
+  function pageSource(page){return 'mushaf-pages/page'+pad3(page)+'.webp'}
   function pageAlt(page){return 'صفحة '+arabicNumber(page)+' من المصحف الشريف'}
 
   function buildStage(){
@@ -121,7 +121,7 @@
     var x=(1-alpha)*Math.cos(p)+alpha*Math.cos(n),y=(1-alpha)*Math.sin(p)+alpha*Math.sin(n);
     return (Math.atan2(y,x)*180/Math.PI+360)%360;
   }
-  function compassFrame(time){
+  function compassFrame(){
     var arrow=document.getElementById('qiblaArrow');
     if(!arrow||compass.target==null){compass.raf=0;return}
     if(compass.display==null)compass.display=compass.target;
@@ -137,10 +137,7 @@
     compass.target=compass.target==null?desired:(compass.target+shortest(compass.target,desired)+360)%360;
     if(!compass.raf)compass.raf=requestAnimationFrame(compassFrame);
     var status=document.getElementById('compassStatus');
-    if(status){
-      if(Number(accuracy)<=0)status.textContent='حرّك الهاتف على شكل رقم ٨ لمعايرة البوصلة';
-      else status.textContent='اتجاه الهاتف: '+arabicNumber(Math.round(compass.heading))+'°';
-    }
+    if(status){if(Number(accuracy)<=0)status.textContent='حرّك الهاتف على شكل رقم ٨ لمعايرة البوصلة';else status.textContent='اتجاه الهاتف: '+arabicNumber(Math.round(compass.heading))+'°'}
   }
   window.onNativeHeading=function(heading,accuracy){state.nativeHeading=Number(heading);state.compassAccuracy=Number(accuracy||0);updateCompass(heading,accuracy)};
   renderQibla=function(){oldRenderQibla();compass.heading=null;compass.target=null;compass.display=null;if(state.nativeHeading!=null)updateCompass(state.nativeHeading,state.compassAccuracy)};
@@ -148,7 +145,7 @@
   function refreshHome(){
     var page=document.getElementById('page-home');if(!page)return;
     page.classList.add('official-home');
-    var hero=page.querySelector('.hero');if(hero){hero.querySelector('p:not(.eyebrow)')&&(hero.querySelector('p:not(.eyebrow)').textContent='مصحف المدينة المصوّر، الأذكار، الحديث، الصلاة والقبلة — دون إنترنت.');}
+    var hero=page.querySelector('.hero');if(hero&&hero.querySelector('p:not(.eyebrow)'))hero.querySelector('p:not(.eyebrow)').textContent='مصحف المدينة المصوّر، الأذكار، الحديث، الصلاة والقبلة — دون إنترنت.';
   }
 
   showPage=function(name,push){
@@ -160,7 +157,6 @@
   function init(){
     buildStage();refreshHome();
     var hint=document.querySelector('.gesture-hint');if(hint)hint.textContent='اسحب الصفحة أفقيًا مثل معرض الصور.';
-    var about=document.querySelector('#page-settings .setting:last-child .muted');if(about)about.textContent='الإصدار 4.4 — صور صفحات مصحف المدينة الحقيقية، سحب 2D سلس، وقبلة محسنة. يعمل دون إنترنت.';
     if(state.page==='reader')renderImages();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
