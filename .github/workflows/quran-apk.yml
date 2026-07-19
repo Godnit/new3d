@@ -13,6 +13,10 @@ on:
       - "quran-offline/**"
       - ".github/workflows/quran-apk.yml"
 
+concurrency:
+  group: rafiq-v47-offline-audio
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,13 +30,14 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - name: Install Android SDK, FFmpeg and image tools
+      - name: Install Android SDK, FFmpeg and transfer tools
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
           sudo apt-get update -qq
           sudo apt-get install -y unzip ffmpeg
-          python3 -m pip install --disable-pip-version-check pillow
+          python3 -m pip install --disable-pip-version-check pillow "huggingface_hub>=0.32"
+          hf --help >/dev/null
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
@@ -79,22 +84,28 @@ jobs:
 
       - name: Download and compress full Yasser Al-Dosari recitation
         shell: bash
+        env:
+          HF_XET_HIGH_PERFORMANCE: "1"
         run: |
           set -euxo pipefail
           ASSETS="quran-offline/app/src/main/assets"
           AUDIO="$ASSETS/quran-audio"
-          SOURCE="quran-offline/build-data/yasser-source"
-          mkdir -p "$AUDIO" "$SOURCE"
-          rm -f "$AUDIO"/*.ogg "$SOURCE"/*.opus
-          export AUDIO SOURCE
+          HFROOT="quran-offline/build-data/hf-yasser"
+          SRCROOT="$HFROOT/Yasser Al Dosari (Murattal)"
+          rm -rf "$AUDIO" "$HFROOT"
+          mkdir -p "$AUDIO" "$HFROOT"
+          hf download zaibihassan/Quranic-Recitation-Data \
+            --repo-type dataset \
+            --include "Yasser Al Dosari (Murattal)/*/*.opus" \
+            --local-dir "$HFROOT"
+          test "$(find "$SRCROOT" -type f -name '*.opus' | wc -l)" -eq 114
+          export AUDIO SRCROOT
           seq -w 1 114 | xargs -P 8 -I{} bash -c '
             set -e
-            curl -fL --retry 8 --retry-all-errors \
-              "https://cdn.mualim.app/yasser-al-dosari-murattal/{}.opus" \
-              -o "$SOURCE/{}.opus"
-            test -s "$SOURCE/{}.opus"
+            INPUT="$SRCROOT/{}/{}.opus"
+            test -s "$INPUT"
             ffmpeg -nostdin -hide_banner -loglevel error -y \
-              -i "$SOURCE/{}.opus" -map_metadata -1 -vn -ac 1 -ar 16000 \
+              -i "$INPUT" -map_metadata -1 -vn -ac 1 -ar 16000 \
               -c:a libopus -application audio -frame_duration 60 \
               -b:a 9k -vbr on -compression_level 10 \
               "$AUDIO/{}.ogg"
