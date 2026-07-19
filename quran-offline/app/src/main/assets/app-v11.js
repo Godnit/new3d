@@ -1,7 +1,7 @@
 (function(){
   'use strict';
 
-  /* v4.6: real Madani Mushaf page images with the ornament baked into each image. */
+  /* v4.6: compact real Madani page images inside one real decorative Mushaf image. */
   var reader={stage:null,current:null,previous:null,next:null,drag:null,animating:false,duration:220};
   var compass={heading:null,target:null,display:null,raf:0,lastTime:0};
   var oldShowPage=showPage;
@@ -11,6 +11,9 @@
   function pad3(value){return String(value).padStart(3,'0')}
   function pageSource(page){return 'mushaf-pages/page'+pad3(page)+'.webp'}
   function pageAlt(page){return 'صفحة '+arabicNumber(page)+' من المصحف الشريف'}
+  function layerMarkup(className){
+    return '<div class="image-page-layer '+className+'"><div class="mushaf-image-shell"><img class="page-content-image" draggable="false" alt=""><img class="real-mushaf-border" src="mushaf-pages/mushaf-border.webp" draggable="false" alt=""></div></div>';
+  }
 
   function buildStage(){
     var old=document.getElementById('mushafStage');
@@ -20,7 +23,7 @@
     stage.id='mushafStage';
     stage.className='mushaf-stage image-mushaf-stage';
     stage.dataset.imageReader='1';
-    stage.innerHTML='<div class="image-page-layer image-prev-layer"><img draggable="false" alt=""></div><div class="image-page-layer image-current-layer"><img draggable="false" alt=""></div><div class="image-page-layer image-next-layer"><img draggable="false" alt=""></div><div class="image-loading">جارٍ فتح صفحة المصحف…</div>';
+    stage.innerHTML=layerMarkup('image-prev-layer')+layerMarkup('image-current-layer')+layerMarkup('image-next-layer')+'<div class="image-loading">جارٍ فتح صفحة المصحف…</div>';
     old.parentNode.replaceChild(stage,old);
     reader.stage=stage;
     reader.previous=stage.querySelector('.image-prev-layer');
@@ -32,7 +35,7 @@
 
   function setImage(layer,page){
     if(!layer)return;
-    var img=layer.querySelector('img');
+    var img=layer.querySelector('.page-content-image');
     if(page<1||page>604){layer.classList.add('empty-image-page');img.removeAttribute('src');img.alt='';return}
     layer.classList.remove('empty-image-page');
     img.alt=pageAlt(page);
@@ -62,7 +65,7 @@
     localStorage.setItem('lastPage',String(state.currentPage));
     localStorage.setItem('lastRead',JSON.stringify({page:state.currentPage}));
     var loading=stage.querySelector('.image-loading');
-    var image=reader.current.querySelector('img');
+    var image=reader.current.querySelector('.page-content-image');
     if(loading){loading.classList.remove('hidden');image.onload=function(){loading.classList.add('hidden')};image.onerror=function(){loading.textContent='تعذر تحميل صورة الصفحة'};if(image.complete&&image.naturalWidth)loading.classList.add('hidden')}
     preload(state.currentPage+2);preload(state.currentPage-2);
   }
