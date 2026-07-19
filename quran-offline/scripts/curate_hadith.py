@@ -30,14 +30,14 @@ def score(item: dict) -> tuple[int, int]:
     text = normalize((item.get("text") or "") + " " + (item.get("display") or ""))
     points = sum(35 for word in IMPORTANT if word in text)
     length = len(text)
-    if 100 <= length <= 1100:
-        points += 28
-    elif length > 2200:
-        points -= 35
+    if 100 <= length <= 950:
+        points += 32
+    elif length > 1800:
+        points -= 45
     if "قال رسول الله" in text or "عن النبي" in text:
-        points += 20
+        points += 24
     number = int(item.get("number") or 99999)
-    points += max(0, 30 - min(30, number // 120))
+    points += max(0, 34 - min(34, number // 100))
     return points, -length
 
 
@@ -61,13 +61,14 @@ def main() -> None:
         groups.setdefault(item.get("book") or "", []).append(item)
 
     selected: list[dict] = []
+    # Keep the compact foundational collections complete.
     for name in ("الأربعون النووية", "الأربعون القدسية"):
         selected.extend(groups.get(name, []))
-    for name, limit in (("صحيح البخاري", 440), ("صحيح مسلم", 440)):
+    # Add only the most useful, famous and searchable records from the two Sahihs.
+    for name, limit in (("صحيح البخاري", 150), ("صحيح مسلم", 150)):
         ranked = sorted(groups.get(name, []), key=score, reverse=True)
         selected.extend(ranked[:limit])
 
-    requested = normalize("عليكم بالصدق فإن الصدق يهدي إلى البر وإن البر يهدي إلى الجنة وما يزال الرجل يصدق ويتحرى الصدق حتى يكتب عند الله صديقا")
     if not any("يتحري الصدق" in normalize(item.get("text") or "") for item in selected):
         selected.insert(0, {
             "id": 9906094,
@@ -81,7 +82,7 @@ def main() -> None:
 
     selected = unique(selected)
     selected.sort(key=lambda item: (0 if int(item.get("id") or 0) == 9906094 else 1, -(score(item)[0])))
-    if not 800 <= len(selected) <= 1050:
+    if not 320 <= len(selected) <= 430:
         raise SystemExit(f"Unexpected curated hadith count: {len(selected)}")
     if not any("يتحري الصدق" in normalize(item.get("text") or "") for item in selected):
         raise SystemExit("Requested truthfulness hadith is missing")
