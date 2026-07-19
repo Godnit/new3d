@@ -2,6 +2,10 @@ package com.mastermedia.quranoffline;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.hardware.Sensor;
@@ -9,16 +13,20 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.Surface;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,6 +37,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity implements SensorEventListener {
     private static final int LOCATION_REQUEST = 1001;
+    private static final int NOTIFICATION_REQUEST = 1002;
     private static final String APP_HOST = "app.local";
     private static final long COMPASS_DISPATCH_INTERVAL_MS = 75L;
 
@@ -45,6 +54,22 @@ public class MainActivity extends Activity implements SensorEventListener {
     private int compassAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE;
     private long lastCompassDispatch;
     private float filteredHeading = Float.NaN;
+    private boolean audioReceiverRegistered;
+
+    private final BroadcastReceiver audioStateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (webView == null) return;
+            boolean playing = intent.getBooleanExtra("playing", false);
+            boolean buffering = intent.getBooleanExtra("buffering", false);
+            int surah = intent.getIntExtra("surah", 1);
+            String name = intent.getStringExtra("name");
+            if (name == null) name = "الفاتحة";
+            final String script = "window.onNativeAudioState&&window.onNativeAudioState(" +
+                    playing + "," + surah + "," + JSONObject.quote(name) + "," + buffering + ")";
+            webView.post(() -> webView.evaluateJavascript(script, null));
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +88,7 @@ public class MainActivity extends Activity implements SensorEventListener {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 
+        webView.addJavascriptInterface(new NativeBridge(), "AndroidBridge");
         webView.setWebViewClient(new LocalAssetClient());
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -91,41 +117,91 @@ public class MainActivity extends Activity implements SensorEventListener {
             }, LOCATION_REQUEST);
         }
 
+        IntentFilter audioFilter = new IntentFilter(AudioService.BROADCAST_STATE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(audioStateReceiver, audioFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(audioStateReceiver, audioFilter);
+        }
+        audioReceiverRegistered = true;
+
         webView.loadUrl("https://" + APP_HOST + "/index.html");
+    }
+
+    public final class NativeBridge {
+        @JavascriptInterface
+        public void playSurah(int number, String name) {
+            Intent intent = new Intent(MainActivity.this, AudioService.class)
+                    .setAction(AudioService.ACTION_PLAY_SURAH)
+                    .putExtra(AudioService.EXTRA_SURAH, number)
+                    .putExtra(AudioService.EXTRA_NAME, name == null ? "" : name);
+            startAudioService(intent, true);
+        }
+
+        @JavascriptInterface
+        public void audioAction(String action) {
+            String nativeAction;
+            boolean foreground = false;
+            if ("toggle".equals(action)) { nativeAction = AudioService.ACTION_TOGGLE; foreground = true; }
+            else if ("next".equals(action)) { nativeAction = AudioService.ACTION_NEXT; foreground = true; }
+            else if ("previous".equals(action)) { nativeAction = AudioService.ACTION_PREVIOUS; foreground = true; }
+            else if ("stop".equals(action)) nativeAction = AudioService.ACTION_STOP;
+            else nativeAction = AudioService.ACTION_QUERY;
+            startAudioService(new Intent(MainActivity.this, AudioService.class).setAction(nativeAction), foreground);
+        }
+
+        @JavascriptInterface
+        public void requestNotificationPermission() {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_REQUEST);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void setPrayerNotificationsEnabled(boolean enabled) {
+            PrayerScheduler.setEnabled(getApplicationContext(), enabled);
+        }
+
+        @JavascriptInterface
+        public void schedulePrayerNotifications(String json) {
+            PrayerScheduler.schedule(getApplicationContext(), json == null ? "[]" : json);
+        }
+    }
+
+    private void startAudioService(Intent intent, boolean needsForeground) {
+        try {
+            if (needsForeground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent);
+            else startService(intent);
+        } catch (Exception ignored) {}
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         filteredHeading = Float.NaN;
-        if (sensorManager == null) {
-            return;
-        }
-        if (rotationVector != null) {
-            sensorManager.registerListener(this, rotationVector, SensorManager.SENSOR_DELAY_UI);
-        } else {
-            if (accelerometer != null) {
-                sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI);
-            }
-            if (magnetometer != null) {
-                sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_UI);
+        if (sensorManager != null) {
+            if (rotationVector != null) {
+                sensorManager.registerListener(this, rotationVector, SensorManager.SENSOR_DELAY_UI);
+            } else {
+                if (accelerometer != null) sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI);
+                if (magnetometer != null) sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_UI);
             }
         }
+        startAudioService(new Intent(this, AudioService.class).setAction(AudioService.ACTION_QUERY), false);
     }
 
     @Override
     protected void onPause() {
-        if (sensorManager != null) {
-            sensorManager.unregisterListener(this);
-        }
+        if (sensorManager != null) sensorManager.unregisterListener(this);
         super.onPause();
     }
 
     private static void lowPass(float[] source, float[] target) {
         final float alpha = 0.16f;
-        for (int i = 0; i < 3; i++) {
-            target[i] += alpha * (source[i] - target[i]);
-        }
+        for (int i = 0; i < 3; i++) target[i] += alpha * (source[i] - target[i]);
     }
 
     private float smoothHeading(float heading) {
@@ -141,10 +217,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (webView == null) {
-            return;
-        }
-
+        if (webView == null) return;
         float[] rotationMatrix = new float[9];
         if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
@@ -158,19 +231,15 @@ public class MainActivity extends Activity implements SensorEventListener {
                 hasGeomagnetic = true;
                 compassAccuracy = event.accuracy;
             }
-            if (!hasGravity || !hasGeomagnetic
-                    || !SensorManager.getRotationMatrix(rotationMatrix, null, gravity, geomagnetic)) {
-                return;
-            }
+            if (!hasGravity || !hasGeomagnetic ||
+                    !SensorManager.getRotationMatrix(rotationMatrix, null, gravity, geomagnetic)) return;
         }
-
         dispatchHeading(rotationMatrix);
     }
 
     private void dispatchHeading(float[] rotationMatrix) {
         float[] remapped = new float[9];
         float[] orientation = new float[3];
-
         int axisX = SensorManager.AXIS_X;
         int axisY = SensorManager.AXIS_Y;
         int displayRotation = getWindowManager().getDefaultDisplay().getRotation();
@@ -184,36 +253,24 @@ public class MainActivity extends Activity implements SensorEventListener {
             axisX = SensorManager.AXIS_MINUS_Y;
             axisY = SensorManager.AXIS_X;
         }
-
-        if (!SensorManager.remapCoordinateSystem(rotationMatrix, axisX, axisY, remapped)) {
-            return;
-        }
+        if (!SensorManager.remapCoordinateSystem(rotationMatrix, axisX, axisY, remapped)) return;
         SensorManager.getOrientation(remapped, orientation);
         float heading = (float) Math.toDegrees(orientation[0]);
-        heading = (heading + 360f) % 360f;
-        heading = smoothHeading(heading);
-
+        heading = smoothHeading((heading + 360f) % 360f);
         long now = SystemClock.elapsedRealtime();
-        if (now - lastCompassDispatch < COMPASS_DISPATCH_INTERVAL_MS) {
-            return;
-        }
+        if (now - lastCompassDispatch < COMPASS_DISPATCH_INTERVAL_MS) return;
         lastCompassDispatch = now;
-
         final float finalHeading = heading;
         final int finalAccuracy = compassAccuracy;
         webView.post(() -> webView.evaluateJavascript(
                 "window.onNativeHeading&&window.onNativeHeading(" +
-                        String.format(Locale.US, "%.2f", finalHeading) + "," + finalAccuracy + ")",
-                null
-        ));
+                        String.format(Locale.US, "%.2f", finalHeading) + "," + finalAccuracy + ")", null));
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        if (sensor != null && (sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD
-                || sensor.getType() == Sensor.TYPE_ROTATION_VECTOR)) {
-            compassAccuracy = accuracy;
-        }
+        if (sensor != null && (sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD ||
+                sensor.getType() == Sensor.TYPE_ROTATION_VECTOR)) compassAccuracy = accuracy;
     }
 
     private final class LocalAssetClient extends WebViewClient {
@@ -229,23 +286,14 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
 
         private WebResourceResponse loadLocalAsset(Uri uri) {
-            if (!"https".equalsIgnoreCase(uri.getScheme()) || !APP_HOST.equalsIgnoreCase(uri.getHost())) {
-                return null;
-            }
-
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || !APP_HOST.equalsIgnoreCase(uri.getHost())) return null;
             String path = uri.getPath();
-            if (path == null || path.isEmpty() || "/".equals(path)) {
-                path = "/index.html";
-            }
+            if (path == null || path.isEmpty() || "/".equals(path)) path = "/index.html";
             path = Uri.decode(path.substring(1));
-            if (path.contains("..") || path.startsWith("/")) {
-                return notFound();
-            }
-
+            if (path.contains("..") || path.startsWith("/")) return notFound();
             try {
                 InputStream stream = getAssets().open(path, AssetManager.ACCESS_STREAMING);
-                String mime = mimeType(path);
-                WebResourceResponse response = new WebResourceResponse(mime, "UTF-8", stream);
+                WebResourceResponse response = new WebResourceResponse(mimeType(path), "UTF-8", stream);
                 Map<String, String> headers = new HashMap<>();
                 headers.put("Cache-Control", "public, max-age=31536000, immutable");
                 headers.put("Access-Control-Allow-Origin", "https://" + APP_HOST);
@@ -272,6 +320,7 @@ public class MainActivity extends Activity implements SensorEventListener {
             if (lower.endsWith(".svg")) return "image/svg+xml";
             if (lower.endsWith(".png")) return "image/png";
             if (lower.endsWith(".webp")) return "image/webp";
+            if (lower.endsWith(".ogg") || lower.endsWith(".oga")) return "audio/ogg";
             String guessed = URLConnection.guessContentTypeFromName(path);
             return guessed != null ? guessed : "application/octet-stream";
         }
@@ -279,19 +328,19 @@ public class MainActivity extends Activity implements SensorEventListener {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            super.onBackPressed();
-        }
+        if (webView != null && webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
     }
 
     @Override
     protected void onDestroy() {
-        if (sensorManager != null) {
-            sensorManager.unregisterListener(this);
+        if (sensorManager != null) sensorManager.unregisterListener(this);
+        if (audioReceiverRegistered) {
+            try { unregisterReceiver(audioStateReceiver); } catch (Exception ignored) {}
+            audioReceiverRegistered = false;
         }
         if (webView != null) {
+            webView.removeJavascriptInterface("AndroidBridge");
             webView.loadUrl("about:blank");
             webView.stopLoading();
             webView.setWebChromeClient(null);
@@ -304,8 +353,6 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == LOCATION_REQUEST && webView != null) {
-            webView.reload();
-        }
+        if (requestCode == LOCATION_REQUEST && webView != null) webView.reload();
     }
 }
