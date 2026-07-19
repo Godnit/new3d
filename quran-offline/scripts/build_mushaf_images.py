@@ -55,11 +55,11 @@ def process_one(arguments: tuple[str, str, str]) -> tuple[int, int]:
     y = inner[1] + (inner_height - fitted.height) // 2
     canvas.paste(fitted, (x, y))
 
-    # Preserve the full 800 px resolution. A carefully generated 64-colour palette
-    # keeps black Uthmanic text crisp while dramatically shrinking the repeated ornament.
-    quantized = canvas.quantize(colors=64, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGB")
     destination_path.parent.mkdir(parents=True, exist_ok=True)
-    quantized.save(destination_path, "WEBP", lossless=True, method=5, exact=True)
+    # Keep the original 800-pixel page dimensions. WebP quality 86 preserves the
+    # black Uthmanic strokes cleanly at normal and moderate zoom while avoiding
+    # hundreds of megabytes caused by repeating the ornamental border losslessly.
+    canvas.save(destination_path, "WEBP", quality=86, method=6, exact=True)
     return source_path.stat().st_size, destination_path.stat().st_size
 
 
@@ -86,7 +86,7 @@ def main() -> None:
     files = sorted(args.destination.glob("page*.webp"))
     if len(files) != 604:
         raise RuntimeError(f"Expected 604 images, got {len(files)}")
-    if min(path.stat().st_size for path in files) < 2000:
+    if min(path.stat().st_size for path in files) < 1500:
         raise RuntimeError("A generated Mushaf image looks empty")
     print(f"Baked public-domain ornament into 604 full-resolution pages: {before} -> {after} bytes")
 
