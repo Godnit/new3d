@@ -4,9 +4,15 @@ from __future__ import annotations
 import argparse
 import os
 from concurrent.futures import ProcessPoolExecutor
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageEnhance, ImageOps
+
+
+@lru_cache(maxsize=2)
+def load_border(path: str) -> Image.Image:
+    return Image.open(path).convert("RGB")
 
 
 def content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
@@ -29,7 +35,7 @@ def content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
 def process_one(arguments: tuple[str, str, str]) -> tuple[int, int]:
     source_path, border_path, destination_path = map(Path, arguments)
     source = Image.open(source_path).convert("RGB")
-    border = Image.open(border_path).convert("RGB")
+    border = load_border(str(border_path))
     final_size = source.size
     canvas = ImageOps.fit(border, final_size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
     canvas = ImageEnhance.Contrast(canvas).enhance(1.03)
@@ -49,8 +55,11 @@ def process_one(arguments: tuple[str, str, str]) -> tuple[int, int]:
     y = inner[1] + (inner_height - fitted.height) // 2
     canvas.paste(fitted, (x, y))
 
+    # Preserve the full 800 px resolution. A carefully generated 64-colour palette
+    # keeps black Uthmanic text crisp while dramatically shrinking the repeated ornament.
+    quantized = canvas.quantize(colors=64, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGB")
     destination_path.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(destination_path, "WEBP", lossless=True, method=6, exact=True)
+    quantized.save(destination_path, "WEBP", lossless=True, method=5, exact=True)
     return source_path.stat().st_size, destination_path.stat().st_size
 
 
@@ -79,7 +88,7 @@ def main() -> None:
         raise RuntimeError(f"Expected 604 images, got {len(files)}")
     if min(path.stat().st_size for path in files) < 2000:
         raise RuntimeError("A generated Mushaf image looks empty")
-    print(f"Baked public-domain ornament into 604 pages: {before} -> {after} bytes")
+    print(f"Baked public-domain ornament into 604 full-resolution pages: {before} -> {after} bytes")
 
 
 if __name__ == "__main__":
