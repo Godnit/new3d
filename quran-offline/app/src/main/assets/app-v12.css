@@ -1,0 +1,55 @@
+/* v4.6 — the ornament is baked into every Mushaf image. No CSS frame overlay. */
+html,body,.app{min-height:100dvh!important}
+body.reader-mode .image-page-layer:before,body.reader-mode .image-page-layer:after,
+body.reader-mode .image-page-layer img:before,body.reader-mode .image-page-layer img:after,
+body.reader-mode .mushaf-frame-overlay,body.reader-mode .reader-frame-overlay{display:none!important;content:none!important;background:none!important}
+body.reader-mode .image-page-layer{background:#edf1ee!important;padding:max(62px,calc(env(safe-area-inset-top) + 52px)) 0 max(6px,env(safe-area-inset-bottom))!important}
+body.reader-mode .image-page-layer img{width:100%!important;height:100%!important;object-fit:contain!important;background:#fff!important;border:0!important;outline:0!important;filter:none!important}
+
+/* Keep the bottom navigation attached to the real bottom after the keyboard closes. */
+.bottom-nav{position:fixed!important;right:0!important;left:0!important;top:auto!important;bottom:0!important;transform:none!important}
+main{padding-bottom:calc(102px + env(safe-area-inset-bottom))!important}
+.audio-mini-player:not(.hidden)~*{}
+body:has(.audio-mini-player:not(.hidden)) main{padding-bottom:calc(166px + env(safe-area-inset-bottom))!important}
+
+/* Prayer times: explicit contrast in every app theme. */
+#page-prayer .card.row{background:#fff!important;border-color:#d8e0db!important;color:#153d32!important}
+#page-prayer .select{background:#fff!important;color:#153d32!important;border-color:#ccd9d3!important}
+#page-prayer .next-prayer{background:linear-gradient(145deg,#07503f,#0a7659)!important;color:#fff!important;border:1px solid rgba(212,170,77,.58)!important}
+#page-prayer .next-prayer small,#page-prayer .next-prayer h3,#page-prayer .next-prayer span{color:#f1f7f4!important;opacity:1!important}
+#page-prayer .next-prayer strong{color:#ffd982!important;text-shadow:0 1px 3px rgba(0,0,0,.25)!important}
+#page-prayer .prayer-list{background:#fff!important;border-color:#ccd9d3!important;box-shadow:0 10px 28px rgba(10,52,42,.12)!important}
+#page-prayer .prayer-row{background:#fff!important;color:#163c32!important;border-bottom:1px solid #d8e3dd!important;font-size:17px!important}
+#page-prayer .prayer-row strong{color:#123d31!important;font-weight:800!important}
+#page-prayer .prayer-row span{color:#365c51!important;font-weight:700!important;direction:rtl!important}
+#page-prayer .prayer-row.is-next{background:#fff5d8!important;border-right:5px solid #d6a943!important}
+#page-prayer .muted{color:#526e65!important}
+
+/* Search remains usable and never covers headings. */
+#page-hadith .search-box,#page-quran .search-box,#page-audio .search-box{position:relative!important;top:auto!important;z-index:5!important;margin:8px 0 13px!important;background:#fff!important;color:#173e33!important}
+#page-hadith .search-box input,#page-quran .search-box input,#page-audio .search-box input{color:#173e33!important;font-size:17px!important}
+#page-hadith .filter-scroll{position:relative!important;top:auto!important;z-index:3!important}
+.search-loading{min-height:110px!important;display:grid!important;place-items:center!important}
+#hadithResults{padding-bottom:30px!important}
+
+/* Native-streaming recitation page. */
+.audio-page{padding-bottom:70px!important}
+.audio-notice{margin-bottom:13px;padding:13px 15px;border-radius:17px;background:#eaf4ef;color:#315f51;border:1px solid #ccded6;line-height:1.7;font-size:13px}
+.audio-surah-list{display:grid;gap:9px}
+.audio-surah-row{width:100%;min-height:72px;display:grid;grid-template-columns:46px 1fr 36px;align-items:center;gap:12px;padding:11px 13px;border:1px solid #d8e2dc;border-radius:19px;background:#fff;color:#143c31;text-align:right;box-shadow:0 5px 14px rgba(10,52,42,.07)}
+.audio-surah-row.active{border-color:#cfa43f;background:#fff9e8;box-shadow:0 6px 18px rgba(174,127,23,.13)}
+.audio-surah-row .audio-number{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:#eaf3ef;color:#087155;font-weight:800}
+.audio-surah-row b,.audio-surah-row small{display:block}.audio-surah-row b{font-size:17px}.audio-surah-row small{margin-top:4px;color:#71847c}.audio-surah-row i{font-style:normal;color:#b88822;font-size:19px;text-align:center}
+.audio-mini-player{position:fixed;z-index:70;right:10px;left:10px;bottom:calc(79px + env(safe-area-inset-bottom));min-height:66px;display:grid;grid-template-columns:38px 46px 38px 1fr 34px;align-items:center;gap:6px;padding:8px 10px;border-radius:19px;background:rgba(4,42,33,.97);color:#fff;border:1px solid rgba(221,177,77,.55);box-shadow:0 10px 34px rgba(0,0,0,.3);direction:ltr}
+.audio-mini-player button{height:38px;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:17px}.audio-mini-player .audio-main{height:44px;background:#d4a641;color:#06271f;font-weight:900}
+.audio-mini-info{min-width:0;text-align:right;direction:rtl;padding-inline:5px}.audio-mini-info b,.audio-mini-info small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.audio-mini-info b{font-size:14px}.audio-mini-info small{font-size:10px;color:#c8d9d2;margin-top:2px}
+.prayer-alert-setting small{display:block;margin-top:4px;color:var(--muted);font-weight:400;line-height:1.55}
+
+/* Obsolete image-colour and generated-frame controls are intentionally hidden. */
+#mushafSwatches,#readerSwatches,#mushafFrameSwatches,#readerBackdropSwatches,#mushafSpacingRange,#fontRange,#readerFontRange,#settingsTurnToggle,#pageTurnToggle,#reduceMotionToggle{display:none!important}
+
+@media(max-width:390px){
+  .audio-surah-row{grid-template-columns:42px 1fr 32px;padding-inline:10px}
+  .audio-mini-player{right:6px;left:6px;gap:3px;padding-inline:6px}
+  body.reader-mode .image-page-layer{padding-top:max(58px,calc(env(safe-area-inset-top) + 48px))!important}
+}
