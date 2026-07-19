@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
@@ -14,7 +15,9 @@ import android.media.MediaPlayer;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -30,7 +33,7 @@ public class AudioService extends Service {
     public static final String EXTRA_SURAH = "surah";
     public static final String EXTRA_NAME = "name";
 
-    private static final String CHANNEL_ID = "quran_playback";
+    private static final String CHANNEL_ID = "quran_playback_offline";
     private static final int NOTIFICATION_ID = 4106;
 
     private static final String[] SURAHS = new String[]{
@@ -41,9 +44,20 @@ public class AudioService extends Service {
     private MediaSession mediaSession;
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private int currentSurah = 1;
     private boolean buffering;
     private boolean startedForeground;
+
+    private final Runnable progressTicker = new Runnable() {
+        @Override public void run() {
+            if (player == null) return;
+            updatePlaybackState();
+            updateNotification();
+            broadcastState();
+            handler.postDelayed(this, 1000L);
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -58,6 +72,13 @@ public class AudioService extends Service {
             @Override public void onSkipToNext() { playSurah(currentSurah + 1); }
             @Override public void onSkipToPrevious() { playSurah(currentSurah - 1); }
             @Override public void onStop() { stopSelfSafely(); }
+            @Override public void onSeekTo(long pos) {
+                if (player != null) {
+                    player.seekTo((int) Math.max(0, Math.min(Integer.MAX_VALUE, pos)));
+                    updatePlaybackState();
+                    broadcastState();
+                }
+            }
         });
         mediaSession.setActive(true);
         updatePlaybackState();
@@ -97,6 +118,7 @@ public class AudioService extends Service {
         player.setOnPreparedListener(mp -> {
             buffering = false;
             mp.start();
+            startTicker();
             updatePlaybackState();
             updateNotification();
             broadcastState();
@@ -111,9 +133,9 @@ public class AudioService extends Service {
             broadcastState();
             return true;
         });
-        try {
-            String url = String.format(Locale.US, "https://server11.mp3quran.net/yasser/%03d.mp3", currentSurah);
-            player.setDataSource(url);
+        try (AssetFileDescriptor descriptor = getAssets().openFd(
+                String.format(Locale.US, "quran-audio/%03d.ogg", currentSurah))) {
+            player.setDataSource(descriptor.getFileDescriptor(), descriptor.getStartOffset(), descriptor.getLength());
             player.prepareAsync();
             ensureForeground();
             updatePlaybackState();
@@ -133,7 +155,10 @@ public class AudioService extends Service {
             return;
         }
         requestAudioFocus();
-        if (!buffering) player.start();
+        if (!buffering) {
+            player.start();
+            startTicker();
+        }
         updatePlaybackState();
         updateNotification();
         broadcastState();
@@ -141,9 +166,19 @@ public class AudioService extends Service {
 
     private void pausePlayback() {
         if (player != null && player.isPlaying()) player.pause();
+        stopTicker();
         updatePlaybackState();
         updateNotification();
         broadcastState();
+    }
+
+    private void startTicker() {
+        handler.removeCallbacks(progressTicker);
+        handler.post(progressTicker);
+    }
+
+    private void stopTicker() {
+        handler.removeCallbacks(progressTicker);
     }
 
     private void requestAudioFocus() {
@@ -166,16 +201,31 @@ public class AudioService extends Service {
         }
     }
 
+    private int currentPosition() {
+        try { return player != null ? Math.max(0, player.getCurrentPosition()) : 0; }
+        catch (Exception ignored) { return 0; }
+    }
+
+    private int duration() {
+        try { return player != null ? Math.max(0, player.getDuration()) : 0; }
+        catch (Exception ignored) { return 0; }
+    }
+
     private void updatePlaybackState() {
         boolean playing = player != null && player.isPlaying();
         int state = buffering ? PlaybackState.STATE_BUFFERING : (playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED);
         long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE |
-                PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_STOP;
-        mediaSession.setPlaybackState(new PlaybackState.Builder().setActions(actions).setState(state, 0, 1f).build());
+                PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_STOP |
+                PlaybackState.ACTION_SEEK_TO;
+        mediaSession.setPlaybackState(new PlaybackState.Builder()
+                .setActions(actions)
+                .setState(state, currentPosition(), 1f)
+                .build());
         mediaSession.setMetadata(new android.media.MediaMetadata.Builder()
                 .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, "سورة " + surahName())
                 .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, "ياسر الدوسري")
-                .putString(android.media.MediaMetadata.METADATA_KEY_ALBUM, "القرآن الكريم")
+                .putString(android.media.MediaMetadata.METADATA_KEY_ALBUM, "القرآن الكريم — دون إنترنت")
+                .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, duration())
                 .build());
     }
 
@@ -192,18 +242,20 @@ public class AudioService extends Service {
         Notification.Action toggle = new Notification.Action.Builder(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play, playing ? "إيقاف مؤقت" : "تشغيل", serviceAction(ACTION_TOGGLE, 4002)).build();
         Notification.Action next = new Notification.Action.Builder(android.R.drawable.ic_media_next, "التالي", serviceAction(ACTION_NEXT, 4003)).build();
         Notification.Action stop = new Notification.Action.Builder(android.R.drawable.ic_menu_close_clear_cancel, "إغلاق", serviceAction(ACTION_STOP, 4004)).build();
-        return new Notification.Builder(this, CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle("سورة " + surahName())
-                .setContentText(buffering ? "جارٍ تجهيز التلاوة — ياسر الدوسري" : "ياسر الدوسري")
+                .setContentText(buffering ? "جارٍ تجهيز التلاوة — ياسر الدوسري" : "ياسر الدوسري — تشغيل دون إنترنت")
                 .setContentIntent(content)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setOnlyAlertOnce(true)
                 .setOngoing(playing || buffering)
                 .setShowWhen(false)
                 .addAction(previous).addAction(toggle).addAction(next).addAction(stop)
-                .setStyle(new Notification.MediaStyle().setMediaSession(mediaSession.getSessionToken()).setShowActionsInCompactView(0, 1, 2))
-                .build();
+                .setStyle(new Notification.MediaStyle().setMediaSession(mediaSession.getSessionToken()).setShowActionsInCompactView(0, 1, 2));
+        int total = duration();
+        if (total > 0) builder.setProgress(total, currentPosition(), buffering);
+        return builder.build();
     }
 
     private void ensureForeground() {
@@ -227,6 +279,8 @@ public class AudioService extends Service {
         state.putExtra("buffering", buffering);
         state.putExtra("surah", currentSurah);
         state.putExtra("name", surahName());
+        state.putExtra("position", currentPosition());
+        state.putExtra("duration", duration());
         sendBroadcast(state);
     }
 
@@ -235,12 +289,13 @@ public class AudioService extends Service {
     private void createChannel() {
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "تلاوة القرآن", NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription("مشغل تلاوة ياسر الدوسري");
+        channel.setDescription("مشغل القرآن كاملًا بصوت ياسر الدوسري دون إنترنت");
         channel.setSound(null, null);
         manager.createNotificationChannel(channel);
     }
 
     private void releasePlayer() {
+        stopTicker();
         if (player != null) {
             try { player.stop(); } catch (Exception ignored) {}
             player.reset();
