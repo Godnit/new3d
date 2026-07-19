@@ -63,10 +63,13 @@ public class MainActivity extends Activity implements SensorEventListener {
             boolean playing = intent.getBooleanExtra("playing", false);
             boolean buffering = intent.getBooleanExtra("buffering", false);
             int surah = intent.getIntExtra("surah", 1);
+            int position = intent.getIntExtra("position", 0);
+            int duration = intent.getIntExtra("duration", 0);
             String name = intent.getStringExtra("name");
             if (name == null) name = "الفاتحة";
             final String script = "window.onNativeAudioState&&window.onNativeAudioState(" +
-                    playing + "," + surah + "," + JSONObject.quote(name) + "," + buffering + ")";
+                    playing + "," + surah + "," + JSONObject.quote(name) + "," + buffering + "," +
+                    position + "," + duration + ")";
             webView.post(() -> webView.evaluateJavascript(script, null));
         }
     };
@@ -320,7 +323,7 @@ public class MainActivity extends Activity implements SensorEventListener {
             if (lower.endsWith(".svg")) return "image/svg+xml";
             if (lower.endsWith(".png")) return "image/png";
             if (lower.endsWith(".webp")) return "image/webp";
-            if (lower.endsWith(".ogg") || lower.endsWith(".oga")) return "audio/ogg";
+            if (lower.endsWith(".ogg") || lower.endsWith(".oga") || lower.endsWith(".opus")) return "audio/ogg";
             String guessed = URLConnection.guessContentTypeFromName(path);
             return guessed != null ? guessed : "application/octet-stream";
         }
