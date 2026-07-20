@@ -1,0 +1,60 @@
+name: XAU Real Tick Validation Lab
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - xau-real-tick-lab
+    paths:
+      - 'xau_lab/**'
+      - '.github/workflows/xau-real-tick-lab.yml'
+
+jobs:
+  real-tick-backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: xau_lab/requirements.txt
+
+      - name: Rebuild and verify research engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > xau_lab/real_tick_lab.py
+          for f in xau_lab/chunks/part_*.b64; do
+            base64 --decode "$f" >> xau_lab/real_tick_lab.py
+          done
+          echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check
+          python -m py_compile xau_lab/real_tick_lab.py
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r xau_lab/requirements.txt
+
+      - name: Cache Dukascopy tick chunks
+        uses: actions/cache@v4
+        with:
+          path: .tick_cache
+          key: xauusd-dukascopy-real-ticks-v1
+
+      - name: Run multi-period bid-ask tick backtest
+        env:
+          TICK_CACHE: .tick_cache
+          RESULTS_DIR: results
+        run: python xau_lab/real_tick_lab.py
+
+      - name: Upload reports and trades
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xau-real-tick-results
+          path: results/
+          if-no-files-found: warn
+          retention-days: 14
