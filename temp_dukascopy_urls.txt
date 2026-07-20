@@ -1,0 +1,1 @@
+https://datafeed.dukascopy.com/datafeed/XAUUSD/2024/00/02/00h_ticks.bi5
