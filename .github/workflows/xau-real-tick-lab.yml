@@ -8,6 +8,12 @@ on:
     paths:
       - 'xau_lab/**'
       - '.github/workflows/xau-real-tick-lab.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'xau_lab/**'
+      - '.github/workflows/xau-real-tick-lab.yml'
 
 jobs:
   real-tick-backtest:
