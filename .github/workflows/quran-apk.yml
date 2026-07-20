@@ -7,9 +7,14 @@ on:
     paths:
       - "quran-offline/**"
       - ".github/workflows/quran-apk.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "quran-offline/**"
+      - ".github/workflows/quran-apk.yml"
 
 concurrency:
-  group: rafiq-v48-final-offline
+  group: rafiq-v48-final-offline-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -119,16 +124,12 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
-
           source=Path('quran-offline/build-data/yasser-source')
           files=sorted(source.glob('*.opus'))
           assert len(files)==114
           durations=[]
           for path in files:
-              raw=subprocess.check_output([
-                  'ffprobe','-v','error','-show_entries','format=duration',
-                  '-of','default=noprint_wrappers=1:nokey=1',str(path)
-              ],text=True).strip()
+              raw=subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(path)],text=True).strip()
               duration=float(raw)
               assert duration>8, (path,duration)
               durations.append(duration)
@@ -158,17 +159,13 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
-
           root=Path('quran-offline/app/src/main/assets/quran-audio')
           files=sorted(root.glob('*.ogg'))
           assert len(files)==114
           sizes=[path.stat().st_size for path in files]
           durations=[]
           for path in files:
-              raw=subprocess.check_output([
-                  'ffprobe','-v','error','-show_entries','format=duration',
-                  '-of','default=noprint_wrappers=1:nokey=1',str(path)
-              ],text=True).strip()
+              raw=subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(path)],text=True).strip()
               durations.append(float(raw))
           total_bytes=sum(sizes)
           total_seconds=sum(durations)
@@ -180,7 +177,7 @@ jobs:
           PY
 
           cat > "$ASSETS/AUDIO_SOURCE_NOTICE.txt" <<'EOF'
-          Offline recitation: Yasser Al-Dosari (Murattal). Audio is downloaded during the private test build and recompressed as mono 16 kHz Ogg Opus. Audio ownership remains with the respective reciter, studios and original sources. Confirm redistribution rights independently before public or commercial release.
+          Offline recitation: Yasser Al-Dosari (Murattal), packaged for private personal testing only. Audio ownership remains with the reciter, studios and original sources. Do not sell or publicly redistribute this APK without confirming permission from the audio rights holders.
           EOF
 
       - name: Validate final v4.8 assets and code
@@ -196,7 +193,6 @@ jobs:
           import re
           import unicodedata
           from pathlib import Path
-
           assets=Path('quran-offline/app/src/main/assets')
           images=sorted((assets/'mushaf-pages').glob('page*.webp'))
           audio=sorted((assets/'quran-audio').glob('*.ogg'))
