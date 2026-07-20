@@ -1,26 +1,21 @@
-name: Build Rafiq Al-Huda v4.7 Offline Audio APK
+name: Build Rafiq Al-Huda v4.8 Final Offline APK
 
 on:
   workflow_dispatch:
   push:
-    branches: ["agent/rafiq-alhuda-official-v4"]
-    paths:
-      - "quran-offline/**"
-      - ".github/workflows/quran-apk.yml"
-  pull_request:
-    branches: ["main"]
+    branches: ["develop/rafiq-alhuda"]
     paths:
       - "quran-offline/**"
       - ".github/workflows/quran-apk.yml"
 
 concurrency:
-  group: rafiq-v47-offline-audio
+  group: rafiq-v48-final-offline
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     permissions:
       contents: read
     steps:
@@ -41,7 +36,7 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Prepare Quran pages, curated hadith and adhan
+      - name: Prepare Quran pages, selected hadith and adhan
         shell: bash
         run: |
           set -euxo pipefail
@@ -55,14 +50,18 @@ jobs:
           mkdir -p "$ASSETS/fonts" "$RAW" "$PAGES" "$QCF" "$HADITH" "$MUSHAF" "$TMP"
           rm -f "$PAGES"/*.json "$QCF"/*.json "$MUSHAF"/* "$RAW/adhan_short.ogg"
           rm -rf "$TMP"/*
+
           curl -fsSL --retry 5 "https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json" -o "$ASSETS/quran.json"
           curl -fsSL --retry 5 "https://unpkg.com/adhan@4.4.4/lib/bundles/adhan.umd.min.js" -o "$ASSETS/adhan.umd.min.js"
+
           export PAGES
           seq 1 604 | xargs -P 24 -I{} bash -c 'curl -fsSL --retry 5 "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara-quranacademy/pages/{}.json" -o "$PAGES/{}.json"'
           test "$(find "$PAGES" -name "*.json" | wc -l)" -eq 604
+
           export QCF
           seq 1 604 | xargs -P 16 -I{} bash -c 'curl -fsSL --retry 5 "https://api.quran.com/api/v4/verses/by_page/{}?language=ar&words=true&word_fields=text_qpc_hafs,text_uthmani&fields=juz_number&per_page=50" -o "$QCF/{}.json"'
           test "$(find "$QCF" -name "*.json" | wc -l)" -eq 604
+
           curl -fsSL --retry 6 --retry-all-errors "https://quran.islam-db.com/public/data/pages/quranpages_800.zip" -o "$TMP/mushaf.zip"
           unzip -q "$TMP/mushaf.zip" -d "$TMP/extracted"
           SRC=$(dirname "$(find "$TMP/extracted" -type f -name page001.png | head -1)")
@@ -70,9 +69,11 @@ jobs:
           test "$(find "$SRC" -type f -name 'page*.png' | wc -l)" -eq 604
           python3 quran-offline/scripts/build_mushaf_images.py --source "$SRC" --destination "$MUSHAF"
           test "$(find "$MUSHAF" -name 'page*.webp' | wc -l)" -eq 604
+
           curl -fL --retry 6 --retry-all-errors "https://commons.wikimedia.org/wiki/Special:Redirect/file/Oraci%C3%B3n%20Al-Azzan.ogg" -o "$RAW/adhan_short.ogg"
           test -s "$RAW/adhan_short.ogg"
           curl -fsSL --retry 5 "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf" -o "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
+
           BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
           curl -fsSL --retry 5 "$BASE/the_9_books/bukhari.json" -o "$HADITH/bukhari.json"
           curl -fsSL --retry 5 "$BASE/the_9_books/muslim.json" -o "$HADITH/muslim.json"
@@ -81,16 +82,14 @@ jobs:
           python3 quran-offline/scripts/build_offline_assets.py --assets "$ASSETS" --pages "$PAGES" --qcf-pages "$QCF" --hadith "$HADITH"
           python3 quran-offline/scripts/curate_hadith.py "$ASSETS/hadith.json"
 
-      - name: Download and compress full Yasser Al-Dosari recitation
+      - name: Download complete Yasser Al-Dosari recitation
         shell: bash
         run: |
           set -euxo pipefail
-          ASSETS="quran-offline/app/src/main/assets"
-          AUDIO="$ASSETS/quran-audio"
           SOURCE="quran-offline/build-data/yasser-source"
-          rm -rf "$AUDIO" "$SOURCE"
-          mkdir -p "$AUDIO" "$SOURCE"
-          export AUDIO SOURCE
+          rm -rf "$SOURCE"
+          mkdir -p "$SOURCE"
+          export SOURCE
           seq -w 1 114 | xargs -P 4 -I{} bash -c '
             set -euo pipefail
             N="{}"
@@ -104,70 +103,122 @@ jobs:
             fi
             test -s "$INPUT"
             ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" >/dev/null
-            ffmpeg -nostdin -hide_banner -loglevel error -y \
-              -i "$INPUT" -map_metadata -1 -vn -ac 1 -ar 16000 \
-              -c:a libopus -application audio -frame_duration 60 \
-              -b:a 9k -vbr on -compression_level 10 \
-              "$AUDIO/$N.ogg"
-            test -s "$AUDIO/$N.ogg"
           '
-          test "$(find "$AUDIO" -type f -name '*.ogg' | wc -l)" -eq 114
+          test "$(find "$SOURCE" -type f -name '*.opus' | wc -l)" -eq 114
+
+      - name: Compress recitation to balanced quality and size
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ASSETS="quran-offline/app/src/main/assets"
+          AUDIO="$ASSETS/quran-audio"
+          SOURCE="quran-offline/build-data/yasser-source"
+          rm -rf "$AUDIO"
+          mkdir -p "$AUDIO"
+
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
-          root=Path('quran-offline/app/src/main/assets/quran-audio')
-          files=sorted(root.glob('*.ogg'))
+
+          source=Path('quran-offline/build-data/yasser-source')
+          files=sorted(source.glob('*.opus'))
           assert len(files)==114
-          total_bytes=sum(p.stat().st_size for p in files)
           durations=[]
           for path in files:
-              value=subprocess.check_output([
+              raw=subprocess.check_output([
                   'ffprobe','-v','error','-show_entries','format=duration',
                   '-of','default=noprint_wrappers=1:nokey=1',str(path)
               ],text=True).strip()
-              durations.append(float(value))
+              duration=float(raw)
+              assert duration>8, (path,duration)
+              durations.append(duration)
           total_seconds=sum(durations)
-          print('OFFLINE AUDIO files=',len(files),'bytes=',total_bytes,'hours=',total_seconds/3600,'shortest=',min(durations),'longest=',max(durations))
+          # Aim for about 93 MiB of recitation. Together with the 604 Mushaf
+          # pages and app code this normally produces an APK around 105–125 MiB.
+          target_audio_bytes=93*1024*1024
+          bitrate=round(target_audio_bytes*8/total_seconds)
+          bitrate=max(8000,min(22000,bitrate))
+          Path('quran-offline/build-data/target-bitrate.txt').write_text(str(bitrate),encoding='utf-8')
+          Path('quran-offline/build-data/total-duration.txt').write_text(str(total_seconds),encoding='utf-8')
+          print('SOURCE files=',len(files),'hours=',total_seconds/3600,'target_bitrate=',bitrate)
+          assert total_seconds>40000, total_seconds
+          PY
+
+          TARGET_BITRATE=$(cat quran-offline/build-data/target-bitrate.txt)
+          export AUDIO SOURCE TARGET_BITRATE
+          seq -w 1 114 | xargs -P 6 -I{} bash -c '
+            set -euo pipefail
+            N="{}"
+            ffmpeg -nostdin -hide_banner -loglevel error -y \
+              -i "$SOURCE/$N.opus" -map_metadata -1 -vn -ac 1 -ar 16000 \
+              -c:a libopus -application audio -frame_duration 60 \
+              -b:a "$TARGET_BITRATE" -vbr constrained -compression_level 10 \
+              "$AUDIO/$N.ogg"
+            test -s "$AUDIO/$N.ogg"
+          '
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          root=Path('quran-offline/app/src/main/assets/quran-audio')
+          files=sorted(root.glob('*.ogg'))
+          assert len(files)==114
+          sizes=[path.stat().st_size for path in files]
+          durations=[]
+          for path in files:
+              raw=subprocess.check_output([
+                  'ffprobe','-v','error','-show_entries','format=duration',
+                  '-of','default=noprint_wrappers=1:nokey=1',str(path)
+              ],text=True).strip()
+              durations.append(float(raw))
+          total_bytes=sum(sizes)
+          total_seconds=sum(durations)
+          print('OFFLINE AUDIO files=',len(files),'bytes=',total_bytes,'MiB=',total_bytes/1048576,'hours=',total_seconds/3600,'shortest=',min(durations),'longest=',max(durations))
           assert total_seconds>40000, total_seconds
           assert min(durations)>8, min(durations)
-          assert min(p.stat().st_size for p in files)>2500
+          assert min(sizes)>2500
+          assert 80*1024*1024 < total_bytes < 108*1024*1024, total_bytes
           PY
+
           cat > "$ASSETS/AUDIO_SOURCE_NOTICE.txt" <<'EOF'
-          Offline recitation: Yasser Al-Dosari (Murattal), sourced from the Quranic-Recitation-Data dataset and recompressed as mono 16 kHz Ogg Opus for this personal test build. The dataset's DATA_LICENSE disclaimer states that audio ownership remains with the respective reciter, studios, and original sources. Confirm redistribution rights independently before public or commercial release.
+          Offline recitation: Yasser Al-Dosari (Murattal). Audio is downloaded during the private test build and recompressed as mono 16 kHz Ogg Opus. Audio ownership remains with the respective reciter, studios and original sources. Confirm redistribution rights independently before public or commercial release.
           EOF
 
-      - name: Validate v4.7 assets and code
+      - name: Validate final v4.8 assets and code
         run: |
           set -euxo pipefail
           ASSETS="quran-offline/app/src/main/assets"
           node --check "$ASSETS/app-v11.js"
           node --check "$ASSETS/app-v12.js"
           node --check "$ASSETS/app-v13.js"
+          node --check "$ASSETS/app-v14.js"
           python3 - <<'PY'
           import json
           import re
           import unicodedata
           from pathlib import Path
+
           assets=Path('quran-offline/app/src/main/assets')
           images=sorted((assets/'mushaf-pages').glob('page*.webp'))
           audio=sorted((assets/'quran-audio').glob('*.ogg'))
           hadith=json.load(open(assets/'hadith.json',encoding='utf-8'))
-          image_total=sum(p.stat().st_size for p in images)
-          audio_total=sum(p.stat().st_size for p in audio)
-          print('DIAGNOSTICS images=',len(images),'image_bytes=',image_total,'audio=',len(audio),'audio_bytes=',audio_total,'hadiths=',len(hadith))
+          image_total=sum(path.stat().st_size for path in images)
+          audio_total=sum(path.stat().st_size for path in audio)
+          print('DIAGNOSTICS images=',len(images),'image_MiB=',image_total/1048576,'audio=',len(audio),'audio_MiB=',audio_total/1048576,'hadiths=',len(hadith))
           assert len(images)==604
           assert len(audio)==114
-          assert 320<=len(hadith)<=430
+          assert 250<=len(hadith)<=500
           def normalize(value):
               value=unicodedata.normalize('NFC',str(value or ''))
               value=re.sub(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]','',value)
               value=value.translate(str.maketrans({'أ':'ا','إ':'ا','آ':'ا','ٱ':'ا','ى':'ي','ة':'ه','ؤ':'و','ئ':'ي','ـ':' '}))
               return re.sub(r'\s+',' ',value).strip()
-          assert any('يتحري الصدق' in normalize((h.get('text') or '')+' '+(h.get('display') or '')) for h in hadith)
+          assert any('يتحري الصدق' in normalize((item.get('text') or '')+' '+(item.get('display') or '')) for item in hadith)
           loader=(assets/'app-v7.js').read_text(encoding='utf-8')
-          assert 'app-v13.js' in loader and 'app-v13.css' in loader
-          assert 'mushaf-border.webp' not in [p.name for p in (assets/'mushaf-pages').iterdir()]
-          assert audio_total>35_000_000
+          assert 'app-v14.js' in loader and 'app-v14.css' in loader
+          assert not (assets/'mushaf-pages'/'mushaf-border.webp').exists()
+          assert 'homeSelectedHadith' in (assets/'app-v14.js').read_text(encoding='utf-8')
           PY
           test -s quran-offline/app/src/main/res/raw/adhan_short.ogg
 
@@ -183,17 +234,21 @@ jobs:
           unzip -t "$APK" >/dev/null
           SIZE=$(stat -c%s "$APK")
           echo "APK bytes: $SIZE"
-          test "$SIZE" -lt 188743680
+          echo "APK MiB: $((SIZE/1024/1024))"
+          test "$SIZE" -gt 94371840
+          test "$SIZE" -lt 141557760
           unzip -l "$APK" | grep -q 'assets/quran-audio/114.ogg'
+          unzip -l "$APK" | grep -q 'assets/mushaf-pages/page604.webp'
+          unzip -l "$APK" | grep -q 'assets/app-v14.js'
           echo "Largest packaged files:"
           unzip -l "$APK" | sort -nr -k1 | head -20 || true
-          cp "$APK" Rafiq-AlHuda-v4.7-Offline-Audio-unsigned.apk
-          sha256sum Rafiq-AlHuda-v4.7-Offline-Audio-unsigned.apk
+          cp "$APK" Rafiq-AlHuda-v4.8-Final-Offline-unsigned.apk
+          sha256sum Rafiq-AlHuda-v4.8-Final-Offline-unsigned.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v4.7-Offline-Audio-Unsigned-APK
-          path: Rafiq-AlHuda-v4.7-Offline-Audio-unsigned.apk
+          name: Rafiq-AlHuda-v4.8-Final-Offline-Unsigned-APK
+          path: Rafiq-AlHuda-v4.8-Final-Offline-unsigned.apk
           retention-days: 30
 
       - name: Package Android signing tools
