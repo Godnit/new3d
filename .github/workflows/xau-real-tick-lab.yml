@@ -16,9 +16,14 @@ on:
       - '.github/workflows/xau-real-tick-lab.yml'
 
 jobs:
-  real-tick-backtest:
+  window-backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,7 +35,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild, patch, and verify research engine
+      - name: Rebuild and patch research engine
         shell: bash
         run: |
           set -euo pipefail
@@ -40,50 +45,114 @@ jobs:
           done
           echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check
           python xau_lab/patch_downloader.py
-          python -m py_compile xau_lab/real_tick_lab.py
-          sha256sum xau_lab/real_tick_lab.py | tee xau_lab/rebuilt_engine_sha256.txt
+          python -m py_compile xau_lab/real_tick_lab.py xau_lab/window_runner.py
 
       - name: Install dependencies
         run: python -m pip install --upgrade pip && pip install -r xau_lab/requirements.txt
 
-      - name: Restore Dukascopy tick cache
+      - name: Restore this window tick cache
         uses: actions/cache@v4
         with:
           path: .tick_cache
-          key: xauusd-dukascopy-real-ticks-v2-${{ github.run_id }}
+          key: xauusd-window-${{ matrix.index }}-v2-${{ github.run_id }}
           restore-keys: |
-            xauusd-dukascopy-real-ticks-v2-
-            xauusd-dukascopy-real-ticks-v1-
-            xauusd-dukascopy-real-ticks-v1
+            xauusd-window-${{ matrix.index }}-v2-
 
-      - name: Run multi-period bid-ask tick backtest
-        id: lab
+      - name: Run one real bid-ask tick window
+        id: window
         shell: bash
         env:
+          WINDOW_INDEX: ${{ matrix.index }}
+          WINDOW_RESULTS_DIR: window_results
           TICK_CACHE: .tick_cache
+          DOWNLOAD_WORKERS: '2,1'
+        run: |
+          set +e
+          set -o pipefail
+          python xau_lab/window_runner.py 2>&1 | tee window_${{ matrix.index }}.log
+          code=${PIPESTATUS[0]}
+          echo "$code" > window_${{ matrix.index }}_exit_code.txt
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload window metrics, trades, and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xau-window-${{ matrix.index }}
+          path: |
+            window_results/
+            window_${{ matrix.index }}.log
+            window_${{ matrix.index }}_exit_code.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  aggregate:
+    needs: window-backtest
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: xau_lab/requirements.txt
+
+      - name: Rebuild and patch research engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > xau_lab/real_tick_lab.py
+          for f in xau_lab/chunks/part_*.b64; do
+            base64 --decode "$f" >> xau_lab/real_tick_lab.py
+          done
+          echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check
+          python xau_lab/patch_downloader.py
+          python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r xau_lab/requirements.txt
+
+      - name: Download all window artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: xau-window-*
+          path: collected
+          merge-multiple: true
+
+      - name: Aggregate development, validation, and untouched holdout
+        id: aggregate
+        shell: bash
+        env:
+          COLLECTED_DIR: collected
           RESULTS_DIR: results
         run: |
           set +e
           set -o pipefail
-          python xau_lab/real_tick_lab.py 2>&1 | tee xau_real_tick_run.log
+          python xau_lab/aggregate_results.py 2>&1 | tee aggregate.log
           code=${PIPESTATUS[0]}
-          echo "$code" > xau_real_tick_exit_code.txt
+          echo "$code" > aggregate_exit_code.txt
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload reports, trades, and diagnostic log
+      - name: Upload final research package
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xau-real-tick-results
+          name: xau-real-tick-final
           path: |
             results/
-            xau_real_tick_run.log
-            xau_real_tick_exit_code.txt
-            xau_lab/rebuilt_engine_sha256.txt
+            aggregate.log
+            aggregate_exit_code.txt
+            collected/window_*_exit_code.txt
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Mark research run failed after preserving cache and logs
-        if: steps.lab.outputs.exit_code != '0'
+      - name: Enforce independent holdout gate
+        if: steps.aggregate.outputs.exit_code != '0'
         run: exit 1
