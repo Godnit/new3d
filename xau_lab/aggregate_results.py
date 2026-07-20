@@ -84,7 +84,7 @@ def main() -> int:
 - Selected candidate: `{selected}`
 - Gate result: **{'PASSED' if success else 'NOT PASSED'}**
 - Selection logic: {reason}
-- Data: Dukascopy hourly `.bi5` real bid/ask ticks, decoded at 0.001 XAUUSD price resolution.
+- Data: partitioned XAUUSD real bid/ask tick parquet mirror, sourced from Dukascopy through Tickstory.
 - Time handling: UTC ticks converted to EET/EEST (`Europe/Helsinki`) for server-hour logic.
 - Execution stress: observed spread plus {selected_candidate.slippage_price:.2f} adverse price slippage per entry/market exit.
 - No Headway 2026 test date was used for candidate selection.
@@ -107,7 +107,7 @@ def main() -> int:
 
 ## Guardrails
 
-This is an independent research backtest, not a promise of profit. Dukascopy and Headway quotes, symbol specifications, latency, commission, swaps, stop execution, and trading sessions can differ. The candidate is considered acceptable only when the untouched 2025 holdout gate passes. If the gate is not passed, the current robot remains the safer reference and no successful claim is made.
+This is an independent research backtest, not a promise of profit. The parquet mirror, Dukascopy and Headway quotes, symbol specifications, latency, commission, swaps, stop execution, and trading sessions can differ. The candidate is considered acceptable only when the untouched 2025 holdout gate passes. If the gate is not passed, the current robot remains the safer reference and no successful claim is made.
 """
     (results / "REPORT.md").write_text(report, encoding="utf-8")
     print(report, flush=True)
