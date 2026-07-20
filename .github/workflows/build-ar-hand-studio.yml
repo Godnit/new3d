@@ -4,7 +4,7 @@ on:
   push:
     branches: ["ar-hand-studio-v1"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "ar-hand-studio-v1"]
   workflow_dispatch:
 
 permissions:
