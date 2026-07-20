@@ -6,7 +6,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from PIL import Image, ImageOps
+from PIL import Image
 
 PAGE_WIDTH = 480
 PAGE_HEIGHT = 776
@@ -15,17 +15,18 @@ PAGE_HEIGHT = 776
 def process_page(arguments: tuple[str, str]) -> tuple[int, int]:
     source_path, destination_path = map(Path, arguments)
     source = Image.open(source_path).convert("RGB")
-    fitted = ImageOps.fit(
-        source,
-        (PAGE_WIDTH, PAGE_HEIGHT),
-        method=Image.Resampling.LANCZOS,
-        centering=(0.5, 0.5),
-    )
+
+    # Preserve the complete original Mushaf page. We resize proportionally and
+    # center it on a white canvas instead of cropping it with ImageOps.fit.
+    source.thumbnail((PAGE_WIDTH, PAGE_HEIGHT), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", (PAGE_WIDTH, PAGE_HEIGHT), "white")
+    left = (PAGE_WIDTH - source.width) // 2
+    top = (PAGE_HEIGHT - source.height) // 2
+    canvas.paste(source, (left, top))
+
     destination_path.parent.mkdir(parents=True, exist_ok=True)
-    # Keep the photographed/printed Mushaf page itself intact. No generated frame
-    # is placed above the Quran text. WebP at this size remains clear on phone
-    # screens while all 604 pages stay available offline.
-    fitted.save(destination_path, "WEBP", quality=82, method=6, exact=True)
+    # No generated frame, ornament, header or footer is added above the Quran.
+    canvas.save(destination_path, "WEBP", quality=84, method=6, exact=True)
     return source_path.stat().st_size, destination_path.stat().st_size
 
 
@@ -54,7 +55,7 @@ def main() -> None:
         raise RuntimeError(f"Expected 604 page images, got {len(files)}")
     if min(path.stat().st_size for path in files) < 1200:
         raise RuntimeError("A generated Mushaf page looks empty")
-    print(f"Built 604 compact original Mushaf pages: {before} -> {after} bytes")
+    print(f"Built 604 complete original Mushaf pages without cropping: {before} -> {after} bytes")
 
 
 if __name__ == "__main__":
