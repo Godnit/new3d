@@ -43,6 +43,7 @@ jobs:
           done
           echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check
           python xau_lab/patch_execution_order.py
+          python xau_lab/patch_revision_m5_only.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py
 
       - name: Install dependencies
@@ -111,6 +112,7 @@ jobs:
           done
           echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check
           python xau_lab/patch_execution_order.py
+          python xau_lab/patch_revision_m5_only.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py
 
       - name: Install dependencies
