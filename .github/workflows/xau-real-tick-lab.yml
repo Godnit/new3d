@@ -30,7 +30,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild and verify research engine
+      - name: Rebuild, patch, and verify research engine
         shell: bash
         run: |
           set -euo pipefail
@@ -39,25 +39,37 @@ jobs:
             base64 --decode "$f" >> xau_lab/real_tick_lab.py
           done
           echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check
+          python xau_lab/patch_downloader.py
           python -m py_compile xau_lab/real_tick_lab.py
+          sha256sum xau_lab/real_tick_lab.py | tee xau_lab/rebuilt_engine_sha256.txt
 
       - name: Install dependencies
         run: python -m pip install --upgrade pip && pip install -r xau_lab/requirements.txt
 
-      - name: Cache Dukascopy tick chunks
+      - name: Restore Dukascopy tick cache
         uses: actions/cache@v4
         with:
           path: .tick_cache
-          key: xauusd-dukascopy-real-ticks-v1
+          key: xauusd-dukascopy-real-ticks-v2-${{ github.run_id }}
+          restore-keys: |
+            xauusd-dukascopy-real-ticks-v2-
+            xauusd-dukascopy-real-ticks-v1-
+            xauusd-dukascopy-real-ticks-v1
 
       - name: Run multi-period bid-ask tick backtest
+        id: lab
         shell: bash
         env:
           TICK_CACHE: .tick_cache
           RESULTS_DIR: results
         run: |
+          set +e
           set -o pipefail
           python xau_lab/real_tick_lab.py 2>&1 | tee xau_real_tick_run.log
+          code=${PIPESTATUS[0]}
+          echo "$code" > xau_real_tick_exit_code.txt
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Upload reports, trades, and diagnostic log
         if: always()
@@ -67,5 +79,11 @@ jobs:
           path: |
             results/
             xau_real_tick_run.log
+            xau_real_tick_exit_code.txt
+            xau_lab/rebuilt_engine_sha256.txt
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Mark research run failed after preserving cache and logs
+        if: steps.lab.outputs.exit_code != '0'
+        run: exit 1
