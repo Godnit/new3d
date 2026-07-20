@@ -1,0 +1,25 @@
+/* v4.8 — original Mushaf images only and selected home hadith. */
+:root[data-original-mushaf="1"] .real-mushaf-border,
+:root[data-original-mushaf="1"] .page-curl{display:none!important}
+:root[data-original-mushaf="1"] .image-mushaf-stage{padding:0!important;background:transparent!important;overflow:hidden!important}
+:root[data-original-mushaf="1"] .image-page-layer{padding:0!important;background:transparent!important}
+:root[data-original-mushaf="1"] .mushaf-image-shell{width:100%!important;height:100%!important;padding:0!important;border:0!important;border-radius:0!important;background:#fff!important;box-shadow:none!important;overflow:hidden!important}
+:root[data-original-mushaf="1"] .page-content-image{display:block!important;width:100%!important;height:100%!important;object-fit:contain!important;object-position:center!important;background:#fff!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+
+.home-hadith-section{margin:18px 0 10px}
+.home-hadith-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.home-hadith-head h2{margin:0;font-size:23px}
+.home-hadith-next{width:42px;height:42px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--primary);font-size:22px;font-weight:bold;box-shadow:var(--shadow)}
+.home-hadith-card{position:relative;overflow:hidden;padding:19px;border:1px solid var(--line);border-radius:23px;background:linear-gradient(145deg,var(--surface),var(--surface2));box-shadow:var(--shadow)}
+.home-hadith-card:before{content:"“";position:absolute;left:15px;top:-7px;font:70px Georgia,serif;color:var(--primary);opacity:.11}
+.home-hadith-card p{position:relative;z-index:1;margin:0;font-family:"Traditional Arabic","Amiri",serif;font-size:21px;line-height:1.9;color:var(--text)}
+.home-hadith-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:15px;padding-top:12px;border-top:1px solid var(--line)}
+.home-hadith-meta span{color:var(--muted);font-size:11px;line-height:1.6}
+.home-hadith-meta button{flex:0 0 auto;border:0;border-radius:13px;background:var(--primary);color:#fff;padding:9px 11px;font-size:11px;font-weight:bold}
+
+@media(max-width:420px){
+  .home-hadith-card{padding:17px}
+  .home-hadith-card p{font-size:19px}
+  .home-hadith-meta{align-items:flex-start;flex-direction:column}
+  .home-hadith-meta button{width:100%}
+}
