@@ -51,16 +51,21 @@ jobs:
           key: xauusd-dukascopy-real-ticks-v1
 
       - name: Run multi-period bid-ask tick backtest
+        shell: bash
         env:
           TICK_CACHE: .tick_cache
           RESULTS_DIR: results
-        run: python xau_lab/real_tick_lab.py
+        run: |
+          set -o pipefail
+          python xau_lab/real_tick_lab.py 2>&1 | tee xau_real_tick_run.log
 
-      - name: Upload reports and trades
+      - name: Upload reports, trades, and diagnostic log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: xau-real-tick-results
-          path: results/
+          path: |
+            results/
+            xau_real_tick_run.log
           if-no-files-found: warn
           retention-days: 14
