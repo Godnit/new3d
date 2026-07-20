@@ -41,10 +41,14 @@ new_download = '''def download_window(start: datetime, end: datetime) -> None:
     print(f"Downloading/checking {len(hours)} hourly chunks: {start} -> {end}", flush=True)
     pending = list(hours)
     total_bytes = 0
+    configured = os.environ.get("DOWNLOAD_WORKERS", "4,2,1")
+    worker_passes = tuple(max(1, int(value.strip())) for value in configured.split(",") if value.strip())
+    if not worker_passes:
+        worker_passes = (1,)
 
     # Dukascopy's public feed can throttle cloud runners. Use progressively
-    # lower concurrency and retry only unresolved hours.
-    for pass_no, workers in enumerate((4, 2, 1), 1):
+    # lower concurrency and retry only the unresolved hours.
+    for pass_no, workers in enumerate(worker_passes, 1):
         if not pending:
             break
         print(f"  download pass {pass_no}: pending={len(pending)} workers={workers}", flush=True)
@@ -69,7 +73,7 @@ new_download = '''def download_window(start: datetime, end: datetime) -> None:
     if pending:
         sample = ", ".join(h.isoformat() for h in pending[:8])
         raise RuntimeError(
-            f"Unresolved Dukascopy hours after three passes: {len(pending)}; sample={sample}"
+            f"Unresolved Dukascopy hours after {len(worker_passes)} passes: {len(pending)}; sample={sample}"
         )
 '''
 
