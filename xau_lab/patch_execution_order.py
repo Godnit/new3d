@@ -35,10 +35,13 @@ if old_end not in text:
     raise SystemExit("position-end patch marker not found")
 text = text.replace(old_end, new_end, 1)
 
+# The engine contains two management loops: one for positions carried into
+# the minute and one for positions opened on the minute's first tick. Both
+# must use the last fully closed M1 EMA, never the still-forming current bar.
 count = text.count("float(row.ema21)")
-if count != 2:
-    raise SystemExit(f"expected two current-bar EMA references, found {count}")
+if count != 4:
+    raise SystemExit(f"expected four current-bar EMA references, found {count}")
 text = text.replace("float(row.ema21)", "float(bars.iloc[i - 1].ema21)")
 
 path.write_text(text, encoding="utf-8")
-print("Patched chronological execution and closed-bar EMA management")
+print("Patched chronological execution and all closed-bar EMA management references")
