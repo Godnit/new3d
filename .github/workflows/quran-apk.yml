@@ -30,14 +30,13 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - name: Install Android SDK, FFmpeg and transfer tools
+      - name: Install Android SDK, FFmpeg and image tools
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
           sudo apt-get update -qq
           sudo apt-get install -y unzip ffmpeg
-          python3 -m pip install --disable-pip-version-check pillow "huggingface_hub>=0.32"
-          hf --help >/dev/null
+          python3 -m pip install --disable-pip-version-check pillow
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
@@ -84,32 +83,33 @@ jobs:
 
       - name: Download and compress full Yasser Al-Dosari recitation
         shell: bash
-        env:
-          HF_XET_HIGH_PERFORMANCE: "1"
         run: |
           set -euxo pipefail
           ASSETS="quran-offline/app/src/main/assets"
           AUDIO="$ASSETS/quran-audio"
-          HFROOT="quran-offline/build-data/hf-yasser"
-          SRCROOT="$HFROOT/Yasser Al Dosari (Murattal)"
-          rm -rf "$AUDIO" "$HFROOT"
-          mkdir -p "$AUDIO" "$HFROOT"
-          hf download zaibihassan/Quranic-Recitation-Data \
-            --repo-type dataset \
-            --include "Yasser Al Dosari (Murattal)/*/*.opus" \
-            --local-dir "$HFROOT"
-          test "$(find "$SRCROOT" -type f -name '*.opus' | wc -l)" -eq 114
-          export AUDIO SRCROOT
-          seq -w 1 114 | xargs -P 6 -I{} bash -c '
-            set -e
-            INPUT="$SRCROOT/{}/{}.opus"
+          SOURCE="quran-offline/build-data/yasser-source"
+          rm -rf "$AUDIO" "$SOURCE"
+          mkdir -p "$AUDIO" "$SOURCE"
+          export AUDIO SOURCE
+          seq -w 1 114 | xargs -P 4 -I{} bash -c '
+            set -euo pipefail
+            N="{}"
+            INPUT="$SOURCE/$N.opus"
+            CDN="https://cdn.mualim.app/yasser-al-dosari-murattal/$N.opus"
+            HF="https://huggingface.co/datasets/zaibihassan/Quranic-Recitation-Data/resolve/main/Yasser%20Al%20Dosari%20%28Murattal%29/$N/$N.opus?download=true"
+            echo "Downloading Surah $N"
+            if ! curl -fL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 1800 "$CDN" -o "$INPUT"; then
+              rm -f "$INPUT"
+              curl -fL --retry 8 --retry-all-errors --connect-timeout 20 --max-time 1800 "$HF" -o "$INPUT"
+            fi
             test -s "$INPUT"
+            ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" >/dev/null
             ffmpeg -nostdin -hide_banner -loglevel error -y \
               -i "$INPUT" -map_metadata -1 -vn -ac 1 -ar 16000 \
               -c:a libopus -application audio -frame_duration 60 \
               -b:a 9k -vbr on -compression_level 10 \
-              "$AUDIO/{}.ogg"
-            test -s "$AUDIO/{}.ogg"
+              "$AUDIO/$N.ogg"
+            test -s "$AUDIO/$N.ogg"
           '
           test "$(find "$AUDIO" -type f -name '*.ogg' | wc -l)" -eq 114
           python3 - <<'PY'
@@ -127,7 +127,7 @@ jobs:
               ],text=True).strip()
               durations.append(float(value))
           total_seconds=sum(durations)
-          print('OFFLINE AUDIO files=',len(files),'bytes=',total_bytes,'hours=',total_seconds/3600,'shortest=',min(durations))
+          print('OFFLINE AUDIO files=',len(files),'bytes=',total_bytes,'hours=',total_seconds/3600,'shortest=',min(durations),'longest=',max(durations))
           assert total_seconds>40000, total_seconds
           assert min(durations)>8, min(durations)
           assert min(p.stat().st_size for p in files)>2500
@@ -175,7 +175,7 @@ jobs:
         working-directory: quran-offline
         run: gradle :app:assembleRelease --stacktrace
 
-      - name: Verify and stage APK
+      - name: Analyze, verify and stage APK
         run: |
           set -euxo pipefail
           APK="quran-offline/app/build/outputs/apk/release/app-release-unsigned.apk"
@@ -185,6 +185,8 @@ jobs:
           echo "APK bytes: $SIZE"
           test "$SIZE" -lt 188743680
           unzip -l "$APK" | grep -q 'assets/quran-audio/114.ogg'
+          echo "Largest packaged files:"
+          unzip -l "$APK" | sort -nr -k1 | head -20 || true
           cp "$APK" Rafiq-AlHuda-v4.7-Offline-Audio-unsigned.apk
           sha256sum Rafiq-AlHuda-v4.7-Offline-Audio-unsigned.apk
 
