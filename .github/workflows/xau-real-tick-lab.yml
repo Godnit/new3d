@@ -45,6 +45,7 @@ jobs:
           python xau_lab/patch_execution_order.py
           python xau_lab/patch_revision_m5_only.py
           python xau_lab/patch_adaptive_spread.py
+          python xau_lab/patch_trend_persistence.py
           python xau_lab/patch_protocol.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py
 
@@ -55,8 +56,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .hf_cache
-          key: xauusd-hf-window-${{ matrix.index }}-v2-${{ github.run_id }}
+          key: xauusd-hf-window-${{ matrix.index }}-v3-${{ github.run_id }}
           restore-keys: |
+            xauusd-hf-window-${{ matrix.index }}-v3-
             xauusd-hf-window-${{ matrix.index }}-v2-
             xauusd-hf-window-${{ matrix.index }}-v1-
 
@@ -117,6 +119,7 @@ jobs:
           python xau_lab/patch_execution_order.py
           python xau_lab/patch_revision_m5_only.py
           python xau_lab/patch_adaptive_spread.py
+          python xau_lab/patch_trend_persistence.py
           python xau_lab/patch_protocol.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py
 
