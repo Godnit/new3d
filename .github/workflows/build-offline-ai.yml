@@ -1,0 +1,187 @@
+name: Build Nebras Lightweight Offline AI
+
+on:
+  push:
+    branches: ["offline-ai-android"]
+    paths:
+      - "android-offline-ai/**"
+      - ".github/workflows/build-offline-ai.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "android-offline-ai/**"
+      - ".github/workflows/build-offline-ai.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Cache AI models
+        uses: actions/cache@v4
+        with:
+          path: .model-cache
+          key: nebras-models-v3-qwen25-05b-q8-efficientnet-lite0
+
+      - name: Download and verify models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .model-cache
+          mkdir -p android-offline-ai/app/src/main/assets/models
+
+          QWEN_FILE=.model-cache/Nebras-Qwen2.5-0.5B-Q8.task
+          QWEN_URL='https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task?download=true'
+          QWEN_SHA='e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2'
+
+          if [ ! -f "$QWEN_FILE" ]; then
+            curl --fail --location --retry 8 --retry-delay 5 \
+              --output "$QWEN_FILE" "$QWEN_URL"
+          fi
+          echo "$QWEN_SHA  $QWEN_FILE" | sha256sum --check
+
+          VISION_FILE=.model-cache/efficientnet-lite0.tflite
+          VISION_URL='https://storage.googleapis.com/mediapipe-models/image_classifier/efficientnet_lite0/float32/1/efficientnet_lite0.tflite'
+          if [ ! -s "$VISION_FILE" ]; then
+            curl --fail --location --retry 8 --retry-delay 5 \
+              --output "$VISION_FILE" "$VISION_URL"
+          fi
+
+          cp "$VISION_FILE" android-offline-ai/app/src/main/assets/models/efficientnet-lite0.tflite
+          du -h "$QWEN_FILE" android-offline-ai/app/src/main/assets/models/efficientnet-lite0.tflite
+
+      - name: Split model into Drive-sized parts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .model-parts
+          mkdir -p .model-parts
+          split -b 95000000 -d -a 2 --additional-suffix=.part \
+            .model-cache/Nebras-Qwen2.5-0.5B-Q8.task \
+            .model-parts/Nebras-Qwen2.5-0.5B-Q8.part
+          cat > .model-parts/README.txt <<'EOF'
+          Nebras Qwen model backup
+          Rejoin the six parts in numerical order to recreate the model:
+          cat Nebras-Qwen2.5-0.5B-Q8.part*.part > Nebras-Qwen2.5-0.5B-Q8.task
+          SHA-256: e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2
+          The Nebras app normally downloads and resumes this model automatically.
+          EOF
+          ls -lh .model-parts
+
+      - name: Upload model part 00
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-00
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part00.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-01
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part01.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-02
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part02.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-03
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part03.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 04
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-04
+          path: .model-parts/Nebras-Qwen2.5-0.5B-Q8.part04.part
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload model part 05 and instructions
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nebras-Model-Part-05
+          path: |
+            .model-parts/Nebras-Qwen2.5-0.5B-Q8.part05.part
+            .model-parts/README.txt
+          compression-level: 0
+          retention-days: 30
+
+      - name: Build lightweight APK
+        id: build
+        continue-on-error: true
+        working-directory: android-offline-ai
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NebrasAI-Light-build-log
+          path: android-offline-ai/build.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Verify APK size and rename
+        if: steps.build.outcome == 'success'
+        shell: bash
+        run: |
+          APK='android-offline-ai/app/build/outputs/apk/release/app-release.apk'
+          SIZE=$(stat -c%s "$APK")
+          LIMIT=$((100 * 1000 * 1000))
+          echo "APK size: $SIZE bytes"
+          if [ "$SIZE" -ge "$LIMIT" ]; then
+            echo "APK is not below 100 MB"
+            exit 1
+          fi
+          cp "$APK" NebrasAI-Android8-Light.apk
+          ls -lh NebrasAI-Android8-Light.apk
+
+      - name: Upload lightweight APK
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NebrasAI-Android8-Light-APK
+          path: NebrasAI-Android8-Light.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail job if build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
