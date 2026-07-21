@@ -13,14 +13,12 @@ new_windows = '''WINDOWS = [
     ("dev_2023_oct", "dev", "2023-10-09", "2023-10-14"),
     ("val_2024_feb", "validation", "2024-02-12", "2024-02-17"),
     ("val_2024_aug", "validation", "2024-08-12", "2024-08-17"),
-    ("hold_2025_feb", "holdout", "2025-02-10", "2025-02-15"),
-    ("hold_2025_aug", "holdout", "2025-08-11", "2025-08-16"),
+    ("hold_2025_apr", "holdout", "2025-04-14", "2025-04-19"),
+    ("hold_2025_nov", "holdout", "2025-11-10", "2025-11-15"),
 ]
 '''
 
-# Replace the complete protocol block regardless of which previously retired
-# holdout pair is currently committed. This remains deterministic and keeps
-# February/August 2025 untouched by all earlier research iterations.
+# April/November 2025 have not been used in earlier holdout decisions.
 pattern = r"WINDOWS = \[\n.*?\n\]\n"
 text, count = re.subn(pattern, new_windows, text, count=1, flags=re.S)
 if count != 1:
@@ -54,9 +52,10 @@ runner.write_text(text, encoding="utf-8")
 
 aggregate = Path("xau_lab/aggregate_results.py")
 report = aggregate.read_text(encoding="utf-8")
-report = report.replace(
-    "The candidate is considered acceptable only when the untouched 2025 holdout gate passes.",
-    "The previously inspected January/March/May/September/October/December 2025 windows are retired from holdout use. The candidate is considered acceptable only when the newly untouched February/August 2025 holdout gate passes.",
+report = re.sub(
+    r"The previously inspected .*? holdout gate passes\.",
+    "The previously inspected January/February/March/May/August/September/October/December 2025 windows are retired from holdout use. The candidate is considered acceptable only when the newly untouched April/November 2025 holdout gate passes.",
+    report,
 )
 aggregate.write_text(report, encoding="utf-8")
-print("Patched protocol: new 2024 validation windows and newly untouched February/August 2025 holdout")
+print("Patched protocol: preserve 2024 validation and use newly untouched April/November 2025 holdout")
