@@ -52,6 +52,7 @@ jobs:
           python xau_lab/patch_session_1619.py
           python xau_lab/patch_protocol.py
           python xau_lab/patch_m5_trend_strength.py
+          python xau_lab/patch_enforce_directional_revision.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py
 
       - name: Install dependencies
@@ -135,6 +136,7 @@ jobs:
           python xau_lab/patch_session_1619.py
           python xau_lab/patch_protocol.py
           python xau_lab/patch_m5_trend_strength.py
+          python xau_lab/patch_enforce_directional_revision.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py
 
       - name: Install dependencies
