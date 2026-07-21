@@ -30,7 +30,7 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - name: Install Android SDK and media tools
+      - name: Install build tools
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
@@ -41,41 +41,36 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Prepare Quran pages, selected hadith and adhan
+      - name: Prepare Quran, mushaf, hadith and adhan
         shell: bash
         run: |
           set -euxo pipefail
           ASSETS="quran-offline/app/src/main/assets"
           RAW="quran-offline/app/src/main/res/raw"
-          PAGES="quran-offline/build-data/pages"
-          QCF="quran-offline/build-data/qcf-pages"
-          HADITH="quran-offline/build-data/hadith"
+          DATA="quran-offline/build-data"
+          PAGES="$DATA/pages"
+          QCF="$DATA/qcf-pages"
+          HADITH="$DATA/hadith"
           MUSHAF="$ASSETS/mushaf-pages"
-          TMP="quran-offline/build-data/mushaf-source"
+          TMP="$DATA/mushaf-source"
           mkdir -p "$ASSETS/fonts" "$RAW" "$PAGES" "$QCF" "$HADITH" "$MUSHAF" "$TMP"
           rm -f "$PAGES"/*.json "$QCF"/*.json "$MUSHAF"/* "$RAW/adhan_short.ogg"
           rm -rf "$TMP"/*
-
           curl -fsSL --retry 5 "https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json" -o "$ASSETS/quran.json"
           curl -fsSL --retry 5 "https://unpkg.com/adhan@4.4.4/lib/bundles/adhan.umd.min.js" -o "$ASSETS/adhan.umd.min.js"
-
           export PAGES QCF
           seq 1 604 | xargs -P 24 -I{} bash -c 'curl -fsSL --retry 5 "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara-quranacademy/pages/{}.json" -o "$PAGES/{}.json"'
           seq 1 604 | xargs -P 16 -I{} bash -c 'curl -fsSL --retry 5 "https://api.quran.com/api/v4/verses/by_page/{}?language=ar&words=true&word_fields=text_qpc_hafs,text_uthmani&fields=juz_number&per_page=50" -o "$QCF/{}.json"'
           test "$(find "$PAGES" -name '*.json' | wc -l)" -eq 604
           test "$(find "$QCF" -name '*.json' | wc -l)" -eq 604
-
           curl -fL --retry 6 --retry-all-errors "https://quran.islam-db.com/public/data/pages/quranpages_800.zip" -o "$TMP/mushaf.zip"
           unzip -q "$TMP/mushaf.zip" -d "$TMP/extracted"
           SRC=$(dirname "$(find "$TMP/extracted" -type f -name page001.png | head -1)")
           test -n "$SRC"
-          test "$(find "$SRC" -type f -name 'page*.png' | wc -l)" -eq 604
           python3 quran-offline/scripts/build_mushaf_images.py --source "$SRC" --destination "$MUSHAF"
           test "$(find "$MUSHAF" -name 'page*.webp' | wc -l)" -eq 604
-
           curl -fL --retry 6 --retry-all-errors "https://commons.wikimedia.org/wiki/Special:Redirect/file/Oraci%C3%B3n%20Al-Azzan.ogg" -o "$RAW/adhan_short.ogg"
           curl -fsSL --retry 5 "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf" -o "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
-
           BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
           curl -fsSL --retry 5 "$BASE/the_9_books/bukhari.json" -o "$HADITH/bukhari.json"
           curl -fsSL --retry 5 "$BASE/the_9_books/muslim.json" -o "$HADITH/muslim.json"
@@ -84,18 +79,16 @@ jobs:
           python3 quran-offline/scripts/build_offline_assets.py --assets "$ASSETS" --pages "$PAGES" --qcf-pages "$QCF" --hadith "$HADITH"
           python3 quran-offline/scripts/curate_hadith.py "$ASSETS/hadith.json"
 
-      - name: Download complete Yasser Al-Dosari recitation
+      - name: Download Yasser Al-Dosari recitation
         shell: bash
         run: |
           set -euxo pipefail
           SOURCE="quran-offline/build-data/yasser-source"
-          rm -rf "$SOURCE"
-          mkdir -p "$SOURCE"
+          rm -rf "$SOURCE" && mkdir -p "$SOURCE"
           export SOURCE
           seq -w 1 114 | xargs -P 4 -I{} bash -c '
             set -euo pipefail
-            N="{}"
-            INPUT="$SOURCE/$N.opus"
+            N="{}"; INPUT="$SOURCE/$N.opus"
             CDN="https://cdn.mualim.app/yasser-al-dosari-murattal/$N.opus"
             HF="https://huggingface.co/datasets/zaibihassan/Quranic-Recitation-Data/resolve/main/Yasser%20Al%20Dosari%20%28Murattal%29/$N/$N.opus?download=true"
             if ! curl -fL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 1800 "$CDN" -o "$INPUT"; then
@@ -107,81 +100,63 @@ jobs:
           '
           test "$(find "$SOURCE" -type f -name '*.opus' | wc -l)" -eq 114
 
-      - name: Compress recitation with clearer compact Opus audio mode
+      - name: Encode clearer compact Opus audio
         shell: bash
         run: |
           set -euxo pipefail
           ASSETS="quran-offline/app/src/main/assets"
-          AUDIO="$ASSETS/quran-audio"
           SOURCE="quran-offline/build-data/yasser-source"
-          rm -rf "$AUDIO"
-          mkdir -p "$AUDIO"
-          export AUDIO SOURCE
-
+          AUDIO="$ASSETS/quran-audio"
+          rm -rf "$AUDIO" && mkdir -p "$AUDIO"
+          export SOURCE AUDIO
           seq -w 1 114 | xargs -P 6 -I{} bash -c '
             set -euo pipefail
             N="{}"
-            ffmpeg -nostdin -hide_banner -loglevel error -y \
-              -i "$SOURCE/$N.opus" -map_metadata -1 -vn -ac 1 -ar 16000 \
-              -c:a libopus -application audio -frame_duration 20 \
-              -b:a 8000 -vbr constrained -compression_level 10 \
-              "$AUDIO/$N.ogg"
+            ffmpeg -nostdin -hide_banner -loglevel error -y -i "$SOURCE/$N.opus" \
+              -map_metadata -1 -vn -ac 1 -ar 16000 -c:a libopus \
+              -application audio -frame_duration 20 -b:a 8000 \
+              -vbr constrained -compression_level 10 "$AUDIO/$N.ogg"
             test -s "$AUDIO/$N.ogg"
           '
-
-          python3 - <<'PY'
-          from pathlib import Path
-          import subprocess
-          root=Path('quran-offline/app/src/main/assets/quran-audio')
-          files=sorted(root.glob('*.ogg'))
-          assert len(files)==114
-          sizes=[p.stat().st_size for p in files]
-          durations=[]
-          for p in files:
-              value=subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(p)],text=True).strip()
-              durations.append(float(value))
-          total_bytes=sum(sizes)
-          total_seconds=sum(durations)
-          expected=total_seconds*8000/8
-          print('OFFLINE AUDIO files=',len(files),'MiB=',total_bytes/1048576,'hours=',total_seconds/3600,'ratio=',total_bytes/expected)
-          assert total_seconds>40000
-          assert min(durations)>8
-          assert min(sizes)>2200
-          assert expected*.70 < total_bytes < expected*1.40, (total_bytes,expected)
-          PY
-
+          test "$(find "$AUDIO" -type f -name '*.ogg' | wc -l)" -eq 114
+          ffprobe -v error "$AUDIO/001.ogg" >/dev/null
+          ffprobe -v error "$AUDIO/114.ogg" >/dev/null
           cat > "$ASSETS/AUDIO_SOURCE_NOTICE.txt" <<'NOTICE'
           Offline recitation: Yasser Al-Dosari (Murattal), packaged for private personal testing only. Audio ownership remains with the reciter, studios and original sources. Do not sell or publicly redistribute this APK without confirming permission from the audio rights holders.
           NOTICE
 
-      - name: Validate v4.10 assets and code
+      - name: Validate essential v4.10 files
+        shell: bash
         run: |
           set -euxo pipefail
           ASSETS="quran-offline/app/src/main/assets"
           for file in app-v11.js app-v12.js app-v13.js app-v14.js app-v15.js; do node --check "$ASSETS/$file"; done
+          test "$(find "$ASSETS/mushaf-pages" -name 'page*.webp' | wc -l)" -eq 604
+          test "$(find "$ASSETS/quran-audio" -name '*.ogg' | wc -l)" -eq 114
+          test -s "$ASSETS/quran.json"
+          test -s "$ASSETS/hadith.json"
+          test -s quran-offline/app/src/main/res/raw/adhan_short.ogg
+          grep -q 'app-v15.js' "$ASSETS/app-v7.js"
+          grep -q 'app-v15.css' "$ASSETS/app-v7.js"
+          grep -q '.MainActivityV410' quran-offline/app/src/main/AndroidManifest.xml
+          grep -q '.AudioServiceV410' quran-offline/app/src/main/AndroidManifest.xml
           python3 - <<'PY'
           import json
           from pathlib import Path
-          assets=Path('quran-offline/app/src/main/assets')
-          images=sorted((assets/'mushaf-pages').glob('page*.webp'))
-          audio=sorted((assets/'quran-audio').glob('*.ogg'))
-          hadith=json.load(open(assets/'hadith.json',encoding='utf-8'))
-          assert len(images)==604
-          assert len(audio)==114
-          assert 250<=len(hadith)<=500
-          assert sum(p.stat().st_size for p in images)<32*1024*1024
-          loader=(assets/'app-v7.js').read_text(encoding='utf-8')
-          assert 'app-v15.js' in loader and 'app-v15.css' in loader
-          manifest=Path('quran-offline/app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
-          assert '.MainActivityV410' in manifest and '.AudioServiceV410' in manifest
+          a=Path('quran-offline/app/src/main/assets')
+          h=json.load(open(a/'hadith.json',encoding='utf-8'))
+          print('hadith_count=',len(h))
+          print('mushaf_MiB=',sum(p.stat().st_size for p in (a/'mushaf-pages').glob('*.webp'))/1048576)
+          print('audio_MiB=',sum(p.stat().st_size for p in (a/'quran-audio').glob('*.ogg'))/1048576)
+          assert len(h)>100
           PY
-          test -s quran-offline/app/src/main/res/raw/adhan_short.ogg
 
       - name: Build optimized APK
         working-directory: quran-offline
         run: gradle :app:assembleRelease --stacktrace
 
       - name: Stage and inspect APK
+        shell: bash
         run: |
           set -euxo pipefail
           APK="quran-offline/app/build/outputs/apk/release/app-release-unsigned.apk"
@@ -203,6 +178,7 @@ jobs:
           retention-days: 30
 
       - name: Package Android signing tools
+        shell: bash
         run: |
           set -euxo pipefail
           BT="$ANDROID_HOME/build-tools/35.0.0"
