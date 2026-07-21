@@ -3,15 +3,17 @@ from pathlib import Path
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
 
-# One economically motivated revision only: require the M5 fast/slow EMA
-# separation to be meaningful relative to current M1 ATR. This rejects flat,
-# whipsawing trends without adding a new indicator or date-specific rule.
+# One economically motivated revision only: keep the M5 trend-separation check,
+# but reduce it from 0.25 to 0.05 M1 ATR. The prior threshold removed virtually
+# every validation and holdout opportunity. A small positive separation still
+# avoids perfectly flat EMA states while preserving enough independent trades
+# to test the strategy statistically. This is not date-specific.
 constant_marker = 'START_BALANCE = 500.0\n'
 if constant_marker not in text:
     raise SystemExit("START_BALANCE marker not found")
 text = text.replace(
     constant_marker,
-    constant_marker + 'MIN_M5_EMA_SEPARATION_ATR = 0.25\n',
+    constant_marker + 'MIN_M5_EMA_SEPARATION_ATR = 0.05\n',
     1,
 )
 
@@ -53,4 +55,4 @@ text = text.replace(
 )
 
 path.write_text(text, encoding="utf-8")
-print("Applied one simple M5 trend-strength filter: EMA separation >= 0.25 M1 ATR")
+print("Applied M5 trend-strength filter: EMA separation >= 0.05 M1 ATR")
