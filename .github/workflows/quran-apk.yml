@@ -7,6 +7,11 @@ on:
     paths:
       - "quran-offline/**"
       - ".github/workflows/quran-apk.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "quran-offline/**"
+      - ".github/workflows/quran-apk.yml"
 
 concurrency:
   group: rafiq-v49-compact-${{ github.ref }}
@@ -128,8 +133,6 @@ jobs:
               assert duration>8, (path,duration)
               durations.append(duration)
           total_seconds=sum(durations)
-          # Six-kilobit Opus is the lowest standards-backed target. It keeps
-          # every surah offline and materially reduces the previous 93 MiB audio.
           bitrate=6000
           Path('quran-offline/build-data/target-bitrate.txt').write_text(str(bitrate),encoding='utf-8')
           Path('quran-offline/build-data/total-duration.txt').write_text(str(total_seconds),encoding='utf-8')
