@@ -46,6 +46,7 @@ jobs:
           python xau_lab/patch_revision_m5_only.py
           python xau_lab/patch_adaptive_spread.py
           python xau_lab/patch_trend_persistence.py
+          python xau_lab/patch_wide_noise_profile.py
           python xau_lab/patch_protocol.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py
 
@@ -120,6 +121,7 @@ jobs:
           python xau_lab/patch_revision_m5_only.py
           python xau_lab/patch_adaptive_spread.py
           python xau_lab/patch_trend_persistence.py
+          python xau_lab/patch_wide_noise_profile.py
           python xau_lab/patch_protocol.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py
 
