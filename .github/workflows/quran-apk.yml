@@ -1,0 +1,165 @@
+name: Build Rafiq Al-Huda Lite APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["agent/offline-quran-apk-v3-lite"]
+    paths:
+      - "quran-offline/**"
+      - ".github/workflows/quran-apk.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "quran-offline/**"
+      - ".github/workflows/quran-apk.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Download verified offline sources
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ASSETS="quran-offline/app/src/main/assets"
+          PAGES="quran-offline/build-data/pages"
+          QCF="quran-offline/build-data/qcf-pages"
+          HADITH="quran-offline/build-data/hadith"
+          mkdir -p "$ASSETS/fonts" "$PAGES" "$QCF" "$HADITH"
+          rm -rf "$ASSETS/fonts/qcf-v2"
+          rm -f "$ASSETS/quran.json" "$ASSETS/quran_pages.json" "$ASSETS/quran_mushaf.json" "$ASSETS/hadith.json" "$ASSETS/adhan.umd.min.js"
+          rm -f "$PAGES"/*.json "$QCF"/*.json
+
+          curl -fL --retry 4 --retry-all-errors \
+            "https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json" \
+            -o "$ASSETS/quran.json"
+          curl -fL --retry 4 --retry-all-errors \
+            "https://unpkg.com/adhan@4.4.4/lib/bundles/adhan.umd.min.js" \
+            -o "$ASSETS/adhan.umd.min.js"
+
+          export PAGES
+          seq 1 604 | xargs -P 20 -I{} bash -c '
+            set -e
+            curl -fsSL --retry 5 --retry-all-errors \
+              "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara-quranacademy/pages/{}.json" \
+              -o "$PAGES/{}.json"
+          '
+          test "$(find "$PAGES" -type f -name "*.json" | wc -l)" -eq 604
+
+          export QCF
+          seq 1 604 | xargs -P 12 -I{} bash -c '
+            set -e
+            curl -fsSL --retry 6 --retry-all-errors \
+              "https://api.quran.com/api/v4/verses/by_page/{}?language=ar&words=true&word_fields=text_qpc_hafs,text_uthmani&fields=juz_number&per_page=50" \
+              -o "$QCF/{}.json"
+          '
+          test "$(find "$QCF" -type f -name "*.json" | wc -l)" -eq 604
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('quran-offline/build-data/qcf-pages')
+          for page in (1, 2, 50, 604):
+              data = json.load(open(root/f'{page}.json', encoding='utf-8'))
+              verses = data.get('verses') or data.get('data', {}).get('verses') or []
+              assert verses, f'No verses on page {page}'
+              words = [w for v in verses for w in (v.get('words') or [])]
+              assert words, f'No words on page {page}'
+              assert any(w.get('line_number') for w in words), f'No line numbers on page {page}'
+              assert any(w.get('text_qpc_hafs') or w.get('text_uthmani') for w in words), f'No Unicode text on page {page}'
+          print('Unicode Mushaf layout samples validated')
+          PY
+
+          curl -fL --retry 6 --retry-all-errors \
+            "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf" \
+            -o "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
+          test -s "$ASSETS/fonts/UthmanicHafs1Ver18.ttf"
+
+          BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
+          curl -fL --retry 5 --retry-all-errors "$BASE/the_9_books/bukhari.json" -o "$HADITH/bukhari.json"
+          curl -fL --retry 5 --retry-all-errors "$BASE/the_9_books/muslim.json" -o "$HADITH/muslim.json"
+          curl -fL --retry 5 --retry-all-errors "$BASE/forties/nawawi40.json" -o "$HADITH/nawawi40.json"
+          curl -fL --retry 5 --retry-all-errors "$BASE/forties/qudsi40.json" -o "$HADITH/qudsi40.json"
+
+      - name: Build and validate compact offline data
+        run: |
+          set -euxo pipefail
+          python3 quran-offline/scripts/build_offline_assets.py \
+            --assets quran-offline/app/src/main/assets \
+            --pages quran-offline/build-data/pages \
+            --qcf-pages quran-offline/build-data/qcf-pages \
+            --hadith quran-offline/build-data/hadith
+          node --check quran-offline/app/src/main/assets/app-v2.js
+          node --check quran-offline/app/src/main/assets/app-v3.js
+          node --check quran-offline/app/src/main/assets/app-v4.js
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assets = Path('quran-offline/app/src/main/assets')
+          pages = json.load(open(assets/'quran_pages.json', encoding='utf-8'))
+          mushaf = json.load(open(assets/'quran_mushaf.json', encoding='utf-8'))
+          hadith = json.load(open(assets/'hadith.json', encoding='utf-8'))
+          assert len(pages) == 604
+          assert sum(len(p['v']) for p in pages) == 6236
+          assert len(mushaf) == 604
+          assert all(len(p['l']) == 15 for p in mushaf)
+          assert all(any(line['k'] == 'q' for line in p['l']) for p in mushaf)
+          assert len(hadith) >= 6000
+          assert sum(1 for h in hadith if h.get('display') and h['display'] != h['text']) > 1000
+          assert all(h.get('grade') for h in hadith)
+          assert not (assets/'fonts/qcf-v2').exists()
+          html = (assets/'index.html').read_text(encoding='utf-8')
+          assert 'app-v4.css' in html and 'app-v4.js' in html
+          js = (assets/'app-v4.js').read_text(encoding='utf-8')
+          css = (assets/'app-v4.css').read_text(encoding='utf-8')
+          for token in ('gallery-page-copy','highlightText','nextDhikr','onNativeHeading','mushafFrame'):
+              assert token in js or token in css, token
+          sizes = {p.name: p.stat().st_size for p in [assets/'quran.json', assets/'quran_pages.json', assets/'quran_mushaf.json', assets/'hadith.json', assets/'fonts/UthmanicHafs1Ver18.ttf']}
+          print('Compact assets:', sizes, 'total=', sum(sizes.values()))
+          PY
+
+      - name: Build optimized signed Release APK
+        working-directory: quran-offline
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Verify APK, identity and size
+        run: |
+          set -euxo pipefail
+          APK="quran-offline/app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test -f "$APK"
+          test -x "$APKSIGNER"
+          unzip -t "$APK" >/dev/null
+          "$APKSIGNER" verify --verbose "$APK"
+          SIZE=$(stat -c%s "$APK")
+          echo "Lite APK bytes: $SIZE"
+          test "$SIZE" -lt 104857600
+          cp "$APK" Rafiq-AlHuda-Lite-v3.3.apk
+          sha256sum Rafiq-AlHuda-Lite-v3.3.apk
+          unzip -l "$APK" | sort -nr -k1 | head -25 || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rafiq-AlHuda-Lite-v3.3-APK
+          path: Rafiq-AlHuda-Lite-v3.3.apk
+          retention-days: 30

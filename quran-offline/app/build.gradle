@@ -1,0 +1,41 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.mastermedia.quranoffline'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.mastermedia.quranoffline.lite'
+        minSdk 26
+        targetSdk 35
+        versionCode 3
+        versionName '3.3.0-lite'
+        resourceConfigurations += ['ar']
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            zipAlignEnabled true
+            signingConfig signingConfigs.debug
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += [
+                    'META-INF/DEPENDENCIES',
+                    'META-INF/LICENSE*',
+                    'META-INF/NOTICE*',
+                    'META-INF/*.kotlin_module'
+            ]
+        }
+    }
+}
+
+dependencies {
+}
