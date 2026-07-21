@@ -1,0 +1,196 @@
+/* رفيق الهدى 4.3 — الشكل الأزرق التقليدي لصفحة المصحف كما في النسخة الورقية المرجعية. */
+:root{
+  --classic-blue:#123e5f;
+  --classic-blue-2:#2f759e;
+  --classic-paper:#fffef9;
+  --mushaf-sheet-top:clamp(132px,17dvh,184px);
+  --mushaf-sheet-bottom:max(10px,env(safe-area-inset-bottom));
+  --mushaf-sheet-side:10px;
+}
+
+body.reader-mode,body.reader-mode .app,body.reader-mode main,body.reader-mode #page-reader,body.reader-mode .mushaf-stage{
+  background:#e7ece9!important;
+}
+body.reader-mode .mushaf-page{
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  overflow:hidden!important;
+}
+/* الورقة البيضاء نفسها */
+body.reader-mode .mushaf-page:after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  top:var(--mushaf-sheet-top)!important;
+  right:var(--mushaf-sheet-side)!important;
+  bottom:var(--mushaf-sheet-bottom)!important;
+  left:var(--mushaf-sheet-side)!important;
+  z-index:0!important;
+  border:0!important;
+  border-radius:1px!important;
+  background:var(--classic-paper)!important;
+  box-shadow:0 8px 28px rgba(20,42,35,.16)!important;
+  opacity:1!important;
+}
+/* الإطار الأزرق المزخرف المطابق لشكل المصحف الورقي */
+body.reader-mode .mushaf-page:before{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  top:calc(var(--mushaf-sheet-top) + 20px)!important;
+  right:calc(var(--mushaf-sheet-side) + 12px)!important;
+  bottom:calc(var(--mushaf-sheet-bottom) + 27px)!important;
+  left:calc(var(--mushaf-sheet-side) + 12px)!important;
+  z-index:3!important;
+  border:0!important;
+  border-radius:0!important;
+  background:url('mushaf-blue-frame.svg') center/100% 100% no-repeat!important;
+  opacity:1!important;
+  pointer-events:none!important;
+  filter:none!important;
+}
+:root[data-mushaf-frame="gold"] body.reader-mode .mushaf-page:before{filter:sepia(.9) saturate(1.55) hue-rotate(344deg) brightness(.92)!important}
+:root[data-mushaf-frame="green"] body.reader-mode .mushaf-page:before{filter:hue-rotate(68deg) saturate(.8)!important}
+:root[data-mushaf-frame="gray"] body.reader-mode .mushaf-page:before{filter:grayscale(1) contrast(.9)!important}
+:root[data-mushaf-frame="none"] body.reader-mode .mushaf-page:before{display:none!important}
+
+/* اسم السورة والجزء فوق الإطار مثل الصفحة الورقية */
+body.reader-mode .mushaf-page-meta{
+  position:absolute!important;
+  top:calc(var(--mushaf-sheet-top) + 4px)!important;
+  right:42px!important;
+  left:42px!important;
+  z-index:6!important;
+  width:auto!important;
+  height:24px!important;
+  min-height:24px!important;
+  margin:0!important;
+  padding:0 4px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  background:transparent!important;
+  color:#26342f!important;
+  font-family:'Traditional Arabic','Uthmanic Hafs Offline',serif!important;
+  font-size:12px!important;
+  line-height:1!important;
+}
+/* موضع النص داخل الفتحة الداخلية للإطار */
+body.reader-mode .page-text.authentic-mushaf-lines,
+body.reader-mode .mushaf-opening .page-text.authentic-mushaf-lines,
+body.reader-mode .mushaf-fatiha .page-text.authentic-mushaf-lines,
+body.reader-mode .mushaf-baqarah-opening .page-text.authentic-mushaf-lines{
+  position:absolute!important;
+  top:calc(var(--mushaf-sheet-top) + 105px)!important;
+  right:61px!important;
+  bottom:calc(var(--mushaf-sheet-bottom) + 93px)!important;
+  left:61px!important;
+  z-index:5!important;
+  width:auto!important;
+  height:auto!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  display:grid!important;
+  grid-template-rows:repeat(15,minmax(0,1fr))!important;
+  gap:0!important;
+  background:transparent!important;
+  color:#1f2623!important;
+  overflow:hidden!important;
+}
+body.reader-mode .mushaf-line{color:#1f2623!important}
+body.reader-mode .quran-line span,body.reader-mode .basmala-line{
+  color:#1f2623!important;
+  text-shadow:none!important;
+}
+
+/* شريط السورة الأزرق نفسه، مع بقاء اسم السورة ديناميكيًا */
+body.reader-mode .surah-title-line{
+  padding:1px 0!important;
+  overflow:visible!important;
+}
+body.reader-mode .surah-title-line .surah-strip{
+  width:100%!important;
+  height:88%!important;
+  min-height:22px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0 26%!important;
+  border:0!important;
+  border-radius:0!important;
+  background:url('mushaf-blue-surah-banner.svg') center/100% 100% no-repeat!important;
+  box-shadow:none!important;
+  overflow:hidden!important;
+}
+body.reader-mode .surah-title-line .surah-strip i{display:none!important}
+body.reader-mode .surah-title-line .surah-strip b{
+  position:relative!important;
+  z-index:2!important;
+  display:block!important;
+  color:#37463f!important;
+  font-family:'Traditional Arabic','Uthmanic Hafs Offline',serif!important;
+  font-weight:500!important;
+  font-size:clamp(14px,3.7vw,19px)!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+}
+
+/* رقم الصفحة أسفل الإطار، مع إزالة الرموز التي جعلت الصفحة تبدو كتطبيق لا كمصحف */
+body.reader-mode .mushaf-page-footer{
+  position:absolute!important;
+  right:40px!important;
+  bottom:calc(var(--mushaf-sheet-bottom) + 2px)!important;
+  left:40px!important;
+  z-index:6!important;
+  width:auto!important;
+  height:24px!important;
+  min-height:24px!important;
+  margin:0!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  background:transparent!important;
+  color:#2b3933!important;
+}
+body.reader-mode .mushaf-page-footer b{
+  position:static!important;
+  transform:none!important;
+  font-family:'Traditional Arabic',serif!important;
+  font-size:13px!important;
+  font-weight:500!important;
+}
+body.reader-mode .mushaf-page-footer button,body.reader-mode .mushaf-page-footer span{display:none!important}
+
+/* لون الورق يغيّر داخل الورقة فقط، من دون تبديل شكل الإطار الأزرق */
+:root[data-mushaf="cream"]{--classic-paper:#fffdf5}
+:root[data-mushaf="white"]{--classic-paper:#ffffff}
+:root[data-mushaf="parchment"]{--classic-paper:#f5ead2}
+:root[data-mushaf="green"]{--classic-paper:#eef6eb}
+:root[data-mushaf="night"]{--classic-paper:#13251f}
+:root[data-mushaf="night"] body.reader-mode .mushaf-page-meta,
+:root[data-mushaf="night"] body.reader-mode .mushaf-page-footer,
+:root[data-mushaf="night"] body.reader-mode .quran-line span,
+:root[data-mushaf="night"] body.reader-mode .basmala-line,
+:root[data-mushaf="night"] body.reader-mode .mushaf-line{color:#f1ead9!important}
+:root[data-mushaf="night"] body.reader-mode .surah-title-line .surah-strip b{color:#24342e!important}
+
+@media(max-width:390px){
+  :root{--mushaf-sheet-side:6px;--mushaf-sheet-top:clamp(126px,16dvh,170px)}
+  body.reader-mode .mushaf-page-meta{right:35px!important;left:35px!important}
+  body.reader-mode .page-text.authentic-mushaf-lines,
+  body.reader-mode .mushaf-opening .page-text.authentic-mushaf-lines,
+  body.reader-mode .mushaf-fatiha .page-text.authentic-mushaf-lines,
+  body.reader-mode .mushaf-baqarah-opening .page-text.authentic-mushaf-lines{right:50px!important;left:50px!important;top:calc(var(--mushaf-sheet-top) + 98px)!important;bottom:calc(var(--mushaf-sheet-bottom) + 86px)!important}
+}
+@media(max-height:760px){
+  :root{--mushaf-sheet-top:112px}
+  body.reader-mode .page-text.authentic-mushaf-lines,
+  body.reader-mode .mushaf-opening .page-text.authentic-mushaf-lines,
+  body.reader-mode .mushaf-fatiha .page-text.authentic-mushaf-lines,
+  body.reader-mode .mushaf-baqarah-opening .page-text.authentic-mushaf-lines{top:calc(var(--mushaf-sheet-top) + 82px)!important;bottom:calc(var(--mushaf-sheet-bottom) + 70px)!important}
+}

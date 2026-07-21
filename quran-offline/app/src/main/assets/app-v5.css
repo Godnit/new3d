@@ -1,0 +1,105 @@
+/* رفيق الهدى 4.1 — واجهة زمردية ذهبية، قارئ 2D، بحث دقيق، وبطاقات حديث كاملة. */
+:root{
+  --v5-ink:#f7edda;
+  --v5-gold:#d9aa4c;
+  --v5-gold-soft:#f0ce82;
+  --v5-deep:#031f19;
+  --v5-deeper:#02130f;
+  --v5-panel:#07352b;
+  --v5-panel-2:#0a4638;
+  --v5-line:rgba(217,170,76,.38);
+}
+
+body{background:linear-gradient(180deg,var(--v5-deeper),#05271f 46%,#061f1a);}
+.topbar{background:linear-gradient(145deg,#053c31,#075543)!important;border-bottom:1px solid var(--v5-line);box-shadow:0 8px 26px rgba(0,0,0,.22)}
+.topbar .brand strong,.topbar .brand small{color:var(--v5-ink)!important}
+.icon-btn{background:rgba(255,255,255,.08)!important;color:var(--v5-gold-soft)!important;border:1px solid rgba(255,255,255,.10)!important}
+.bottom-nav{background:rgba(3,31,25,.97)!important;border-top:1px solid var(--v5-line)!important;box-shadow:0 -8px 28px rgba(0,0,0,.20)}
+.bottom-nav .nav{color:#b8c8c2!important}.bottom-nav .nav.active{color:var(--v5-gold-soft)!important}
+.bottom-nav .nav span{filter:saturate(.75)}
+
+/* الصفحة الرئيسية مثل الهوية المرجعية */
+#page-home{color:var(--v5-ink)}
+#page-home .v5-hero{position:relative;overflow:hidden;border:1px solid var(--v5-line);border-radius:28px;background:radial-gradient(circle at 82% 15%,rgba(217,170,76,.15),transparent 34%),linear-gradient(145deg,#073c30,#03261f);box-shadow:0 20px 42px rgba(0,0,0,.28)}
+#page-home .v5-hero:before{content:"";position:absolute;inset:-30% 36% 30% -18%;background:radial-gradient(circle,rgba(217,170,76,.12),transparent 63%);pointer-events:none}
+#page-home .hero-mark{color:var(--v5-gold-soft)!important}
+#page-home h1,#page-home h2{color:var(--v5-ink)!important}
+#page-home .eyebrow{color:var(--v5-gold-soft)!important}
+#page-home .v5-next-prayer{background:rgba(0,0,0,.22)!important;border:1px solid var(--v5-line)!important;color:var(--v5-ink)!important}
+#page-home .v5-dashboard{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px!important}
+#page-home .v5-dashboard .quick{min-height:110px;padding:14px 8px;border:1px solid var(--v5-line)!important;border-radius:19px;background:linear-gradient(145deg,#083e33,#052a23)!important;color:var(--v5-ink)!important;box-shadow:inset 0 1px rgba(255,255,255,.04),0 9px 24px rgba(0,0,0,.16)}
+#page-home .v5-dashboard .quick span{font-size:27px;color:var(--v5-gold-soft)}
+#page-home .v5-dashboard .quick b{color:var(--v5-gold-soft)!important;font-size:14px}
+#page-home .v5-dashboard .quick small{color:#b8c8c2!important;font-size:10px;line-height:1.45}
+#page-home>.section-head,#page-home>.mini-grid{display:none!important}
+.continue-card{background:linear-gradient(145deg,#0b493b,#07352b)!important;border-color:var(--v5-line)!important;color:var(--v5-ink)!important}
+
+/* القوائم والبحث */
+.search-box{background:#062d25!important;border:1px solid var(--v5-line)!important;box-shadow:0 10px 24px rgba(0,0,0,.16)}
+.search-box input{color:var(--v5-ink)!important}.search-box input::placeholder{color:#a9bbb4!important}.search-box span{color:var(--v5-gold-soft)!important}
+.segmented,.filter-scroll{background:transparent!important}
+.segmented button,.chip{background:#07352b!important;color:#c6d3ce!important;border:1px solid rgba(217,170,76,.20)!important}
+.segmented button.active,.chip.active{background:linear-gradient(145deg,#b78531,#d9aa4c)!important;color:#08271f!important;border-color:transparent!important}
+.list-card,.surah-row,.settings-card,.setting,.card{background:#f7f4ec!important;color:#173c32!important;border-color:#d9d4c7!important}
+.surah-row strong,.setting label{color:#173c32!important}.surah-row small,.muted{color:#70827c!important}
+.number-badge{background:#0a5c49!important;color:#fff!important}
+mark{background:#f1c860!important;color:#18342d!important;padding:0 2px;border-radius:4px}
+
+/* قارئ المصحف: صفحة واحدة كاملة مع صفحتين 2D مخفيتين خارج الإطار */
+body.reader-mode{background:#eef1ee!important}
+body.reader-mode #page-reader{background:radial-gradient(circle at 50% 42%,#ffffff 0,#eef1ee 62%,#dde5e1 100%)!important}
+body.reader-mode .mushaf-stage{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;padding:max(54px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom))!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;touch-action:none!important;perspective:none!important;contain:layout paint}
+body.reader-mode .mushaf-page{position:relative!important;flex:0 0 auto!important;width:min(calc(100vw - 16px),calc((100dvh - 68px)*.685))!important;max-height:calc(100dvh - 68px)!important;margin:0!important;transform:none;transform-style:flat!important;backface-visibility:visible!important;will-change:transform;touch-action:none!important;z-index:3;border-radius:13px!important;box-shadow:0 18px 42px rgba(36,45,40,.20)!important;background:radial-gradient(circle at 50% 43%,rgba(255,255,255,.56),transparent 62%),repeating-linear-gradient(8deg,rgba(110,83,40,.018) 0 1px,transparent 1px 8px),var(--paper)!important}
+body.reader-mode .mushaf-side-page{position:absolute!important;inset:0!important;margin:auto!important;z-index:2;pointer-events:none!important}
+body.reader-mode #mushafPage{z-index:4}
+body.reader-mode .mushaf-page:before{inset:8px!important;border:3px double var(--paper-edge)!important;border-radius:9px!important;opacity:.84!important}
+body.reader-mode .mushaf-page:after{inset:15px!important;border-radius:7px!important}
+body.reader-mode .mushaf-page header{height:30px!important;color:#544e43!important;font-size:10px!important}
+body.reader-mode .mushaf-page footer{height:28px!important;color:#625a4d!important}
+body.reader-mode .page-text.mushaf-lines{height:calc(100% - 58px)!important;padding:5px 18px 3px!important;grid-template-rows:repeat(15,minmax(0,1fr))!important;overflow:hidden!important}
+body.reader-mode .quran-line{white-space:nowrap!important;overflow:visible!important;line-height:1!important;text-align:center!important}
+body.reader-mode .mushaf-opening .page-text.mushaf-lines{height:68%!important;margin:auto!important;padding:3% 9%!important;display:grid!important;grid-template-rows:repeat(8,minmax(0,1fr))!important;align-content:center!important}
+body.reader-mode .mushaf-opening .blank-line{display:none!important}
+body.reader-mode .mushaf-fatiha .page-text.mushaf-lines{height:64%!important}
+body.reader-mode .mushaf-baqarah-opening .page-text.mushaf-lines{height:70%!important}
+body.reader-mode .mushaf-opening .surah-title-line{font-size:20px!important}
+body.reader-mode .mushaf-opening .basmala-line{font-size:24px!important}
+body.reader-mode .reader-floating-chrome{inset:max(8px,env(safe-area-inset-top)) 12px auto!important;z-index:80!important}
+body.reader-mode .reader-float-btn{background:rgba(4,51,42,.94)!important;border-color:rgba(217,170,76,.34)!important;color:var(--v5-gold-soft)!important}
+body.reader-mode .reader-page-chip{background:rgba(255,255,255,.93)!important;color:#173c32!important;border:1px solid #d3ddd8!important}
+body.reader-mode .gesture-hint{display:none!important}
+.page-curl,.reader-edge,.gallery-page-copy,.page-turn-copy{display:none!important}
+
+/* الحديث: لا قص ولا ارتفاع ثابت */
+#page-hadith{color:var(--v5-ink)}
+#page-hadith .section-head h2,#page-hadith .section-head .eyebrow{color:var(--v5-ink)!important}
+.v5-hadith-card{position:relative;overflow:visible!important;max-height:none!important;height:auto!important;background:#f7f4ec!important;border:1px solid #ddd5c5!important;border-radius:24px!important;padding:20px!important;color:#173c32!important;box-shadow:0 13px 30px rgba(0,0,0,.15)!important}
+.v5-hadith-card .hadith-text{display:block!important;max-height:none!important;overflow:visible!important;white-space:normal!important;font-size:clamp(23px,6.7vw,31px)!important;line-height:1.95!important;color:#173c32!important;margin:18px 0!important}
+.v5-hadith-card .hadith-meta{display:grid!important;gap:8px!important;background:#e9efeb!important;border-radius:18px!important;padding:14px!important;color:#587068!important;overflow:visible!important}
+.v5-hadith-card .hadith-meta span{display:block!important;white-space:normal!important}
+.v5-hadith-card .hadith-meta b{color:#173c32!important}
+.hadith-book-chip{display:inline-flex;padding:7px 12px;border-radius:999px;background:#0b604c;color:#fff;font-size:11px}
+.hadith-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:13px}
+.details-btn{border:1px solid #cfd8d3;border-radius:13px;background:#eef2ef;color:#0a5c49;padding:9px 12px;font-weight:bold}
+.hadith-full{margin-top:12px;padding:15px;border-radius:16px;background:#fff;border:1px dashed #c9d3ce;color:#304b43;font-family:'Uthmanic Hafs Offline','Traditional Arabic',serif;font-size:20px;line-height:1.9;white-space:normal;overflow-wrap:anywhere}
+.hadith-library-head strong{color:var(--v5-ink)!important}.hadith-library-head span{color:#b9c9c3!important}
+.smart-note{background:#0a4638!important;color:#d5e4de!important;border:1px solid var(--v5-line)!important}
+
+/* الأذكار */
+#page-adhkar{color:var(--v5-ink)}
+#page-adhkar .section-head h2,#page-adhkar .section-head .eyebrow{color:var(--v5-ink)!important}
+.adhkar-page-card{background:#f7f4ec!important;color:#173c32!important;border-color:#ddd5c5!important}
+.adhkar-page-card>p{color:#173c32!important}.adhkar-page-progress{color:var(--v5-ink)!important}
+
+/* القبلة */
+.qibla-card{background:linear-gradient(145deg,#073c31,#05291f)!important;color:var(--v5-ink)!important;border:1px solid var(--v5-line)!important}
+.qibla-card h3,.qibla-card .muted{color:var(--v5-ink)!important}
+.compass{border-color:var(--v5-gold)!important}.qibla-arrow{transition:transform .12s linear!important;will-change:transform;transform-origin:50% 100%}
+.compass-status{background:rgba(255,255,255,.08)!important;color:#c7d4cf!important;border:1px solid rgba(255,255,255,.08)}
+
+@media(max-width:390px){
+  #page-home .v5-dashboard .quick{min-height:99px;padding:11px 6px}
+  #page-home .v5-dashboard .quick span{font-size:24px}
+  body.reader-mode .page-text.mushaf-lines{padding-inline:13px!important}
+  .v5-hadith-card{padding:16px!important}
+}
