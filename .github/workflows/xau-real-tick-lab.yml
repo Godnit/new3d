@@ -51,6 +51,7 @@ jobs:
           python xau_lab/patch_strategy_revision.py
           python xau_lab/patch_session_1619.py
           python xau_lab/patch_protocol.py
+          python xau_lab/patch_m5_trend_strength.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py
 
       - name: Install dependencies
@@ -60,8 +61,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .hf_cache
-          key: xauusd-hf-window-${{ matrix.index }}-v6-${{ github.run_id }}
+          key: xauusd-hf-window-${{ matrix.index }}-v7-${{ github.run_id }}
           restore-keys: |
+            xauusd-hf-window-${{ matrix.index }}-v7-
             xauusd-hf-window-${{ matrix.index }}-v6-
             xauusd-hf-window-${{ matrix.index }}-v5-
             xauusd-hf-window-${{ matrix.index }}-v4-
@@ -132,6 +134,7 @@ jobs:
           python xau_lab/patch_strategy_revision.py
           python xau_lab/patch_session_1619.py
           python xau_lab/patch_protocol.py
+          python xau_lab/patch_m5_trend_strength.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py
 
       - name: Install dependencies
