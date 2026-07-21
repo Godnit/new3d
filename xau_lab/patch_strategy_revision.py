@@ -5,9 +5,11 @@ text = path.read_text(encoding="utf-8")
 
 marker = "    return out\n\n\ndef in_session"
 insert = '''    # One simple revision based only on development + validation trades:
-    # bullish continuation entries were profitable, while bullish follow entries
-    # were weak; bearish follow entries were profitable, while bearish continuation
-    # entries were weak. Test this directional specialization without adding indicators.
+    # keep the profitable directional specialization, but use a less reactive
+    # exit profile. Development + validation showed most expectancy came from
+    # full targets, while frequent early stop management contributed little.
+    # Wider ATR protection and later break-even/trailing are economically
+    # defensible for a trend-continuation system and are not date-specific.
     out.append(
         replace(
             base,
@@ -18,15 +20,15 @@ insert = '''    # One simple revision based only on development + validation tra
             blocked_hour=24,
             signal_mode="all",
             m15_mode="veto",
-            stop_atr=1.15,
-            rr=1.10,
-            be_trigger=0.55,
+            stop_atr=1.25,
+            rr=1.35,
+            be_trigger=0.80,
             be_lock_atr=0.05,
-            trail_start=0.90,
-            trail_atr=0.65,
-            fail_fast_minutes=3,
-            fail_fast_max_mfe_r=0.25,
-            fail_fast_current_r=-0.05,
+            trail_start=1.20,
+            trail_atr=0.80,
+            fail_fast_minutes=4,
+            fail_fast_max_mfe_r=0.30,
+            fail_fast_current_r=-0.10,
         )
     )
     return out
@@ -52,4 +54,4 @@ if marker2 not in text:
 text = text.replace(marker2, insert2, 1)
 
 path.write_text(text, encoding="utf-8")
-print("Added one directional signal specialization revision")
+print("Applied one revision: balanced exit management for directional continuation strategy")
