@@ -8,28 +8,27 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
-# The source pages are 800 px wide. 600 px is noticeably clearer than the
-# previous 480 px build on 720 px phones, while grayscale WebP keeps the total
-# package small enough for the complete offline recitation.
-PAGE_WIDTH = 600
-PAGE_HEIGHT = 970
-WEBP_QUALITY = 74
+# 540 px gives 26% more pixels than the older 480 px build.  Grayscale WebP,
+# careful contrast and light sharpening preserve legibility while staying under
+# the compact package budget.
+PAGE_WIDTH = 540
+PAGE_HEIGHT = 873
+WEBP_QUALITY = 68
 
 
 def process_page(arguments: tuple[str, str]) -> tuple[int, int]:
     source_path, destination_path = map(Path, arguments)
     source = Image.open(source_path)
 
-    # The supplied Madani pages are monochrome. Keeping a single luminance
-    # channel saves space without discarding Quran text detail.
+    # The Madani source is monochrome, so one luminance channel avoids storing
+    # three duplicate RGB channels.  No Quran content is cropped or reflowed.
     source = ImageOps.grayscale(source)
-    source = ImageOps.autocontrast(source, cutoff=0.15)
+    source = ImageOps.autocontrast(source, cutoff=0.10)
     source.thumbnail((PAGE_WIDTH, PAGE_HEIGHT), Image.Resampling.LANCZOS)
 
-    # A light unsharp mask restores edge clarity lost during down-sampling.
-    # It does not redraw, crop or reflow any Quran text.
-    source = source.filter(ImageFilter.UnsharpMask(radius=0.65, percent=125, threshold=2))
-    source = ImageEnhance.Contrast(source).enhance(1.035)
+    # Restore edge definition after down-sampling without redrawing glyphs.
+    source = source.filter(ImageFilter.UnsharpMask(radius=0.55, percent=118, threshold=2))
+    source = ImageEnhance.Contrast(source).enhance(1.025)
 
     canvas = Image.new("L", (PAGE_WIDTH, PAGE_HEIGHT), 255)
     left = (PAGE_WIDTH - source.width) // 2
