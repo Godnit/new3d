@@ -22,10 +22,10 @@ new_windows = '''WINDOWS = [
     ("dev_2022_sep", "dev", "2022-09-19", "2022-09-24"),
     ("dev_2023_mar", "dev", "2023-03-13", "2023-03-18"),
     ("dev_2023_oct", "dev", "2023-10-09", "2023-10-14"),
-    ("val_2025_jan", "validation", "2025-01-13", "2025-01-18"),
-    ("val_2025_oct", "validation", "2025-10-20", "2025-10-25"),
-    ("hold_2026_jan", "holdout", "2026-01-12", "2026-01-17"),
-    ("hold_2026_apr", "holdout", "2026-04-13", "2026-04-18"),
+    ("val_2026_jan", "validation", "2026-01-12", "2026-01-17"),
+    ("val_2026_apr", "validation", "2026-04-13", "2026-04-18"),
+    ("hold_2020_jan", "holdout", "2020-01-13", "2020-01-18"),
+    ("hold_2020_oct", "holdout", "2020-10-19", "2020-10-24"),
 ]
 '''
 if old_windows not in text:
@@ -60,7 +60,7 @@ aggregate = Path("xau_lab/aggregate_results.py")
 report = aggregate.read_text(encoding="utf-8")
 report = report.replace(
     "The candidate is considered acceptable only when the untouched 2025 holdout gate passes.",
-    "After the first 2025 holdout was inspected, it was promoted to validation. The candidate is considered acceptable only when the newly untouched January/April 2026 holdout gate passes.",
+    "The previously inspected 2025/2026 windows are no longer holdout data. The candidate is considered acceptable only when the newly untouched January/October 2020 holdout gate passes.",
 )
 aggregate.write_text(report, encoding="utf-8")
-print("Patched validation protocol: 2025 validation and newly untouched pre-Headway 2026 holdout")
+print("Patched protocol: inspected 2026 windows are validation; newly untouched 2020 windows are holdout")
