@@ -13,19 +13,25 @@ import real_tick_lab as lab
 REPO_ID = "CarlosSilva1/xauusd-ticks"
 
 # All windows are independent of the 2026 Headway report period.
+# The previous five-day windows produced only 12 trades for the selected
+# candidate, which is too small for a meaningful validation decision. This
+# protocol-only revision expands every window to about three trading weeks
+# inside the same calendar month. It does not alter entry, exit, risk, session,
+# spread, or direction rules, and the 2025 holdout remains untouched by
+# development/validation selection.
 WINDOWS = [
-    ("dev_2021_jun", "dev", "2021-06-14", "2021-06-19"),
-    ("dev_2021_oct", "dev", "2021-10-11", "2021-10-16"),
-    ("dev_2022_mar", "dev", "2022-03-07", "2022-03-12"),
-    ("dev_2022_sep", "dev", "2022-09-19", "2022-09-24"),
-    ("dev_2023_mar", "dev", "2023-03-13", "2023-03-18"),
-    ("dev_2023_oct", "dev", "2023-10-09", "2023-10-14"),
-    ("val_2024_mar", "validation", "2024-03-04", "2024-03-09"),
-    ("val_2024_oct", "validation", "2024-10-21", "2024-10-26"),
-    # Fresh untouched 2025 holdout windows for this revision. Previously
-    # inspected 2025 windows are retired and never reused for selection.
-    ("hold_2025_may", "holdout", "2025-05-12", "2025-05-17"),
-    ("hold_2025_dec", "holdout", "2025-12-08", "2025-12-13"),
+    ("dev_2021_jun", "dev", "2021-06-07", "2021-06-26"),
+    ("dev_2021_oct", "dev", "2021-10-04", "2021-10-23"),
+    ("dev_2022_mar", "dev", "2022-03-07", "2022-03-26"),
+    ("dev_2022_sep", "dev", "2022-09-05", "2022-09-24"),
+    ("dev_2023_mar", "dev", "2023-03-06", "2023-03-25"),
+    ("dev_2023_oct", "dev", "2023-10-02", "2023-10-21"),
+    ("val_2024_mar", "validation", "2024-03-04", "2024-03-23"),
+    ("val_2024_oct", "validation", "2024-10-07", "2024-10-26"),
+    # Fresh 2025 holdout months remain selection-blind. Only their sample
+    # length is increased; their outcomes are not used to choose candidates.
+    ("hold_2025_may", "holdout", "2025-05-05", "2025-05-24"),
+    ("hold_2025_dec", "holdout", "2025-12-01", "2025-12-20"),
 ]
 
 
