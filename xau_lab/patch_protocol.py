@@ -1,20 +1,9 @@
 from pathlib import Path
+import re
 
 runner = Path("xau_lab/hf_window_runner.py")
 text = runner.read_text(encoding="utf-8")
-old_windows = '''WINDOWS = [
-    ("dev_2021_jun", "dev", "2021-06-14", "2021-06-19"),
-    ("dev_2021_oct", "dev", "2021-10-11", "2021-10-16"),
-    ("dev_2022_mar", "dev", "2022-03-07", "2022-03-12"),
-    ("dev_2022_sep", "dev", "2022-09-19", "2022-09-24"),
-    ("dev_2023_mar", "dev", "2023-03-13", "2023-03-18"),
-    ("dev_2023_oct", "dev", "2023-10-09", "2023-10-14"),
-    ("val_2024_mar", "validation", "2024-03-04", "2024-03-09"),
-    ("val_2024_oct", "validation", "2024-10-21", "2024-10-26"),
-    ("hold_2025_jan", "holdout", "2025-01-13", "2025-01-18"),
-    ("hold_2025_oct", "holdout", "2025-10-20", "2025-10-25"),
-]
-'''
+
 new_windows = '''WINDOWS = [
     ("dev_2021_jun", "dev", "2021-06-14", "2021-06-19"),
     ("dev_2021_oct", "dev", "2021-10-11", "2021-10-16"),
@@ -28,9 +17,14 @@ new_windows = '''WINDOWS = [
     ("hold_2025_aug", "holdout", "2025-08-11", "2025-08-16"),
 ]
 '''
-if old_windows not in text:
-    raise SystemExit("window protocol marker not found")
-text = text.replace(old_windows, new_windows, 1)
+
+# Replace the complete protocol block regardless of which previously retired
+# holdout pair is currently committed. This remains deterministic and keeps
+# February/August 2025 untouched by all earlier research iterations.
+pattern = r"WINDOWS = \[\n.*?\n\]\n"
+text, count = re.subn(pattern, new_windows, text, count=1, flags=re.S)
+if count != 1:
+    raise SystemExit("window protocol block not found")
 
 old_print = '''    print(
         f"Built {name}: ticks={len(ticks):,}, M1 bars={len(bars):,}, "
@@ -51,16 +45,18 @@ new_print = '''    spread_q = bars["spread_first"].quantile([0.50, 0.90, 0.99]).
         flush=True,
     )
 '''
-if old_print not in text:
+if old_print in text:
+    text = text.replace(old_print, new_print, 1)
+elif "spread_q50/q90/q99" not in text:
     raise SystemExit("diagnostic print marker not found")
-text = text.replace(old_print, new_print, 1)
+
 runner.write_text(text, encoding="utf-8")
 
 aggregate = Path("xau_lab/aggregate_results.py")
 report = aggregate.read_text(encoding="utf-8")
 report = report.replace(
     "The candidate is considered acceptable only when the untouched 2025 holdout gate passes.",
-    "The previously inspected January/May/October/December 2025 and prior validation windows are no longer holdout data. The candidate is considered acceptable only when the newly untouched February/August 2025 holdout gate passes.",
+    "The previously inspected January/March/May/September/October/December 2025 windows are retired from holdout use. The candidate is considered acceptable only when the newly untouched February/August 2025 holdout gate passes.",
 )
 aggregate.write_text(report, encoding="utf-8")
 print("Patched protocol: new 2024 validation windows and newly untouched February/August 2025 holdout")
