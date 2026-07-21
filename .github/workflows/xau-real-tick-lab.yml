@@ -44,6 +44,8 @@ jobs:
           echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check
           python xau_lab/patch_execution_order.py
           python xau_lab/patch_revision_m5_only.py
+          python xau_lab/patch_adaptive_spread.py
+          python xau_lab/patch_protocol.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py
 
       - name: Install dependencies
@@ -53,8 +55,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .hf_cache
-          key: xauusd-hf-window-${{ matrix.index }}-v1-${{ github.run_id }}
+          key: xauusd-hf-window-${{ matrix.index }}-v2-${{ github.run_id }}
           restore-keys: |
+            xauusd-hf-window-${{ matrix.index }}-v2-
             xauusd-hf-window-${{ matrix.index }}-v1-
 
       - name: Run one real bid-ask tick window
@@ -113,6 +116,8 @@ jobs:
           echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check
           python xau_lab/patch_execution_order.py
           python xau_lab/patch_revision_m5_only.py
+          python xau_lab/patch_adaptive_spread.py
+          python xau_lab/patch_protocol.py
           python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py
 
       - name: Install dependencies
