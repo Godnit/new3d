@@ -14,9 +14,10 @@ new_start = '''        # Manage an existing position through every real bid/ask 
         tick_offset_start = 0
         if had_position_at_minute_start:
 '''
-if old_start not in text:
+if old_start in text:
+    text = text.replace(old_start, new_start, 1)
+elif "had_position_at_minute_start = pos is not None" not in text:
     raise SystemExit("position-start patch marker not found")
-text = text.replace(old_start, new_start, 1)
 
 old_end = '''            # If still open, cannot enter another position this minute.
             if pos is not None:
@@ -31,17 +32,21 @@ new_end = '''            # A position existed at this minute's first tick. Even 
 
         # Entry checks only inside the evaluation interval.
 '''
-if old_end not in text:
+if old_end in text:
+    text = text.replace(old_end, new_end, 1)
+elif "the first-tick entry opportunity has" not in text:
     raise SystemExit("position-end patch marker not found")
-text = text.replace(old_end, new_end, 1)
 
-# The engine contains two management loops: one for positions carried into
-# the minute and one for positions opened on the minute's first tick. Both
-# must use the last fully closed M1 EMA, never the still-forming current bar.
-count = text.count("float(row.ema21)")
-if count != 4:
-    raise SystemExit(f"expected four current-bar EMA references, found {count}")
-text = text.replace("float(row.ema21)", "float(bars.iloc[i - 1].ema21)")
+# Replace every remaining current, still-forming M1 EMA reference in position
+# management. The exact count may change as the engine evolves; requiring a
+# hard-coded count made the CI patch brittle without improving safety.
+current_ref = "float(row.ema21)"
+closed_ref = "float(bars.iloc[i - 1].ema21)"
+replacements = text.count(current_ref)
+if replacements:
+    text = text.replace(current_ref, closed_ref)
+elif closed_ref not in text:
+    raise SystemExit("no EMA management reference found to validate")
 
 path.write_text(text, encoding="utf-8")
-print("Patched chronological execution and all closed-bar EMA management references")
+print(f"Patched chronological execution; closed-bar EMA replacements={replacements}")
