@@ -1,0 +1,116 @@
+name: Build Rafiq Al-Huda APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["agent/offline-quran-apk-v2"]
+    paths:
+      - "quran-offline/**"
+      - ".github/workflows/quran-apk.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "quran-offline/**"
+      - ".github/workflows/quran-apk.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Download verified offline sources
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ASSETS="quran-offline/app/src/main/assets"
+          PAGES="quran-offline/build-data/pages"
+          HADITH="quran-offline/build-data/hadith"
+          mkdir -p "$ASSETS" "$PAGES" "$HADITH"
+          rm -f "$ASSETS/quran.json" "$ASSETS/quran_pages.json" "$ASSETS/hadith.json" "$ASSETS/adhan.umd.min.js"
+
+          curl -fL --retry 4 --retry-all-errors \
+            "https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json" \
+            -o "$ASSETS/quran.json"
+          curl -fL --retry 4 --retry-all-errors \
+            "https://unpkg.com/adhan@4.4.4/lib/bundles/adhan.umd.min.js" \
+            -o "$ASSETS/adhan.umd.min.js"
+
+          export PAGES
+          seq 1 604 | xargs -P 20 -I{} bash -c '
+            set -e
+            curl -fsSL --retry 5 --retry-all-errors \
+              "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara-quranacademy/pages/{}.json" \
+              -o "$PAGES/{}.json"
+          '
+          test "$(find "$PAGES" -type f -name "*.json" | wc -l)" -eq 604
+
+          BASE="https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book"
+          curl -fL --retry 5 --retry-all-errors "$BASE/the_9_books/bukhari.json" -o "$HADITH/bukhari.json"
+          curl -fL --retry 5 --retry-all-errors "$BASE/the_9_books/muslim.json" -o "$HADITH/muslim.json"
+          curl -fL --retry 5 --retry-all-errors "$BASE/forties/nawawi40.json" -o "$HADITH/nawawi40.json"
+          curl -fL --retry 5 --retry-all-errors "$BASE/forties/qudsi40.json" -o "$HADITH/qudsi40.json"
+
+      - name: Build and validate offline data
+        run: |
+          set -euxo pipefail
+          python3 quran-offline/scripts/build_offline_assets.py \
+            --assets quran-offline/app/src/main/assets \
+            --pages quran-offline/build-data/pages \
+            --hadith quran-offline/build-data/hadith
+          node --check quran-offline/app/src/main/assets/app-v2.js
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assets = Path('quran-offline/app/src/main/assets')
+          pages = json.load(open(assets/'quran_pages.json', encoding='utf-8'))
+          hadith = json.load(open(assets/'hadith.json', encoding='utf-8'))
+          assert len(pages) == 604
+          assert sum(len(p['verses']) for p in pages) == 6236
+          assert len(hadith) >= 6000
+          html = (assets/'index.html').read_text(encoding='utf-8')
+          for name in ('app-v2.css', 'app-v2.js', 'quran_pages.json', 'hadith.json'):
+              assert name in html or (assets/name).exists(), name
+          print('Offline assets:', len(pages), 'pages and', len(hadith), 'hadiths')
+          PY
+
+      - name: Build APK
+        working-directory: quran-offline
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK and size
+        run: |
+          set -euxo pipefail
+          APK="quran-offline/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          unzip -t "$APK" >/dev/null
+          SIZE=$(stat -c%s "$APK")
+          echo "APK bytes: $SIZE"
+          test "$SIZE" -lt 104857600
+          cp "$APK" Rafiq-AlHuda-v2.apk
+          sha256sum Rafiq-AlHuda-v2.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rafiq-AlHuda-v2-APK
+          path: Rafiq-AlHuda-v2.apk
+          retention-days: 30
