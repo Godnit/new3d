@@ -22,8 +22,9 @@ WINDOWS = [
     ("dev_2023_oct", "dev", "2023-10-09", "2023-10-14"),
     ("val_2024_mar", "validation", "2024-03-04", "2024-03-09"),
     ("val_2024_oct", "validation", "2024-10-21", "2024-10-26"),
-    ("hold_2025_jan", "holdout", "2025-01-13", "2025-01-18"),
-    ("hold_2025_oct", "holdout", "2025-10-20", "2025-10-25"),
+    # Newly untouched holdout windows. Earlier 2025 windows are retired from holdout use.
+    ("hold_2025_mar", "holdout", "2025-03-10", "2025-03-15"),
+    ("hold_2025_sep", "holdout", "2025-09-15", "2025-09-20"),
 ]
 
 
