@@ -17,8 +17,10 @@ def main() -> None:
     prepare_v412.main()
     root = Path(__file__).resolve().parents[1]
     java = root / "app/src/main/java/com/mastermedia/quranoffline"
+    assets = root / "app/src/main/assets"
     audio = java / "AudioServiceV410.java"
     activity = java / "MainActivityV410.java"
+    reader = assets / "app-v11.js"
 
     replace_exact(audio, "import java.io.IOException;\n", "import java.io.File;\nimport java.io.IOException;\n")
     old_source = '''        try (AssetFileDescriptor descriptor = getAssets().openFd(
@@ -147,6 +149,16 @@ def main() -> None:
             audioDownloadReceiverRegistered = false;
         }
         if (webView != null) {''')
+
+    old_page_source = '''  function pageSource(page){
+    var style=localStorage.getItem('mushafImageStyle')||'blue';
+    var directory=style==='gold'?'mushaf-pages-gold':(style==='plain'?'mushaf-pages':'mushaf-pages-blue');
+    return directory+'/page'+pad3(page)+'.webp';
+  }'''
+    new_page_source = '''  function pageSource(page){
+    return 'mushaf-pages/page'+pad3(page)+'.webp';
+  }'''
+    replace_exact(reader, old_page_source, new_page_source)
 
 
 if __name__ == "__main__":
