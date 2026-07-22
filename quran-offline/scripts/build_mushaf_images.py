@@ -11,9 +11,11 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
-WIDTH = 620
-HEIGHT = 930
-QUALITY = 72
+# 600 px keeps Arabic glyphs readable on common 720 px phone screens. For scanned
+# line art, resolution matters more than a high photographic quality value.
+WIDTH = 600
+HEIGHT = 900
+QUALITY = 58
 
 
 def source_urls(page_number: int) -> list[tuple[str, str]]:
@@ -58,9 +60,11 @@ def process(arguments: tuple[str, str]) -> tuple[int, int]:
     source_path, output_path = map(Path, arguments)
     with Image.open(source_path) as opened:
         source = ImageOps.exif_transpose(opened).convert("RGB")
+
+    # Preserve the whole printed page, including all four blue decorated edges.
     source = ImageOps.contain(source, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-    source = source.filter(ImageFilter.UnsharpMask(radius=0.38, percent=106, threshold=3))
-    source = ImageEnhance.Contrast(source).enhance(1.01)
+    source = source.filter(ImageFilter.UnsharpMask(radius=0.34, percent=112, threshold=3))
+    source = ImageEnhance.Contrast(source).enhance(1.015)
     page = Image.new("RGB", (WIDTH, HEIGHT), "white")
     page.paste(source, ((WIDTH - source.width) // 2, (HEIGHT - source.height) // 2))
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,7 +94,7 @@ def main() -> None:
     if len(files) != 604:
         raise RuntimeError(f"Expected 604 pages, got {len(files)}")
     for sample in (files[0], files[1], files[430], files[439], files[-1]):
-        if sample.stat().st_size < 10_000:
+        if sample.stat().st_size < 8_000:
             raise RuntimeError(f"Generated page is suspiciously small: {sample}")
         with Image.open(sample) as image:
             if image.size != (WIDTH, HEIGHT):
