@@ -3,66 +3,58 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import shutil
+import tempfile
+import urllib.parse
 import urllib.request
-import zipfile
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
-# A ready-made 604-page Madinah Mushaf image bundle. The 480px edition is about
-# 28 MiB before repacking and is much more suitable for a compact offline APK.
-BUNDLE_URL = "https://quran.islam-db.com/public/data/pages/quranpages_480.zip"
+# Ready-made Madinah Mushaf scans. Quran text and the original blue ornament are
+# already combined in each source image; the app never draws a frame at runtime.
 WIDTH = 480
 HEIGHT = 720
-QUALITY = 70
+QUALITY = 64
 
 
-def download_bundle(destination: Path) -> None:
-    request = urllib.request.Request(
-        BUNDLE_URL,
-        headers={"User-Agent": "Mozilla/5.0 RafiqAlHuda/4.15"},
-    )
+def source_urls(page_number: int) -> list[tuple[str, str]]:
+    equran = f"https://equran.me/assets/images/pages/{page_number:04d}.jpg"
+    ummah = f"https://ummah.su/img/mushaf/{page_number}.jpg"
+    encoded = urllib.parse.quote(ummah, safe="")
+    return [
+        (equran, f"https://equran.me/page-img-{page_number}.html"),
+        (ummah, f"https://ummah.su/quran/medinskiy-muskhaf/{page_number}"),
+        ("https://images.weserv.nl/?url=" + encoded + "&output=jpg&q=90", "https://images.weserv.nl/"),
+        ("https://wsrv.nl/?url=" + encoded + "&output=jpg&q=90", "https://wsrv.nl/"),
+    ]
+
+
+def download_page(arguments: tuple[int, str]) -> str:
+    page_number, destination_text = arguments
+    destination = Path(destination_text)
     last_error: Exception | None = None
-    for _ in range(5):
-        try:
-            with urllib.request.urlopen(request, timeout=180) as response:
-                payload = response.read()
-            if len(payload) < 10 * 1024 * 1024:
-                raise RuntimeError(f"Mushaf ZIP is suspiciously small: {len(payload)} bytes")
-            destination.write_bytes(payload)
-            with zipfile.ZipFile(destination) as archive:
-                bad = archive.testzip()
-                if bad:
-                    raise RuntimeError(f"Corrupt file in Mushaf ZIP: {bad}")
-            return
-        except Exception as error:
-            last_error = error
-    raise RuntimeError(f"Unable to download Mushaf ZIP: {last_error}")
-
-
-def page_number(path: Path) -> int | None:
-    matches = re.findall(r"\d+", path.stem)
-    if not matches:
-        return None
-    value = int(matches[-1])
-    return value if 1 <= value <= 604 else None
-
-
-def discover_pages(directory: Path) -> dict[int, Path]:
-    candidates: dict[int, Path] = {}
-    for path in directory.rglob("*"):
-        if not path.is_file() or path.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
-            continue
-        number = page_number(path)
-        if number is not None and number not in candidates:
-            candidates[number] = path
-    missing = sorted(set(range(1, 605)) - set(candidates))
-    if missing:
-        raise RuntimeError(f"Mushaf bundle is missing pages: {missing[:12]}")
-    return candidates
+    for url, referer in source_urls(page_number):
+        for _ in range(3):
+            try:
+                request = urllib.request.Request(url, headers={
+                    "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/132 Safari/537.36",
+                    "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+                    "Referer": referer,
+                })
+                with urllib.request.urlopen(request, timeout=75) as response:
+                    payload = response.read()
+                if len(payload) < 8_000:
+                    raise RuntimeError(f"Page {page_number} is suspiciously small")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(payload)
+                with Image.open(destination) as image:
+                    image.verify()
+                return str(destination)
+            except Exception as error:
+                last_error = error
+    raise RuntimeError(f"Failed to download decorated Mushaf page {page_number}: {last_error}")
 
 
 def process(arguments: tuple[str, str]) -> tuple[int, int]:
@@ -70,13 +62,14 @@ def process(arguments: tuple[str, str]) -> tuple[int, int]:
     with Image.open(source_path) as opened:
         source = ImageOps.exif_transpose(opened).convert("RGB")
 
-    # Keep the complete page and its original decoration. No frame is drawn.
+    # Preserve the full printed page and every decorated edge without cropping.
     source = ImageOps.contain(source, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-    source = source.filter(ImageFilter.UnsharpMask(radius=0.28, percent=108, threshold=3))
-    source = ImageEnhance.Contrast(source).enhance(1.01)
+    source = ImageOps.autocontrast(source, cutoff=(0.06, 0.06))
+    source = source.filter(ImageFilter.UnsharpMask(radius=0.28, percent=112, threshold=3))
+    source = ImageEnhance.Contrast(source).enhance(1.012)
+
     page = Image.new("RGB", (WIDTH, HEIGHT), "white")
     page.paste(source, ((WIDTH - source.width) // 2, (HEIGHT - source.height) // 2))
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
     page.save(output_path, "WEBP", quality=QUALITY, method=6, exact=True)
     return source_path.stat().st_size, output_path.stat().st_size
@@ -85,30 +78,28 @@ def process(arguments: tuple[str, str]) -> tuple[int, int]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, required=True,
-                        help="Compatibility argument; the compact page bundle is used.")
+                        help="Compatibility argument; ready-decorated remote scans are used.")
     parser.add_argument("--destination", type=Path, required=True)
     args = parser.parse_args()
 
     shutil.rmtree(args.destination, ignore_errors=True)
     args.destination.mkdir(parents=True, exist_ok=True)
-    work = args.destination.parent / "mushaf-480-bundle"
-    shutil.rmtree(work, ignore_errors=True)
-    work.mkdir(parents=True, exist_ok=True)
-    archive_path = work / "quranpages_480.zip"
-    extracted = work / "extracted"
-    extracted.mkdir()
 
-    download_bundle(archive_path)
-    with zipfile.ZipFile(archive_path) as archive:
-        archive.extractall(extracted)
-    pages = discover_pages(extracted)
+    # IMPORTANT: temporary JPGs stay under the system temp directory, never under
+    # app/src/main/assets. This prevents the original scans from being packaged a
+    # second time inside the APK.
+    with tempfile.TemporaryDirectory(prefix="rafiq-mushaf-") as temporary:
+        source_dir = Path(temporary)
+        downloads = [(n, str(source_dir / f"{n:03d}.jpg")) for n in range(1, 605)]
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            downloaded = list(pool.map(download_page, downloads))
 
-    tasks = [
-        (str(pages[number]), str(args.destination / f"page{number:03d}.webp"))
-        for number in range(1, 605)
-    ]
-    with ProcessPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
-        sizes = list(pool.map(process, tasks, chunksize=8))
+        tasks = [
+            (downloaded[n - 1], str(args.destination / f"page{n:03d}.webp"))
+            for n in range(1, 605)
+        ]
+        with ProcessPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
+            sizes = list(pool.map(process, tasks, chunksize=6))
 
     files = sorted(args.destination.glob("page*.webp"))
     if len(files) != 604:
@@ -123,18 +114,23 @@ def main() -> None:
                 raise RuntimeError(f"Page appears empty: {sample}")
 
     output_bytes = sum(item[1] for item in sizes)
-    if output_bytes >= 42 * 1024 * 1024:
-        raise RuntimeError(f"Compressed Mushaf is still too large: {output_bytes / 1048576:.2f} MiB")
+    if output_bytes >= 45 * 1024 * 1024:
+        raise RuntimeError(f"Decorated Mushaf is unexpectedly large: {output_bytes / 1048576:.2f} MiB")
+
+    # Remove leftovers accidentally packaged by the previous implementation.
+    for stale in ("mushaf-480-bundle", "mushaf-complete-blue-source"):
+        shutil.rmtree(args.destination.parent / stale, ignore_errors=True)
 
     (args.destination.parent / "MUSHAF_SOURCE_NOTICE.txt").write_text(
-        "The app uses the quranpages_480.zip bundle from quran.islam-db.com. "
-        "Each page is a complete ready-made Mushaf image; the app does not draw an "
-        "ornamental frame over Quran text. Confirm redistribution permission before "
-        "a public or commercial release.\n",
+        "The app uses complete ready-scanned Hafs Mushaf page images from equran.me, "
+        "with ummah.su as a fallback. Quran text and the original blue ornament are "
+        "one source image; no frame is generated at runtime. Temporary source scans "
+        "are kept outside app assets and are not packaged in the APK. Confirm "
+        "redistribution permission before a public or commercial release.\n",
         encoding="utf-8",
     )
     print(
-        f"Built 604 complete Mushaf pages at {WIDTH}x{HEIGHT}, WebP q={QUALITY}: "
+        f"Built 604 complete blue-decorated pages at {WIDTH}x{HEIGHT}, WebP q={QUALITY}: "
         f"{output_bytes / 1048576:.2f} MiB"
     )
 
