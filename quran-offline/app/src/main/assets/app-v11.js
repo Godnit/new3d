@@ -1,18 +1,20 @@
 (function(){
   'use strict';
 
-  /* v4.6: compact real Madani page images inside one real decorative Mushaf image. */
+  /* v4.13: complete precomposed Mushaf page images; text and ornament are one file. */
   var reader={stage:null,current:null,previous:null,next:null,drag:null,animating:false,duration:220};
-  var compass={heading:null,target:null,display:null,raf:0,lastTime:0};
   var oldShowPage=showPage;
-  var oldRenderQibla=renderQibla;
 
   function clamp(value,min,max){return Math.max(min,Math.min(max,value))}
   function pad3(value){return String(value).padStart(3,'0')}
-  function pageSource(page){return 'mushaf-pages/page'+pad3(page)+'.webp'}
+  function pageSource(page){
+    var style=localStorage.getItem('mushafImageStyle')||'blue';
+    var directory=style==='gold'?'mushaf-pages-gold':(style==='plain'?'mushaf-pages':'mushaf-pages-blue');
+    return directory+'/page'+pad3(page)+'.webp';
+  }
   function pageAlt(page){return 'صفحة '+arabicNumber(page)+' من المصحف الشريف'}
   function layerMarkup(className){
-    return '<div class="image-page-layer '+className+'"><div class="mushaf-image-shell"><img class="page-content-image" draggable="false" alt=""><img class="real-mushaf-border" src="mushaf-pages/mushaf-border.webp" draggable="false" alt=""></div></div>';
+    return '<div class="image-page-layer '+className+'"><div class="mushaf-image-shell"><img class="page-content-image" draggable="false" alt=""></div></div>';
   }
 
   function buildStage(){
@@ -113,37 +115,10 @@
   }
 
   renderMushafPage=renderImages;
+  window.refreshMushafImages=renderImages;
   turnTo=function(page){go(page)};
   readerNext=function(){go(state.currentPage+1)};
   readerPrev=function(){go(state.currentPage-1)};
-
-  function shortest(from,to){return ((to-from+540)%360)-180}
-  function circularSmooth(previous,next,alpha){
-    if(previous==null)return next;
-    var p=previous*Math.PI/180,n=next*Math.PI/180;
-    var x=(1-alpha)*Math.cos(p)+alpha*Math.cos(n),y=(1-alpha)*Math.sin(p)+alpha*Math.sin(n);
-    return (Math.atan2(y,x)*180/Math.PI+360)%360;
-  }
-  function compassFrame(){
-    var arrow=document.getElementById('qiblaArrow');
-    if(!arrow||compass.target==null){compass.raf=0;return}
-    if(compass.display==null)compass.display=compass.target;
-    var delta=shortest(compass.display,compass.target);
-    compass.display+=clamp(delta,-8,8)*.18;
-    arrow.style.transform='translate(-50%,-100%) rotate('+compass.display+'deg)';
-    if(Math.abs(delta)>.15)compass.raf=requestAnimationFrame(compassFrame);else compass.raf=0;
-  }
-  function updateCompass(rawHeading,accuracy){
-    var heading=Number(rawHeading);if(!Number.isFinite(heading))return;
-    compass.heading=circularSmooth(compass.heading,(heading+360)%360,.12);
-    var desired=(Number(state.qibla||0)-compass.heading+360)%360;
-    compass.target=compass.target==null?desired:(compass.target+shortest(compass.target,desired)+360)%360;
-    if(!compass.raf)compass.raf=requestAnimationFrame(compassFrame);
-    var status=document.getElementById('compassStatus');
-    if(status){if(Number(accuracy)<=0)status.textContent='حرّك الهاتف على شكل رقم ٨ لمعايرة البوصلة';else status.textContent='اتجاه الهاتف: '+arabicNumber(Math.round(compass.heading))+'°'}
-  }
-  window.onNativeHeading=function(heading,accuracy){state.nativeHeading=Number(heading);state.compassAccuracy=Number(accuracy||0);updateCompass(heading,accuracy)};
-  renderQibla=function(){oldRenderQibla();compass.heading=null;compass.target=null;compass.display=null;if(state.nativeHeading!=null)updateCompass(state.nativeHeading,state.compassAccuracy)};
 
   function refreshHome(){
     var page=document.getElementById('page-home');if(!page)return;
@@ -154,7 +129,6 @@
   showPage=function(name,push){
     oldShowPage(name,push);
     if(name==='reader')requestAnimationFrame(renderImages);
-    if(name==='qibla'){compass.heading=null;compass.target=null;compass.display=null;setTimeout(function(){if(state.nativeHeading!=null)updateCompass(state.nativeHeading,state.compassAccuracy)},80)}
   };
 
   function init(){
