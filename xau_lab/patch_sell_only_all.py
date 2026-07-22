@@ -4,11 +4,10 @@ path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
 
 # One simple, economically defensible revision based only on development and
-# validation evidence from run 100: long signals lost -16.79 USD across 18
-# trades, while all short signals were approximately breakeven (-0.11 USD)
-# before any holdout selection. Keep the same signal families and risk logic,
-# but remove the weak long side. No date-specific, weekday, or extra indicator
-# condition is introduced.
+# validation evidence: long signals were materially weaker, while the short
+# side was near breakeven before holdout selection. Keep the same signal
+# families and risk logic, but remove the weak long side. No date-specific,
+# weekday, or extra-indicator condition is introduced.
 if 'name="rev_sell_only_all"' not in text:
     boundary = text.find("\ndef in_session")
     if boundary < 0:
@@ -43,11 +42,14 @@ if 'name="rev_sell_only_all"' not in text:
 '''
     text = text[:return_pos] + candidate + text[return_pos:]
 
+# Later protocol patches append suffixes such as _cl55 to candidate names.
+# Match the stable prefix so the sell-only rule survives those harmless
+# renames. The previous exact-name comparison silently allowed long trades.
 signal_anchor = "    # Exact baseline keeps its report-driven special hour rules.\n    hour = bars.index[i].tz_convert(SERVER_TZ).hour\n"
-if 'if c.name == "rev_sell_only_all":' not in text:
+if 'c.name.startswith("rev_sell_only_all")' not in text:
     if signal_anchor not in text:
         raise SystemExit("signal anchor not found for sell-only-all revision")
-    signal_insert = '''    if c.name == "rev_sell_only_all":
+    signal_insert = '''    if c.name.startswith("rev_sell_only_all"):
         buy_trigger = False
 
     # Exact baseline keeps its report-driven special hour rules.
@@ -55,5 +57,8 @@ if 'if c.name == "rev_sell_only_all":' not in text:
 '''
     text = text.replace(signal_anchor, signal_insert, 1)
 
+# Remove the obsolete exact-name guard if an earlier run inserted it.
+text = text.replace('    if c.name == "rev_sell_only_all":\n        buy_trigger = False\n\n', '')
+
 path.write_text(text, encoding="utf-8")
-print("Added one simple revision: preserve all short signals and disable longs")
+print("Added sell-only revision with suffix-safe direction enforcement")
