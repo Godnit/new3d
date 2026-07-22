@@ -1,0 +1,304 @@
+package com.mastermedia.quranoffline;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Environment;
+import android.os.IBinder;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.net.ssl.HttpsURLConnection;
+
+public class AudioDownloadServiceV414 extends Service {
+    public static final String ACTION_DOWNLOAD = "com.mastermedia.quranoffline.DOWNLOAD_SURAH_V414";
+    public static final String ACTION_DELETE = "com.mastermedia.quranoffline.DELETE_SURAH_V414";
+    public static final String BROADCAST_DOWNLOAD = "com.mastermedia.quranoffline.AUDIO_DOWNLOAD_STATE_V414";
+    public static final String EXTRA_SURAH = "surah";
+
+    private static final String CHANNEL_ID = "quran_audio_downloads_v414";
+    private static final int NOTIFICATION_ID = 4140;
+    private static final Set<Integer> BUILT_IN = new HashSet<>();
+
+    static {
+        BUILT_IN.add(1);
+        BUILT_IN.add(2);
+        BUILT_IN.add(3);
+        BUILT_IN.add(4);
+    }
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Set<Integer> queued = java.util.Collections.synchronizedSet(new HashSet<>());
+    private final AtomicInteger pending = new AtomicInteger();
+
+    public static boolean isBuiltIn(int surah) {
+        return BUILT_IN.contains(surah);
+    }
+
+    public static File audioDirectory(Context context) {
+        File base = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+        if (base == null) base = context.getFilesDir();
+        File directory = new File(base, "adel-rayan-surahs");
+        if (!directory.exists()) directory.mkdirs();
+        return directory;
+    }
+
+    public static File audioFile(Context context, int surah) {
+        return new File(audioDirectory(context), String.format(Locale.US, "%03d.mp3", surah));
+    }
+
+    public static boolean isDownloaded(Context context, int surah) {
+        File file = audioFile(context, surah);
+        return file.isFile() && file.length() > 10_000L;
+    }
+
+    public static boolean isAvailable(Context context, int surah) {
+        return isBuiltIn(surah) || isDownloaded(context, surah);
+    }
+
+    public static boolean deleteDownloaded(Context context, int surah) {
+        if (isBuiltIn(surah)) return false;
+        File file = audioFile(context, surah);
+        File part = new File(file.getParentFile(), file.getName() + ".part");
+        if (part.exists()) part.delete();
+        return !file.exists() || file.delete();
+    }
+
+    public static String availabilityJson(Context context) {
+        JSONObject root = new JSONObject();
+        JSONArray items = new JSONArray();
+        try {
+            JSONObject manifest = readManifest(context);
+            JSONArray sources = manifest.optJSONArray("surahs");
+            for (int surah = 1; surah <= 114; surah++) {
+                JSONObject source = sources != null && sources.length() >= surah
+                        ? sources.optJSONObject(surah - 1) : null;
+                JSONObject item = new JSONObject();
+                item.put("surah", surah);
+                item.put("builtIn", isBuiltIn(surah));
+                item.put("downloaded", isDownloaded(context, surah));
+                item.put("available", isAvailable(context, surah));
+                item.put("bytes", source == null ? 0L : source.optLong("bytes", 0L));
+                File downloaded = audioFile(context, surah);
+                item.put("storedBytes", downloaded.isFile() ? downloaded.length() : 0L);
+                items.put(item);
+            }
+            root.put("reciter", manifest.optString("reciter", "عادل ريان"));
+            root.put("builtInJuz", 5);
+            root.put("items", items);
+        } catch (Exception error) {
+            try {
+                root.put("error", "تعذر قراءة قائمة ملفات الصوت");
+                root.put("items", items);
+            } catch (Exception ignored) {}
+        }
+        return root.toString();
+    }
+
+    private static JSONObject readManifest(Context context) throws Exception {
+        try (InputStream input = context.getAssets().open("audio-download-manifest.json")) {
+            byte[] buffer = new byte[16_384];
+            java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+            int count;
+            while ((count = input.read(buffer)) >= 0) output.write(buffer, 0, count);
+            return new JSONObject(output.toString(StandardCharsets.UTF_8.name()));
+        }
+    }
+
+    private static JSONObject sourceFor(Context context, int surah) throws Exception {
+        JSONArray items = readManifest(context).getJSONArray("surahs");
+        JSONObject item = items.getJSONObject(surah - 1);
+        if (item.optInt("surah") != surah) throw new IllegalStateException("Audio manifest order mismatch");
+        return item;
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        createChannel();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        String action = intent == null ? null : intent.getAction();
+        int surah = intent == null ? 0 : intent.getIntExtra(EXTRA_SURAH, 0);
+        if (surah < 1 || surah > 114) {
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+        if (ACTION_DELETE.equals(action)) {
+            boolean deleted = deleteDownloaded(this, surah);
+            broadcast(surah, deleted ? "deleted" : "error", 0, 0L, 0L,
+                    deleted ? "" : "تعذر حذف ملف السورة");
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+        if (!ACTION_DOWNLOAD.equals(action)) {
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+        if (isAvailable(this, surah)) {
+            broadcast(surah, "completed", 100, audioFile(this, surah).length(),
+                    audioFile(this, surah).length(), "");
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+        if (!queued.add(surah)) {
+            broadcast(surah, "queued", 0, 0L, 0L, "");
+            return START_NOT_STICKY;
+        }
+        pending.incrementAndGet();
+        startForeground(NOTIFICATION_ID, notification(surah, 0, true, "في انتظار تنزيل السورة"));
+        executor.execute(() -> {
+            try {
+                download(surah);
+            } finally {
+                queued.remove(surah);
+                if (pending.decrementAndGet() <= 0) {
+                    stopForeground(STOP_FOREGROUND_REMOVE);
+                    stopSelf();
+                }
+            }
+        });
+        return START_NOT_STICKY;
+    }
+
+    private void download(int surah) {
+        File destination = audioFile(this, surah);
+        File part = new File(destination.getParentFile(), destination.getName() + ".part");
+        HttpsURLConnection connection = null;
+        try {
+            JSONObject source = sourceFor(this, surah);
+            String url = source.getString("url");
+            long expectedBytes = source.optLong("bytes", 0L);
+            String expectedHash = source.optString("sha256", "");
+            if (!url.startsWith("https://")) throw new SecurityException("Only HTTPS audio sources are allowed");
+
+            broadcast(surah, "downloading", 0, 0L, expectedBytes, "");
+            NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (manager != null) manager.notify(NOTIFICATION_ID,
+                    notification(surah, 0, true, "جارٍ بدء التنزيل"));
+
+            connection = (HttpsURLConnection) new java.net.URL(url).openConnection();
+            connection.setConnectTimeout(25_000);
+            connection.setReadTimeout(45_000);
+            connection.setRequestProperty("User-Agent", "RafiqAlHuda/4.14 Android");
+            connection.setInstanceFollowRedirects(true);
+            int response = connection.getResponseCode();
+            if (response < 200 || response >= 300) throw new java.io.IOException("HTTP " + response);
+            long total = expectedBytes > 0 ? expectedBytes : connection.getContentLengthLong();
+
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            long written = 0L;
+            int lastPercent = -1;
+            if (part.exists()) part.delete();
+            try (InputStream input = new BufferedInputStream(connection.getInputStream(), 64 * 1024);
+                 BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(part), 64 * 1024)) {
+                byte[] buffer = new byte[64 * 1024];
+                int count;
+                while ((count = input.read(buffer)) >= 0) {
+                    output.write(buffer, 0, count);
+                    digest.update(buffer, 0, count);
+                    written += count;
+                    int percent = total > 0 ? (int) Math.min(99, written * 100L / total) : 0;
+                    if (percent != lastPercent) {
+                        lastPercent = percent;
+                        broadcast(surah, "downloading", percent, written, total, "");
+                        if (manager != null && (percent % 2 == 0 || percent >= 98)) {
+                            manager.notify(NOTIFICATION_ID,
+                                    notification(surah, percent, total <= 0, "جارٍ تنزيل سورة رقم " + surah));
+                        }
+                    }
+                }
+            }
+            if (expectedBytes > 0 && written != expectedBytes) {
+                throw new java.io.IOException("Downloaded size mismatch: " + written + " != " + expectedBytes);
+            }
+            String hash = hex(digest.digest());
+            if (!expectedHash.isEmpty() && !expectedHash.equalsIgnoreCase(hash)) {
+                throw new java.io.IOException("Downloaded checksum mismatch");
+            }
+            if (destination.exists() && !destination.delete()) throw new java.io.IOException("Cannot replace old file");
+            if (!part.renameTo(destination)) throw new java.io.IOException("Cannot finish downloaded file");
+            broadcast(surah, "completed", 100, written, written, "");
+            if (manager != null) manager.notify(NOTIFICATION_ID,
+                    notification(surah, 100, false, "اكتمل تنزيل السورة"));
+        } catch (Exception error) {
+            if (part.exists()) part.delete();
+            broadcast(surah, "error", 0, 0L, 0L, "فشل التنزيل. تحقق من الإنترنت ثم أعد المحاولة.");
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static String hex(byte[] bytes) {
+        StringBuilder builder = new StringBuilder(bytes.length * 2);
+        for (byte value : bytes) builder.append(String.format(Locale.US, "%02x", value & 0xff));
+        return builder.toString();
+    }
+
+    private void broadcast(int surah, String status, int progress, long bytes, long total, String error) {
+        Intent intent = new Intent(BROADCAST_DOWNLOAD).setPackage(getPackageName());
+        intent.putExtra("surah", surah);
+        intent.putExtra("status", status);
+        intent.putExtra("progress", progress);
+        intent.putExtra("bytes", bytes);
+        intent.putExtra("total", total);
+        intent.putExtra("error", error == null ? "" : error);
+        sendBroadcast(intent);
+    }
+
+    private Notification notification(int surah, int progress, boolean indeterminate, String text) {
+        Intent open = new Intent(this, MainActivityV410.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 4140, open,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder builder = new Notification.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("تنزيل تلاوة سورة رقم " + surah)
+                .setContentText(text)
+                .setContentIntent(pendingIntent)
+                .setOnlyAlertOnce(true)
+                .setOngoing(progress < 100)
+                .setShowWhen(false);
+        if (progress < 100) builder.setProgress(100, progress, indeterminate);
+        return builder.build();
+    }
+
+    private void createChannel() {
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID, "تنزيل تلاوات القرآن", NotificationManager.IMPORTANCE_LOW);
+        channel.setDescription("تنزيل السور للاستماع إليها دون إنترنت");
+        channel.setSound(null, null);
+        manager.createNotificationChannel(channel);
+    }
+
+    @Override
+    public void onDestroy() {
+        executor.shutdownNow();
+        super.onDestroy();
+    }
+
+    @Override public IBinder onBind(Intent intent) { return null; }
+}
