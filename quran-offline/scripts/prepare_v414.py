@@ -19,8 +19,7 @@ def main() -> None:
     activity = java / "MainActivityV410.java"
     reader = assets / "app-v11.js"
 
-    # Keep MainActivity's original stable compass implementation unchanged.
-    # Only update the visible reciter labels and install optional downloads.
+    # Reader/audio source patches retained from v4.14-v4.15.
     replace_exact(audio, "ياسر الدوسري", "عادل ريان", expected_min=3)
     replace_exact(audio, "import java.io.IOException;\n", "import java.io.File;\nimport java.io.IOException;\n")
 
@@ -53,6 +52,35 @@ def main() -> None:
         }'''
     replace_exact(audio, old_source, new_source)
 
+    # Native seek command used by the draggable timeline.
+    replace_exact(audio,
+                  '    public static final String ACTION_QUERY = "com.mastermedia.quranoffline.QUERY_AUDIO_V410";\n',
+                  '    public static final String ACTION_QUERY = "com.mastermedia.quranoffline.QUERY_AUDIO_V410";\n'
+                  '    public static final String ACTION_SEEK = "com.mastermedia.quranoffline.SEEK_AUDIO_V416";\n')
+    replace_exact(audio,
+                  '    public static final String EXTRA_NAME = "name";\n',
+                  '    public static final String EXTRA_NAME = "name";\n'
+                  '    public static final String EXTRA_POSITION = "position";\n')
+    replace_exact(audio,
+                  '''        } else if (ACTION_STOP.equals(action)) {
+            stopSelfSafely("");
+        } else if (ACTION_QUERY.equals(action)) {''',
+                  '''        } else if (ACTION_STOP.equals(action)) {
+            stopSelfSafely("");
+        } else if (ACTION_SEEK.equals(action)) {
+            if (active && prepared && player != null) {
+                try {
+                    int requested = intent.getIntExtra(EXTRA_POSITION, 0);
+                    int safe = Math.max(0, Math.min(duration(), requested));
+                    player.seekTo(safe);
+                    updatePlaybackState();
+                    updateNotification();
+                    broadcastState();
+                } catch (RuntimeException ignored) {}
+            }
+        } else if (ACTION_QUERY.equals(action)) {''')
+
+    # Download receiver and bridge.
     replace_exact(activity,
                   "    private boolean audioReceiverRegistered;\n",
                   "    private boolean audioReceiverRegistered;\n    private boolean audioDownloadReceiverRegistered;\n")
@@ -121,6 +149,23 @@ def main() -> None:
         }
 
         @JavascriptInterface
+        public void seekAudio(int positionMillis) {
+            int safe = Math.max(0, positionMillis);
+            Intent intent = new Intent(MainActivityV410.this, AudioServiceV410.class)
+                    .setAction(AudioServiceV410.ACTION_SEEK)
+                    .putExtra(AudioServiceV410.EXTRA_POSITION, safe);
+            startAudioService(intent, false);
+        }
+
+        @JavascriptInterface
+        public void refreshCompassLocation() {
+            runOnUiThread(() -> {
+                updateFromLastKnownLocation();
+                requestFreshCompassLocation();
+            });
+        }
+
+        @JavascriptInterface
         public void requestNotificationPermission() {'''
     replace_exact(activity, bridge_anchor, bridge_methods)
 
@@ -139,6 +184,104 @@ def main() -> None:
             audioDownloadReceiverRegistered = false;
         }
         if (webView != null) {''')
+
+    # Fresh location is used for both geomagnetic declination and the JS Qibla
+    # bearing. This avoids a stale saved city being combined with a current sensor.
+    replace_exact(activity,
+                  'import android.location.Location;\nimport android.location.LocationManager;\n',
+                  'import android.location.Location;\nimport android.location.LocationListener;\nimport android.location.LocationManager;\n')
+    replace_exact(activity,
+                  'import android.os.Bundle;\nimport android.os.SystemClock;\n',
+                  'import android.os.Bundle;\nimport android.os.Looper;\nimport android.os.SystemClock;\n')
+    replace_exact(activity,
+                  '''        } else {
+            updateFromLastKnownLocation();
+        }
+
+        IntentFilter audioFilter''',
+                  '''        } else {
+            updateFromLastKnownLocation();
+            requestFreshCompassLocation();
+        }
+
+        IntentFilter audioFilter''')
+    replace_exact(activity,
+                  '''    @Override
+    protected void onResume() {
+        super.onResume();
+        filteredHeading = Float.NaN;
+        updateFromLastKnownLocation();''',
+                  '''    @Override
+    protected void onResume() {
+        super.onResume();
+        filteredHeading = Float.NaN;
+        updateFromLastKnownLocation();
+        requestFreshCompassLocation();''')
+
+    method_anchor = '''    @Override
+    protected void onResume() {'''
+    fresh_method = '''    private void deliverFreshCompassLocation(Location location) {
+        if (location == null) return;
+        updateDeclination((float) location.getLatitude(), (float) location.getLongitude(),
+                (float) location.getAltitude(), true);
+        if (webView != null) {
+            final double latitude = location.getLatitude();
+            final double longitude = location.getLongitude();
+            final double altitude = location.getAltitude();
+            final float accuracy = location.hasAccuracy() ? location.getAccuracy() : -1f;
+            webView.post(() -> webView.evaluateJavascript(
+                    "window.onNativeCompassLocation&&window.onNativeCompassLocation(" +
+                            String.format(Locale.US, "%.7f", latitude) + "," +
+                            String.format(Locale.US, "%.7f", longitude) + "," +
+                            String.format(Locale.US, "%.2f", altitude) + "," +
+                            String.format(Locale.US, "%.1f", accuracy) + ")", null));
+        }
+    }
+
+    private void requestFreshCompassLocation() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED &&
+                checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        != PackageManager.PERMISSION_GRANTED) return;
+        try {
+            LocationManager manager = (LocationManager) getSystemService(LOCATION_SERVICE);
+            if (manager == null) return;
+            String provider = null;
+            if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                provider = LocationManager.GPS_PROVIDER;
+            } else if (manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                provider = LocationManager.NETWORK_PROVIDER;
+            }
+            if (provider == null) return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                manager.getCurrentLocation(provider, null, getMainExecutor(), this::deliverFreshCompassLocation);
+            } else {
+                manager.requestSingleUpdate(provider, new LocationListener() {
+                    @Override public void onLocationChanged(Location location) {
+                        deliverFreshCompassLocation(location);
+                    }
+                    @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
+                    @Override public void onProviderEnabled(String provider) {}
+                    @Override public void onProviderDisabled(String provider) {}
+                }, Looper.getMainLooper());
+            }
+        } catch (SecurityException | RuntimeException ignored) {}
+    }
+
+    @Override
+    protected void onResume() {'''
+    replace_exact(activity, method_anchor, fresh_method)
+
+    replace_exact(activity,
+                  '''        if (requestCode == LOCATION_REQUEST) {
+            updateFromLastKnownLocation();
+            if (webView != null) webView.reload();
+        }''',
+                  '''        if (requestCode == LOCATION_REQUEST) {
+            updateFromLastKnownLocation();
+            requestFreshCompassLocation();
+            if (webView != null) webView.reload();
+        }''')
 
     old_page_source = '''  function pageSource(page){
     var style=localStorage.getItem('mushafImageStyle')||'blue';
