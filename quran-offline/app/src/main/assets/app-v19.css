@@ -86,7 +86,7 @@ body.audio-page-active,body.audio-page-active .app,body.audio-page-active main,b
 #audioSeekRange{
   display:block;width:100%;height:28px;margin:0;appearance:none;-webkit-appearance:none;background:transparent;touch-action:none;cursor:pointer;
 }
-#audioSeekRange::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:linear-gradient(to right,var(--accent) 0,var(--accent) calc(var(--seek-progress,0)*1%),#56756b calc(var(--seek-progress,0)*1%),#56756b 100%)}
+#audioSeekRange::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:linear-gradient(to right,var(--accent) 0,var(--accent) var(--seek-progress,0%),#56756b var(--seek-progress,0%),#56756b 100%)}
 #audioSeekRange::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;margin-top:-7px;border-radius:50%;border:3px solid #fff;background:var(--accent);box-shadow:0 2px 7px rgba(0,0,0,.35)}
 #audioSeekRange::-moz-range-track{height:6px;border-radius:999px;background:#56756b}
 #audioSeekRange::-moz-range-progress{height:6px;border-radius:999px;background:var(--accent)}
