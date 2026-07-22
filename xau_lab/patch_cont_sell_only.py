@@ -8,8 +8,14 @@ text = path.read_text(encoding="utf-8")
 # expectancy, while continuation sells were the only signal family with
 # non-negative expectancy. Test a sell-only trend-continuation candidate rather
 # than adding another indicator or date-specific exception.
-marker = "    return out\n\n\ndef in_session"
-insert = '''    out.append(
+if 'name="rev_cont_sell_only"' not in text:
+    boundary = text.find("\ndef in_session")
+    if boundary < 0:
+        raise SystemExit("in_session boundary not found for sell-only revision")
+    return_pos = text.rfind("    return out", 0, boundary)
+    if return_pos < 0:
+        raise SystemExit("final candidate return not found for sell-only revision")
+    candidate = '''    out.append(
         replace(
             base,
             name="rev_cont_sell_only",
@@ -31,27 +37,21 @@ insert = '''    out.append(
             close_extreme_fraction=0.65,
         )
     )
-    return out
-
-
-def in_session'''
-if marker not in text:
-    raise SystemExit("candidate return marker not found for sell-only revision")
-text = text.replace(marker, insert, 1)
-
-signal_marker = '''    # Exact baseline keeps its report-driven special hour rules.
-    hour = bars.index[i].tz_convert(SERVER_TZ).hour
 '''
-signal_insert = '''    if c.name == "rev_cont_sell_only":
+    text = text[:return_pos] + candidate + text[return_pos:]
+
+signal_anchor = "    # Exact baseline keeps its report-driven special hour rules.\n    hour = bars.index[i].tz_convert(SERVER_TZ).hour\n"
+if 'if c.name == "rev_cont_sell_only":' not in text:
+    if signal_anchor not in text:
+        raise SystemExit("signal anchor not found for sell-only revision")
+    signal_insert = '''    if c.name == "rev_cont_sell_only":
         buy_trigger = False
         sell_trigger = cont_sell
 
     # Exact baseline keeps its report-driven special hour rules.
     hour = bars.index[i].tz_convert(SERVER_TZ).hour
 '''
-if signal_marker not in text:
-    raise SystemExit("signal marker not found for sell-only revision")
-text = text.replace(signal_marker, signal_insert, 1)
+    text = text.replace(signal_anchor, signal_insert, 1)
 
 path.write_text(text, encoding="utf-8")
 print("Added one simple revision: continuation-sell-only candidate")
