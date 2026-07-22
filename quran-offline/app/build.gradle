@@ -10,9 +10,9 @@ android {
         applicationId 'com.mastermedia.quranoffline.lite'
         minSdk 26
         targetSdk 35
-        // Previous signed release: versionCode 16, versionName '4.12.0'
-        versionCode 17
-        versionName '4.13.0'
+        // Previous signed release: versionCode 17, versionName '4.13.0'
+        versionCode 18
+        versionName '4.14.0'
         resourceConfigurations += ['ar']
     }
 
@@ -26,8 +26,8 @@ android {
     }
 
     androidResources {
-        // Audio must remain uncompressed so MediaPlayer can open it directly
-        // from the APK through AssetFileDescriptor.
+        // Built-in Opus audio stays uncompressed so MediaPlayer can open it
+        // directly from the APK through AssetFileDescriptor.
         noCompress += ['ogg']
     }
 
