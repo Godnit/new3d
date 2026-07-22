@@ -1,4 +1,4 @@
-name: Build Rafiq Al-Huda v4.12 Adel Rayan Offline APK
+name: Build Rafiq Al-Huda v4.14 Compact Downloadable Audio APK
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
       - ".github/workflows/quran-apk.yml"
 
 concurrency:
-  group: rafiq-v412-${{ github.ref }}
+  group: rafiq-v414-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -46,15 +46,16 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Apply v4.12 native reader and compass patch
+      - name: Apply v4.14 native patches
         run: |
           set -euxo pipefail
-          python3 quran-offline/scripts/prepare_v412.py
-          grep -q 'عادل ريان' quran-offline/app/src/main/java/com/mastermedia/quranoffline/AudioServiceV410.java
+          python3 quran-offline/scripts/prepare_v414.py
+          grep -q 'AudioDownloadServiceV414' quran-offline/app/src/main/java/com/mastermedia/quranoffline/MainActivityV410.java
+          grep -q 'AudioDownloadServiceV414.audioFile' quran-offline/app/src/main/java/com/mastermedia/quranoffline/AudioServiceV410.java
           grep -q 'COMPASS_DISPATCH_INTERVAL_MS = 35L' quran-offline/app/src/main/java/com/mastermedia/quranoffline/MainActivityV410.java
-          grep -q 'SENSOR_DELAY_GAME' quran-offline/app/src/main/java/com/mastermedia/quranoffline/MainActivityV410.java
+          grep -q "return 'mushaf-pages/page'" quran-offline/app/src/main/assets/app-v11.js
 
-      - name: Prepare Quran, Mushaf, hadith and adhan
+      - name: Prepare compact Quran, Mushaf, hadith and adhan
         shell: bash
         run: |
           set -euxo pipefail
@@ -68,7 +69,7 @@ jobs:
           TMP="$DATA/mushaf-source"
           mkdir -p "$ASSETS/fonts" "$RAW" "$PAGES" "$QCF" "$HADITH" "$MUSHAF" "$TMP"
           rm -f "$PAGES"/*.json "$QCF"/*.json "$MUSHAF"/* "$RAW/adhan_short.ogg"
-          rm -rf "$TMP"/*
+          rm -rf "$ASSETS/mushaf-pages-blue" "$ASSETS/mushaf-pages-gold" "$TMP"/*
 
           curl -fsSL --retry 5 "https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json" -o "$ASSETS/quran.json"
           curl -fsSL --retry 5 "https://unpkg.com/adhan@4.4.4/lib/bundles/adhan.umd.min.js" -o "$ASSETS/adhan.umd.min.js"
@@ -97,7 +98,7 @@ jobs:
           python3 quran-offline/scripts/build_offline_assets.py --assets "$ASSETS" --pages "$PAGES" --qcf-pages "$QCF" --hadith "$HADITH"
           python3 quran-offline/scripts/curate_hadith.py "$ASSETS/hadith.json"
 
-      - name: Resolve Adel Rayan complete recitation source
+      - name: Resolve Adel Rayan source
         shell: bash
         run: |
           set -euxo pipefail
@@ -108,49 +109,31 @@ jobs:
           python3 - <<'PY'
           import json, re, unicodedata
           from pathlib import Path
-
-          data = json.loads(Path('quran-offline/build-data/mp3quran-reciter-list.json').read_text(encoding='utf-8'))
-
-          def normalize(value):
-              value = unicodedata.normalize('NFKD', str(value or ''))
-              value = ''.join(ch for ch in value if not unicodedata.combining(ch))
-              value = re.sub(r'[^\u0621-\u064A]+', '', value)
-              return value.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ى','ي')
-
-          wanted = normalize('عادل ريان')
-          matches = [r for r in data.get('reciters', []) if normalize(r.get('name')) == wanted]
-          if not matches:
-              raise RuntimeError('Adel Rayan was not found in MP3Quran API')
-
-          selected = None
-          for reciter in matches:
-              for moshaf in reciter.get('moshaf', []):
-                  surahs = {int(x) for x in str(moshaf.get('surah_list','')).split(',') if x.strip().isdigit()}
-                  if int(moshaf.get('surah_total') or 0) == 114 and surahs == set(range(1,115)):
-                      selected = (reciter, moshaf)
-                      break
-              if selected:
-                  break
-          if not selected:
-              raise RuntimeError('No complete 114-surah Adel Rayan Mushaf was found')
-
-          reciter, moshaf = selected
-          server = str(moshaf['server']).strip()
-          if not server.endswith('/'):
-              server += '/'
-          env = Path('quran-offline/build-data/adel-source.env')
-          env.write_text(
-              f"ADEL_SERVER={server}\nRECITER_API_NAME={reciter['name']}\nRECITER_MOSHAF={moshaf['name']}\n",
-              encoding='utf-8'
-          )
-          print(f"reciter={reciter['name']}")
-          print(f"moshaf={moshaf['name']}")
-          print(f"server={server}")
+          data=json.loads(Path('quran-offline/build-data/mp3quran-reciter-list.json').read_text(encoding='utf-8'))
+          def norm(v):
+              v=unicodedata.normalize('NFKD',str(v or ''))
+              v=''.join(c for c in v if not unicodedata.combining(c))
+              v=re.sub(r'[^\u0621-\u064A]+','',v)
+              return v.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ى','ي')
+          selected=None
+          for reciter in data.get('reciters',[]):
+              if norm(reciter.get('name'))!=norm('عادل ريان'): continue
+              for moshaf in reciter.get('moshaf',[]):
+                  surahs={int(x) for x in str(moshaf.get('surah_list','')).split(',') if x.strip().isdigit()}
+                  if int(moshaf.get('surah_total') or 0)==114 and surahs==set(range(1,115)):
+                      selected=(reciter,moshaf);break
+              if selected: break
+          if not selected: raise RuntimeError('No complete Adel Rayan Mushaf found')
+          reciter,moshaf=selected
+          server=str(moshaf['server']).strip()
+          if not server.endswith('/'): server+='/'
+          Path('quran-offline/build-data/adel-source.env').write_text(
+              f"ADEL_SERVER={server}\nRECITER_API_NAME={reciter['name']}\nRECITER_MOSHAF={moshaf['name']}\n",encoding='utf-8')
+          print(server)
           PY
-          cat "$DATA/adel-source.env"
           cat "$DATA/adel-source.env" >> "$GITHUB_ENV"
 
-      - name: Download complete Adel Rayan recitation
+      - name: Download and inspect all source Surahs
         shell: bash
         run: |
           set -euxo pipefail
@@ -159,188 +142,122 @@ jobs:
           export SOURCE ADEL_SERVER
           seq -w 1 114 | xargs -P 4 -I{} bash -c '
             set -euo pipefail
-            N="{}"
-            INPUT="$SOURCE/$N.source"
-            URL="${ADEL_SERVER}${N}.mp3"
+            N="{}"; INPUT="$SOURCE/$N.source"; URL="${ADEL_SERVER}${N}.mp3"
             curl -fL --retry 8 --retry-all-errors --connect-timeout 20 --max-time 1800 -A "Mozilla/5.0" "$URL" -o "$INPUT"
             test -s "$INPUT"
             ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" >/dev/null
-            printf "surah=%s source=mp3quran url=%s\n" "$N" "$URL" > "$SOURCE/$N.source.txt"
+            printf "%s" "$URL" > "$SOURCE/$N.url"
           '
           test "$(find "$SOURCE" -type f -name '*.source' | wc -l)" -eq 114
-          test "$(find "$SOURCE" -type f -name '*.source.txt' | wc -l)" -eq 114
 
-      - name: Plan compact high-clarity Opus bitrate
+      - name: Plan matching compact Opus quality
         shell: bash
         run: |
           set -euxo pipefail
           python3 - <<'PY'
-          import json, subprocess
+          import json,subprocess
           from pathlib import Path
-
-          source = Path('quran-offline/build-data/adel-rayan-source')
-          durations = []
-          for number in range(1, 115):
-              path = source / f'{number:03d}.source'
-              probe = json.loads(subprocess.check_output([
-                  'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-                  '-of', 'json', str(path)
-              ], text=True))
-              duration = float(probe['format']['duration'])
-              if duration < 8:
-                  raise RuntimeError(f'Suspiciously short source: {path} ({duration}s)')
-              durations.append(duration)
-
-          total_seconds = sum(durations)
-          if not 20 * 3600 < total_seconds < 40 * 3600:
-              raise RuntimeError(f'Unexpected complete-recitation duration: {total_seconds / 3600:.3f}h')
-
-          target_bytes = 112 * 1024 * 1024
-          bitrate = round((target_bytes * 8 / total_seconds) / 100) * 100
-          bitrate = max(10000, min(14000, bitrate))
-          Path('quran-offline/build-data/audio-plan.env').write_text(
-              f'OPUS_BITRATE={bitrate}\nTOTAL_SOURCE_SECONDS={total_seconds:.6f}\n',
-              encoding='utf-8'
-          )
-          print(f'total_source_hours={total_seconds/3600:.3f}')
-          print(f'opus_target_bitrate={bitrate}')
+          source=Path('quran-offline/build-data/adel-rayan-source')
+          durations=[]
+          for n in range(1,115):
+              data=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','json',str(source/f'{n:03d}.source')],text=True))
+              durations.append(float(data['format']['duration']))
+          total=sum(durations)
+          if not 20*3600<total<40*3600: raise RuntimeError(total)
+          bitrate=round(((112*1024*1024)*8/total)/100)*100
+          bitrate=max(10000,min(14000,bitrate))
+          Path('quran-offline/build-data/audio-plan.env').write_text(f'OPUS_BITRATE={bitrate}\nTOTAL_SOURCE_SECONDS={total:.6f}\n',encoding='utf-8')
+          print('hours=',total/3600,'bitrate=',bitrate)
           PY
-          cat quran-offline/build-data/audio-plan.env
           cat quran-offline/build-data/audio-plan.env >> "$GITHUB_ENV"
 
-      - name: Encode Adel Rayan clear compact Opus audio
-        shell: bash
-        run: |
-          set -euxo pipefail
-          ASSETS="quran-offline/app/src/main/assets"
-          SOURCE="quran-offline/build-data/adel-rayan-source"
-          AUDIO="$ASSETS/quran-audio"
-          rm -rf "$AUDIO" && mkdir -p "$AUDIO"
-          export SOURCE AUDIO OPUS_BITRATE
-          seq -w 1 114 | xargs -P 6 -I{} bash -c '
-            set -euo pipefail
-            N="{}"
-            TMP="$AUDIO/$N.tmp.ogg"
-            ffmpeg -nostdin -hide_banner -loglevel error -y -i "$SOURCE/$N.source" \
-              -map_metadata -1 -vn -ac 1 -ar 24000 -c:a libopus \
-              -application audio -frame_duration 40 -b:a "$OPUS_BITRATE" \
-              -vbr on -compression_level 10 -packet_loss 0 -fec 0 "$TMP"
-            test -s "$TMP"
-            mv "$TMP" "$AUDIO/$N.ogg"
-          '
-          test "$(find "$AUDIO" -type f -name '*.ogg' | wc -l)" -eq 114
-
-      - name: Validate every source and encoded Surah
+      - name: Encode built-in Surahs covering first five Juz
         shell: bash
         run: |
           set -euxo pipefail
           SOURCE="quran-offline/build-data/adel-rayan-source"
           AUDIO="quran-offline/app/src/main/assets/quran-audio"
-          export SOURCE AUDIO
-          seq -w 1 114 | xargs -P 6 -I{} bash -c '
+          rm -rf "$AUDIO" && mkdir -p "$AUDIO"
+          export SOURCE AUDIO OPUS_BITRATE
+          seq -w 1 4 | xargs -P 4 -I{} bash -c '
             set -euo pipefail
-            N="{}"
-            ffmpeg -nostdin -hide_banner -loglevel error -v error -i "$SOURCE/$N.source" -f null -
-            ffmpeg -nostdin -hide_banner -loglevel error -v error -i "$AUDIO/$N.ogg" -f null -
+            N="{}"; TMP="$AUDIO/$N.tmp.ogg"
+            ffmpeg -nostdin -hide_banner -loglevel error -y -i "$SOURCE/$N.source" \
+              -map_metadata -1 -vn -ac 1 -ar 24000 -c:a libopus -application audio \
+              -frame_duration 40 -b:a "$OPUS_BITRATE" -vbr on -compression_level 10 \
+              -packet_loss 0 -fec 0 "$TMP"
+            test -s "$TMP"; mv "$TMP" "$AUDIO/$N.ogg"
           '
+          test "$(find "$AUDIO" -type f -name '*.ogg' | wc -l)" -eq 4
+
+      - name: Build verified download manifest and validate audio
+        shell: bash
+        run: |
+          set -euxo pipefail
           python3 - <<'PY'
-          import hashlib, json, subprocess
+          import hashlib,json,subprocess
           from pathlib import Path
-
-          source = Path('quran-offline/build-data/adel-rayan-source')
-          audio = Path('quran-offline/app/src/main/assets/quran-audio')
-          manifest = []
-          total_source = total_output = 0.0
-          total_bytes = 0
-
-          def duration(path: Path) -> float:
-              probe = json.loads(subprocess.check_output([
-                  'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-                  '-of', 'json', str(path)
-              ], text=True))
-              return float(probe['format']['duration'])
-
-          for number in range(1, 115):
-              src = source / f'{number:03d}.source'
-              out = audio / f'{number:03d}.ogg'
-              src_duration = duration(src)
-              out_duration = duration(out)
-              if abs(src_duration - out_duration) > 0.25:
-                  raise RuntimeError(f'Duration mismatch for Surah {number:03d}: {src_duration} vs {out_duration}')
-              size = out.stat().st_size
-              if size < 10000:
-                  raise RuntimeError(f'Encoded file too small: {out} ({size} bytes)')
-              manifest.append({
-                  'surah': number,
-                  'reciter': 'عادل ريان',
-                  'source': (source / f'{number:03d}.source.txt').read_text(encoding='utf-8').strip(),
-                  'source_duration': src_duration,
-                  'output_duration': out_duration,
-                  'bytes': size,
-                  'sha256': hashlib.sha256(out.read_bytes()).hexdigest(),
-              })
-              total_source += src_duration
-              total_output += out_duration
-              total_bytes += size
-
-          audio_mib = total_bytes / 1048576
-          if not 104 <= audio_mib <= 126:
-              raise RuntimeError(f'Audio package outside target: {audio_mib:.3f} MiB')
-          if abs(total_source - total_output) > 1.0:
-              raise RuntimeError('Total encoded duration does not match the source')
-
-          plan = Path('quran-offline/build-data/audio-plan.env').read_text(encoding='utf-8')
-          target_bitrate = int(plan.split('OPUS_BITRATE=')[1].splitlines()[0])
-          Path('quran-offline/app/src/main/assets/quran-audio-manifest.json').write_text(
-              json.dumps({
-                  'reciter': 'عادل ريان',
-                  'surahs': manifest,
-                  'total_source_seconds': total_source,
-                  'total_output_seconds': total_output,
-                  'total_bytes': total_bytes,
-                  'target_bitrate': target_bitrate,
-              }, ensure_ascii=False, indent=2),
-              encoding='utf-8'
-          )
-          print(f'audio_files={len(manifest)}')
-          print(f'audio_hours={total_output/3600:.3f}')
-          print(f'audio_MiB={audio_mib:.3f}')
+          source=Path('quran-offline/build-data/adel-rayan-source')
+          audio=Path('quran-offline/app/src/main/assets/quran-audio')
+          assets=Path('quran-offline/app/src/main/assets')
+          def duration(path):
+              d=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','json',str(path)],text=True))
+              return float(d['format']['duration'])
+          items=[]
+          for n in range(1,115):
+              src=source/f'{n:03d}.source'
+              if src.stat().st_size<10000: raise RuntimeError(src)
+              items.append({'surah':n,'url':(source/f'{n:03d}.url').read_text(),'bytes':src.stat().st_size,'sha256':hashlib.sha256(src.read_bytes()).hexdigest(),'duration':duration(src)})
+          built=[]
+          for n in range(1,5):
+              out=audio/f'{n:03d}.ogg'
+              subprocess.check_call(['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-i',str(out),'-f','null','-'])
+              if abs(duration(out)-items[n-1]['duration'])>.25: raise RuntimeError(f'duration mismatch {n}')
+              built.append({'surah':n,'bytes':out.stat().st_size,'sha256':hashlib.sha256(out.read_bytes()).hexdigest(),'duration':duration(out)})
+          built_bytes=sum(x['bytes'] for x in built)
+          if not 10*1048576<built_bytes<30*1048576: raise RuntimeError(f'Unexpected built-in audio size {built_bytes/1048576:.2f} MiB')
+          manifest={'reciter':'عادل ريان','built_in_surahs':[1,2,3,4],'built_in_covers_juz':5,'note':'Surah An-Nisa is included completely to avoid cutting a Surah at the end of Juz 5.','surahs':items}
+          (assets/'audio-download-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+          (assets/'quran-audio-manifest.json').write_text(json.dumps({'reciter':'عادل ريان','built_in_surahs':built,'total_bytes':built_bytes},ensure_ascii=False,indent=2),encoding='utf-8')
+          print('built_in_audio_MiB=',built_bytes/1048576)
           PY
-          cat > "quran-offline/app/src/main/assets/AUDIO_SOURCE_NOTICE.txt" <<'NOTICE'
-          Offline recitation: Adel Rayan (Hafs, Murattal), downloaded during the private test build from the MP3Quran API source. Audio ownership remains with the reciter, studios and original source. Confirm redistribution permission before any public or commercial release.
+          cat > quran-offline/app/src/main/assets/AUDIO_SOURCE_NOTICE.txt <<'NOTICE'
+          Built-in audio contains Surahs 1-4. Other Surahs are downloaded only when the user taps Download, verified by SHA-256, and stored in the app-specific music directory. Source: MP3Quran Adel Rayan Mushaf. Confirm redistribution permission before public or commercial release.
           NOTICE
 
-      - name: Validate essential v4.12 files
+      - name: Validate essential v4.14 files and compact targets
         shell: bash
         run: |
           set -euxo pipefail
           ASSETS="quran-offline/app/src/main/assets"
-          for file in app-v11.js app-v12.js app-v13.js app-v14.js app-v15.js app-v16.js; do node --check "$ASSETS/$file"; done
+          for file in app-v11.js app-v12.js app-v13.js app-v14.js app-v15.js app-v16.js app-v17.js; do node --check "$ASSETS/$file"; done
           test "$(find "$ASSETS/mushaf-pages" -name 'page*.webp' | wc -l)" -eq 604
-          test "$(find "$ASSETS/quran-audio" -name '*.ogg' | wc -l)" -eq 114
+          test ! -d "$ASSETS/mushaf-pages-blue"
+          test ! -d "$ASSETS/mushaf-pages-gold"
+          test "$(find "$ASSETS/quran-audio" -name '*.ogg' | wc -l)" -eq 4
+          test -s "$ASSETS/audio-download-manifest.json"
+          test -s "$ASSETS/quran-audio-manifest.json"
           test -s "$ASSETS/quran.json"
           test -s "$ASSETS/hadith.json"
-          test -s "$ASSETS/quran-audio-manifest.json"
-          test -s "$ASSETS/mushaf-blue-frame.svg"
-          test -s "$ASSETS/mushaf-gold-frame.svg"
           test -s quran-offline/app/src/main/res/raw/adhan_short.ogg
-          grep -q 'app-v16.js' "$ASSETS/app-v7.js"
-          grep -q 'app-v16.css' "$ASSETS/app-v7.js"
-          grep -q "versionCode 16" quran-offline/app/build.gradle
-          grep -q "versionName '4.12.0'" quran-offline/app/build.gradle
+          grep -q 'app-v17.js' "$ASSETS/app-v7.js"
+          grep -q 'app-v17.css' "$ASSETS/app-v7.js"
+          grep -q "versionCode 18" quran-offline/app/build.gradle
+          grep -q "versionName '4.14.0'" quran-offline/app/build.gradle
           grep -q "applicationId 'com.mastermedia.quranoffline.lite'" quran-offline/app/build.gradle
+          grep -q 'android.permission.INTERNET' quran-offline/app/src/main/AndroidManifest.xml
+          grep -q 'AudioDownloadServiceV414' quran-offline/app/src/main/AndroidManifest.xml
           python3 - <<'PY'
           import json
           from pathlib import Path
-          assets = Path('quran-offline/app/src/main/assets')
-          hadith = json.load(open(assets/'hadith.json', encoding='utf-8'))
-          manifest = json.load(open(assets/'quran-audio-manifest.json', encoding='utf-8'))
-          assert len(hadith) > 100
-          assert manifest['reciter'] == 'عادل ريان'
-          assert len(manifest['surahs']) == 114
-          print('hadith_count=', len(hadith))
-          print('mushaf_MiB=', sum(p.stat().st_size for p in (assets/'mushaf-pages').glob('*.webp'))/1048576)
-          print('audio_MiB=', manifest['total_bytes']/1048576)
+          a=Path('quran-offline/app/src/main/assets')
+          m=json.load(open(a/'audio-download-manifest.json',encoding='utf-8'))
+          assert m['built_in_surahs']==[1,2,3,4] and len(m['surahs'])==114
+          pages=sum(p.stat().st_size for p in (a/'mushaf-pages').glob('*.webp'))
+          audio=sum(p.stat().st_size for p in (a/'quran-audio').glob('*.ogg'))
+          print('mushaf_MiB=',pages/1048576,'built_in_audio_MiB=',audio/1048576)
+          assert pages<45*1048576
+          assert audio<30*1048576
           PY
 
       - name: Build optimized release APK
@@ -359,57 +276,49 @@ jobs:
           set -euo pipefail
           BT="$ANDROID_HOME/build-tools/35.0.0"
           UNSIGNED="quran-offline/app/build/outputs/apk/release/app-release-unsigned.apk"
-          ALIGNED="$RUNNER_TEMP/Rafiq-AlHuda-v4.12-Adel-Rayan-Offline-aligned-unsigned.apk"
-          SIGNED="Rafiq-AlHuda-v4.12-Adel-Rayan-Offline.apk"
-          UNSIGNED_FINAL="Rafiq-AlHuda-v4.12-Adel-Rayan-Offline-unsigned-aligned.apk"
+          ALIGNED="$RUNNER_TEMP/Rafiq-AlHuda-v4.14-Compact-aligned-unsigned.apk"
+          SIGNED="Rafiq-AlHuda-v4.14-Compact.apk"
+          UNSIGNED_FINAL="Rafiq-AlHuda-v4.14-Compact-unsigned-aligned.apk"
           test -f "$UNSIGNED"
           unzip -t "$UNSIGNED" >/dev/null
           "$BT/zipalign" -f -p 4 "$UNSIGNED" "$ALIGNED"
           "$BT/zipalign" -c -v 4 "$ALIGNED"
-
           if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$RELEASE_KEYSTORE_PASSWORD" ] && [ -n "$RELEASE_KEY_ALIAS" ] && [ -n "$RELEASE_KEY_PASSWORD" ]; then
             KEYSTORE="$RUNNER_TEMP/release-keystore.p12"
             printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
-            test -s "$KEYSTORE"
-            "$BT/apksigner" sign \
-              --ks "$KEYSTORE" \
-              --ks-pass "pass:$RELEASE_KEYSTORE_PASSWORD" \
-              --ks-key-alias "$RELEASE_KEY_ALIAS" \
-              --key-pass "pass:$RELEASE_KEY_PASSWORD" \
-              --out "$SIGNED" "$ALIGNED"
+            "$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass "pass:$RELEASE_KEYSTORE_PASSWORD" --ks-key-alias "$RELEASE_KEY_ALIAS" --key-pass "pass:$RELEASE_KEY_PASSWORD" --out "$SIGNED" "$ALIGNED"
             "$BT/apksigner" verify --verbose --print-certs "$SIGNED" | tee signing-report.txt
-            FINAL_PATH="$SIGNED"
-            SIGNED_STATE=true
-            rm -f "$KEYSTORE"
+            FINAL_PATH="$SIGNED"; SIGNED_STATE=true; rm -f "$KEYSTORE"
           else
             cp "$ALIGNED" "$UNSIGNED_FINAL"
-            printf '%s\n' 'NOT SIGNED: release key secrets are not configured; sign locally with the existing private key.' | tee signing-report.txt
-            FINAL_PATH="$UNSIGNED_FINAL"
-            SIGNED_STATE=false
+            printf '%s\n' 'NOT SIGNED: sign locally with the existing private key.' | tee signing-report.txt
+            FINAL_PATH="$UNSIGNED_FINAL"; SIGNED_STATE=false
           fi
-
           unzip -t "$FINAL_PATH" >/dev/null
           unzip -l "$FINAL_PATH" > apk-contents.txt
           grep -q 'assets/quran-audio/001.ogg' apk-contents.txt
-          grep -q 'assets/quran-audio/114.ogg' apk-contents.txt
-          grep -q 'assets/quran-audio-manifest.json' apk-contents.txt
+          grep -q 'assets/quran-audio/004.ogg' apk-contents.txt
+          ! grep -q 'assets/quran-audio/005.ogg' apk-contents.txt
+          grep -q 'assets/audio-download-manifest.json' apk-contents.txt
           grep -q 'assets/mushaf-pages/page604.webp' apk-contents.txt
-          grep -q 'assets/app-v16.js' apk-contents.txt
-          grep -q 'assets/mushaf-gold-frame.svg' apk-contents.txt
+          grep -q 'assets/app-v17.js' apk-contents.txt
+          BYTES=$(stat -c %s "$FINAL_PATH")
+          test "$BYTES" -lt $((130*1024*1024))
           sha256sum "$FINAL_PATH" | tee SHA256SUMS.txt
-          stat -c 'APK bytes: %s' "$FINAL_PATH" | tee APK-SIZE.txt
+          printf 'APK bytes: %s\n' "$BYTES" | tee APK-SIZE.txt
           echo "final_path=$FINAL_PATH" >> "$GITHUB_OUTPUT"
           echo "signed=$SIGNED_STATE" >> "$GITHUB_OUTPUT"
 
       - name: Upload verified APK build
         uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v4.12-Adel-Rayan-Offline-Build
+          name: Rafiq-AlHuda-v4.14-Compact-Downloadable-Audio-Build
           path: |
             ${{ steps.package.outputs.final_path }}
             SHA256SUMS.txt
             APK-SIZE.txt
             signing-report.txt
             quran-offline/app/src/main/assets/quran-audio-manifest.json
+            quran-offline/app/src/main/assets/audio-download-manifest.json
           if-no-files-found: error
           retention-days: 30
