@@ -1,7 +1,7 @@
 (function(){
   'use strict';
 
-  /* v4.8 — selected hadiths on home, original Mushaf image only, and final offline labels. */
+  /* v4.13 — selected hadiths and cleanup of obsolete runtime Mushaf overlays. */
   var selectedHadiths=[];
   var selectedIndex=0;
   var hadithPolls=0;
@@ -102,16 +102,9 @@
   };
 
   function removeAddedMushafFrames(){
-    document.documentElement.dataset.originalMushaf='1';
-    var frames=document.querySelectorAll('.real-mushaf-border,.page-curl');
+    delete document.documentElement.dataset.originalMushaf;
+    var frames=document.querySelectorAll('.real-mushaf-border,.mushaf-theme-frame,.page-curl');
     for(var i=0;i<frames.length;i++)frames[i].remove();
-    var shells=document.querySelectorAll('.mushaf-image-shell');
-    for(var j=0;j<shells.length;j++){
-      shells[j].style.background='#fff';
-      shells[j].style.padding='0';
-      shells[j].style.border='0';
-      shells[j].style.boxShadow='none';
-    }
   }
 
   function improvePrayerSetting(){
