@@ -1,4 +1,5 @@
 from pathlib import Path
+import runpy
 
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
@@ -34,3 +35,9 @@ def candidates() -> list[Candidate]:
 text = text.replace(marker, wrapper + marker, 1)
 path.write_text(text, encoding="utf-8")
 print("Applied one strategy revision: close-location threshold 0.65 -> 0.55")
+
+# The prior run has now been audited. Execute exactly one new economically
+# defensible strategy revision (continuation sells only) and rotate the already
+# inspected holdout to fresh non-Headway periods before the next run.
+runpy.run_path("xau_lab/patch_cont_sell_only.py", run_name="__main__")
+runpy.run_path("xau_lab/patch_fresh_holdout_2026.py", run_name="__main__")
