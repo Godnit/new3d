@@ -1,14 +1,13 @@
 from pathlib import Path
+import re
 
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
 
-marker = "    return out\n\n\ndef in_session"
-insert = '''    # One simple, economically defensible revision after the prior run was
-    # too sparse (11 development trades, 2 validation trades): remove the
-    # narrow clock-window dependency and let the existing trend, candle,
-    # adaptive-spread, and risk filters decide across the liquid trading day.
-    # Midnight server hour remains blocked to avoid rollover conditions.
+candidate = '''    # One simple, economically defensible revision after the prior run was
+    # too sparse: remove the narrow clock-window dependency and let the
+    # existing trend, candle, spread, and risk filters decide across the
+    # liquid trading day. Midnight server hour remains blocked for rollover.
     out.append(
         replace(
             base,
@@ -30,13 +29,16 @@ insert = '''    # One simple, economically defensible revision after the prior r
             fail_fast_current_r=-0.10,
         )
     )
-    return out
+'''
 
-
-def in_session'''
-
-if marker not in text:
-    raise SystemExit("candidate-list marker not found for global liquid-session revision")
-text = text.replace(marker, insert, 1)
-path.write_text(text, encoding="utf-8")
-print("Applied one revision: global liquid-day cross/follow candidate with rollover blocked")
+if 'name="rev_global_liquid_cross_follow"' in text:
+    print("Global liquid-session candidate already present")
+else:
+    pattern = r"(?ms)^(?P<indent>    )return out\s*\n(?=\s*def in_session\b)"
+    match = re.search(pattern, text)
+    if not match:
+        raise SystemExit("could not locate final candidate return before in_session")
+    replacement = candidate + "    return out\n"
+    text = text[:match.start()] + replacement + text[match.end():]
+    path.write_text(text, encoding="utf-8")
+    print("Applied global liquid-day cross/follow candidate with rollover blocked")
