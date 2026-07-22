@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
@@ -34,11 +33,24 @@ candidate = '''    # One simple, economically defensible revision after the prio
 if 'name="rev_global_liquid_cross_follow"' in text:
     print("Global liquid-session candidate already present")
 else:
-    pattern = r"(?ms)^(?P<indent>    )return out\s*\n(?=\s*def in_session\b)"
-    match = re.search(pattern, text)
-    if not match:
+    marker = "\ndef in_session"
+    marker_pos = text.find(marker)
+    if marker_pos < 0:
+        raise SystemExit("could not locate in_session definition")
+
+    # Later research patches may insert comments or helper candidates between
+    # the final candidate return and def in_session. Locate the final indented
+    # return statement in the candidates() section rather than relying on an
+    # exact adjacent-regex layout.
+    return_pos = text.rfind("    return out", 0, marker_pos)
+    if return_pos < 0:
         raise SystemExit("could not locate final candidate return before in_session")
-    replacement = candidate + "    return out\n"
-    text = text[:match.start()] + replacement + text[match.end():]
+    return_end = text.find("\n", return_pos)
+    if return_end < 0:
+        return_end = marker_pos
+    else:
+        return_end += 1
+
+    text = text[:return_pos] + candidate + "    return out\n" + text[return_end:]
     path.write_text(text, encoding="utf-8")
     print("Applied global liquid-day cross/follow candidate with rollover blocked")
