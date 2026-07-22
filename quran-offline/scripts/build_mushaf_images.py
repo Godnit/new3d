@@ -11,14 +11,13 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
-# Preserve enough pixels for crisp Arabic text, then remove invisible scanner
-# noise by reducing each page to a carefully selected color palette. The printed
-# pages mainly use white, black, blue and small gold accents, so this is much more
-# efficient than blurring or aggressively lowering the resolution.
-WIDTH = 580
-HEIGHT = 870
-COLORS = 32
-QUALITY = 68
+# The pages use a small printed palette: white paper, black Quran text, blue
+# ornament and small gold accents. Sixteen colors preserve those visible tones
+# while removing scanner grain that otherwise multiplies the APK size.
+WIDTH = 560
+HEIGHT = 840
+COLORS = 16
+QUALITY = 62
 
 
 def source_urls(page_number: int) -> list[tuple[str, str]]:
@@ -64,12 +63,10 @@ def process(arguments: tuple[str, str]) -> tuple[int, int]:
     with Image.open(source_path) as opened:
         source = ImageOps.exif_transpose(opened).convert("RGB")
 
-    # Keep the entire page and border. Mild autocontrast and sharpening improve
-    # thin vowel marks before color quantization removes scanner grain.
     source = ImageOps.contain(source, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
     source = ImageOps.autocontrast(source, cutoff=(0.08, 0.08))
-    source = source.filter(ImageFilter.UnsharpMask(radius=0.32, percent=114, threshold=3))
-    source = ImageEnhance.Contrast(source).enhance(1.018)
+    source = source.filter(ImageFilter.UnsharpMask(radius=0.30, percent=118, threshold=3))
+    source = ImageEnhance.Contrast(source).enhance(1.02)
 
     page = Image.new("RGB", (WIDTH, HEIGHT), "white")
     page.paste(source, ((WIDTH - source.width) // 2, (HEIGHT - source.height) // 2))
@@ -106,7 +103,7 @@ def main() -> None:
     if len(files) != 604:
         raise RuntimeError(f"Expected 604 pages, got {len(files)}")
     for sample in (files[0], files[1], files[430], files[439], files[-1]):
-        if sample.stat().st_size < 6_000:
+        if sample.stat().st_size < 5_000:
             raise RuntimeError(f"Generated page is suspiciously small: {sample}")
         with Image.open(sample) as image:
             if image.size != (WIDTH, HEIGHT):
@@ -119,7 +116,7 @@ def main() -> None:
         "Complete ready-scanned Hafs Mushaf page images were obtained from equran.me, "
         "whose page states that its Quran data comes from King Fahd Complex, with "
         "ummah.su as a matching fallback. Text and ornament are one source image; "
-        "no frame is generated at runtime. Scanner noise was removed with a 32-color "
+        "no frame is generated at runtime. Scanner noise was removed with a 16-color "
         "palette while retaining black text, blue ornament and gold accents. Confirm "
         "redistribution permission before a public or commercial release.\n",
         encoding="utf-8",
