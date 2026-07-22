@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1500" preserveAspectRatio="none">
+  <defs>
+    <pattern id="edge" width="80" height="80" patternUnits="userSpaceOnUse">
+      <rect width="80" height="80" fill="#fffdf7"/>
+      <path d="M0 40L40 0l40 40-40 40Z" fill="none" stroke="#b58a37" stroke-width="5"/>
+      <path d="M20 40L40 20l20 20-20 20Z" fill="#e9d7aa" stroke="#6f5421" stroke-width="3"/>
+      <circle cx="40" cy="40" r="7" fill="#8e6a28"/>
+    </pattern>
+    <g id="corner">
+      <path d="M0 0h160v22H22v138H0Z" fill="#6f5421"/>
+      <path d="M18 18h120v14H32v106H18Z" fill="#d2ae5a"/>
+      <path d="M36 36l40 0 22 22-22 22H36L14 58Z" fill="#f3e4ba" stroke="#8e6a28" stroke-width="4"/>
+      <circle cx="55" cy="58" r="11" fill="#8e6a28"/>
+    </g>
+  </defs>
+  <rect x="12" y="12" width="976" height="1476" rx="10" fill="#fffdf7" stroke="#6f5421" stroke-width="10"/>
+  <rect x="30" y="30" width="940" height="1440" rx="7" fill="none" stroke="#d2ae5a" stroke-width="5"/>
+  <rect x="48" y="48" width="904" height="1404" fill="none" stroke="#8e6a28" stroke-width="3"/>
+  <rect x="48" y="48" width="904" height="70" fill="url(#edge)"/>
+  <rect x="48" y="1382" width="904" height="70" fill="url(#edge)"/>
+  <rect x="48" y="118" width="70" height="1264" fill="url(#edge)"/>
+  <rect x="882" y="118" width="70" height="1264" fill="url(#edge)"/>
+  <use href="#corner" transform="translate(20 20)"/>
+  <use href="#corner" transform="translate(980 20) scale(-1 1)"/>
+  <use href="#corner" transform="translate(20 1480) scale(1 -1)"/>
+  <use href="#corner" transform="translate(980 1480) scale(-1 -1)"/>
+  <rect x="108" y="108" width="784" height="1284" fill="none" stroke="#6f5421" stroke-width="5"/>
+  <rect x="119" y="119" width="762" height="1262" fill="none" stroke="#d9bd79" stroke-width="2"/>
+</svg>
