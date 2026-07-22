@@ -56,7 +56,9 @@ jobs:
               patch_m15_slope.py \
               patch_enforce_directional_revision.py \
               patch_pullback_resumption.py \
-              patch_close_location_relax.py; do
+              patch_close_location_relax.py \
+              patch_body_floor06.py \
+              patch_fresh_2025_holdout_v2.py; do
                 echo "=== RUNNING $p ==="
                 python "xau_lab/$p" || exit $?
             done
@@ -134,7 +136,7 @@ jobs:
             : > xau_lab/real_tick_lab.py
             for f in xau_lab/chunks/part_*.b64; do base64 --decode "$f" >> xau_lab/real_tick_lab.py || exit $?; done
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
-            for p in patch_execution_order.py patch_revision_m5_only.py patch_adaptive_spread.py patch_spread_regime.py patch_trend_persistence.py patch_wide_noise_profile.py patch_london_newyork_session.py patch_strategy_revision.py patch_session_1619.py patch_protocol.py patch_m5_trend_strength.py patch_m15_slope.py patch_enforce_directional_revision.py patch_pullback_resumption.py patch_close_location_relax.py; do
+            for p in patch_execution_order.py patch_revision_m5_only.py patch_adaptive_spread.py patch_spread_regime.py patch_trend_persistence.py patch_wide_noise_profile.py patch_london_newyork_session.py patch_strategy_revision.py patch_session_1619.py patch_protocol.py patch_m5_trend_strength.py patch_m15_slope.py patch_enforce_directional_revision.py patch_pullback_resumption.py patch_close_location_relax.py patch_body_floor06.py patch_fresh_2025_holdout_v2.py; do
               echo "=== RUNNING $p ==="
               python "xau_lab/$p" || exit $?
             done
