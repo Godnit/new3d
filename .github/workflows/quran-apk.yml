@@ -179,7 +179,7 @@ jobs:
           AUDIO="quran-offline/app/src/main/assets/quran-audio"
           rm -rf "$AUDIO" && mkdir -p "$AUDIO"
           export SOURCE AUDIO OPUS_BITRATE
-          seq -w 1 4 | xargs -P 4 -I{} bash -c '
+          printf '%03d\n' 1 2 3 4 | xargs -P 4 -I{} bash -c '
             set -euo pipefail
             N="{}"; TMP="$AUDIO/$N.tmp.ogg"
             ffmpeg -nostdin -hide_banner -loglevel error -y -i "$SOURCE/$N.source" \
