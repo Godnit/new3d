@@ -87,7 +87,7 @@ jobs:
 
           git clone --depth 1 https://github.com/rayed/Quran.git "$TMP/rayed-quran"
           test -d "$TMP/rayed-quran/img"
-          test -s "$TMP/rayed-quran/img/1.jpg"
+          test -s "$TMP/rayed-quran/img/001.jpg"
           test -s "$TMP/rayed-quran/img/604.jpg"
           python3 quran-offline/scripts/build_mushaf_images.py --source "$TMP/rayed-quran/img" --destination "$MUSHAF"
           test "$(find "$MUSHAF" -name 'page*.webp' | wc -l)" -eq 604
