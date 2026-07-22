@@ -4,6 +4,7 @@
   /* v4.14 — first five Juz offline, verified per-Surah downloads, one compact real-image Mushaf. */
   var names=['الفاتحة','البقرة','آل عمران','النساء','المائدة','الأنعام','الأعراف','الأنفال','التوبة','يونس','هود','يوسف','الرعد','إبراهيم','الحجر','النحل','الإسراء','الكهف','مريم','طه','الأنبياء','الحج','المؤمنون','النور','الفرقان','الشعراء','النمل','القصص','العنكبوت','الروم','لقمان','السجدة','الأحزاب','سبأ','فاطر','يس','الصافات','ص','الزمر','غافر','فصلت','الشورى','الزخرف','الدخان','الجاثية','الأحقاف','محمد','الفتح','الحجرات','ق','الذاريات','الطور','النجم','القمر','الرحمن','الواقعة','الحديد','المجادلة','الحشر','الممتحنة','الصف','الجمعة','المنافقون','التغابن','الطلاق','التحريم','الملك','القلم','الحاقة','المعارج','نوح','الجن','المزمل','المدثر','القيامة','الإنسان','المرسلات','النبأ','النازعات','عبس','التكوير','الانفطار','المطففين','الانشقاق','البروج','الطارق','الأعلى','الغاشية','الفجر','البلد','الشمس','الليل','الضحى','الشرح','التين','العلق','القدر','البينة','الزلزلة','العاديات','القارعة','التكاثر','العصر','الهمزة','الفيل','قريش','الماعون','الكوثر','الكافرون','النصر','المسد','الإخلاص','الفلق','الناس'];
   var originalPlay=window.playAudioSurah;
+  var previousAudioState=window.onNativeAudioState;
   var availability={items:[]};
   var downloadStates={};
   var rendering=false;
@@ -39,9 +40,7 @@
   }
 
   function actionMarkup(number,data,state){
-    if(state&&state.status==='downloading'){
-      return '<button type="button" class="audio-row-action progress" disabled>'+Math.max(0,Math.min(99,state.progress||0))+'٪</button>';
-    }
+    if(state&&state.status==='downloading')return '<button type="button" class="audio-row-action progress" disabled>'+Math.max(0,Math.min(99,state.progress||0))+'٪</button>';
     if(state&&state.status==='queued')return '<button type="button" class="audio-row-action progress" disabled>انتظار</button>';
     if(data.builtIn)return '<span class="audio-local-badge">داخل التطبيق</span>';
     if(data.downloaded)return '<button type="button" class="audio-row-action delete" data-action="delete" data-surah="'+number+'">حذف</button>';
@@ -62,8 +61,7 @@
       var subtitle=data.builtIn?'عادل ريان — يعمل فورًا دون إنترنت':(data.downloaded?'عادل ريان — محملة على الهاتف':'عادل ريان — تحتاج تنزيلًا مرة واحدة');
       html+='<div class="compact-audio-row '+(available?'available':'missing')+'" data-surah="'+number+'">'+
         '<button type="button" class="audio-row-main" data-action="'+(available?'play':'download')+'" data-surah="'+number+'" data-name="'+escapeHtml(name)+'">'+
-        '<span class="audio-number">'+(typeof arabicNumber==='function'?arabicNumber(number):number)+'</span><span class="audio-row-copy"><b>سورة '+escapeHtml(name)+'</b><small>'+subtitle+'</small></span><i>'+(available?'▶':'↓')+'</i></button>'+
-        actionMarkup(number,data,state)+'</div>';
+        '<span class="audio-number">'+(typeof arabicNumber==='function'?arabicNumber(number):number)+'</span><span class="audio-row-copy"><b>سورة '+escapeHtml(name)+'</b><small>'+subtitle+'</small></span><i>'+(available?'▶':'↓')+'</i></button>'+actionMarkup(number,data,state)+'</div>';
     }
     box.innerHTML=html||'<div class="empty">لا توجد سورة بهذا الاسم.</div>';
     if(box.dataset.compactBound!=='1'){
@@ -93,7 +91,7 @@
       if(typeof nativeBridge.requestNotificationPermission==='function')nativeBridge.requestNotificationPermission();
       nativeBridge.downloadSurahAudio(number);
       toast('بدأ تنزيل سورة '+names[number-1]);
-    }catch(error){downloadStates[number]={status:'error'};scheduleRender();toast('تعذر بدء التنزيل')}
+    }catch(error){delete downloadStates[number];scheduleRender();toast('تعذر بدء التنزيل')}
   }
 
   function removeDownload(number){
@@ -108,13 +106,16 @@
     download(number);
   };
 
+  window.onNativeAudioState=function(){
+    if(typeof previousAudioState==='function')previousAudioState.apply(this,arguments);
+    scheduleRender();
+  };
+
   window.onNativeAudioDownloadState=function(number,status,progress,bytes,total,error){
     number=Number(number)||0;if(!number)return;
     downloadStates[number]={status:String(status||''),progress:Number(progress||0),bytes:Number(bytes||0),total:Number(total||0)};
     if(status==='completed'){
-      delete downloadStates[number];
-      toast('اكتمل تنزيل سورة '+names[number-1]+' وأصبحت تعمل دون إنترنت');
-      refreshAvailability();
+      delete downloadStates[number];toast('اكتمل تنزيل سورة '+names[number-1]+' وأصبحت تعمل دون إنترنت');refreshAvailability();
     }else if(status==='deleted'){
       delete downloadStates[number];toast('تم حذف ملف السورة');refreshAvailability();
     }else if(status==='error'){
@@ -138,11 +139,6 @@
   }
 
   function bind(){
-    var box=document.getElementById('audioSurahList');
-    if(box&&!box.dataset.compactObserver){
-      box.dataset.compactObserver='1';
-      new MutationObserver(function(){if(!rendering)scheduleRender()}).observe(box,{childList:true,subtree:true});
-    }
     var search=document.getElementById('audioSurahSearch');
     if(search&&!search.dataset.compactBound){search.dataset.compactBound='1';search.addEventListener('input',scheduleRender)}
     compactLabels();refreshAvailability();
