@@ -25,10 +25,15 @@
   function syncSeekPaint(){
     var range=document.getElementById('audioSeekRange');if(!range)return;
     var value=Math.max(0,Math.min(1000,Number(range.value)||0));
-    range.style.setProperty('--seek-progress',String(value/10));
+    range.style.setProperty('--seek-progress',(value/10)+'%');
+  }
+  function refreshLabels(){
+    var about=document.querySelector('#page-settings .setting:last-child .muted');
+    if(about)about.textContent='الإصدار 4.16 — مظهر فاتح وليلي فعلي، مصحف مصوّر مزخرف، الأجزاء ٢٦–٣٠ بصوت عادل ريان داخل التطبيق، وتنزيل اختياري لبقية السور.';
   }
   document.addEventListener('input',function(event){if(event.target&&event.target.id==='audioSeekRange')syncSeekPaint()},true);
   document.addEventListener('change',function(event){if(event.target&&event.target.id==='audioSeekRange')syncSeekPaint()},true);
   setInterval(syncSeekPaint,500);
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncSeekPaint);else syncSeekPaint();
+  function init(){syncSeekPaint();refreshLabels();setTimeout(refreshLabels,900)}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
