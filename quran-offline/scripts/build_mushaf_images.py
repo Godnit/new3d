@@ -11,11 +11,14 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
-# 600 px keeps Arabic glyphs readable on common 720 px phone screens. For scanned
-# line art, resolution matters more than a high photographic quality value.
-WIDTH = 600
-HEIGHT = 900
-QUALITY = 58
+# Preserve enough pixels for crisp Arabic text, then remove invisible scanner
+# noise by reducing each page to a carefully selected color palette. The printed
+# pages mainly use white, black, blue and small gold accents, so this is much more
+# efficient than blurring or aggressively lowering the resolution.
+WIDTH = 580
+HEIGHT = 870
+COLORS = 32
+QUALITY = 68
 
 
 def source_urls(page_number: int) -> list[tuple[str, str]]:
@@ -61,12 +64,21 @@ def process(arguments: tuple[str, str]) -> tuple[int, int]:
     with Image.open(source_path) as opened:
         source = ImageOps.exif_transpose(opened).convert("RGB")
 
-    # Preserve the whole printed page, including all four blue decorated edges.
+    # Keep the entire page and border. Mild autocontrast and sharpening improve
+    # thin vowel marks before color quantization removes scanner grain.
     source = ImageOps.contain(source, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-    source = source.filter(ImageFilter.UnsharpMask(radius=0.34, percent=112, threshold=3))
-    source = ImageEnhance.Contrast(source).enhance(1.015)
+    source = ImageOps.autocontrast(source, cutoff=(0.08, 0.08))
+    source = source.filter(ImageFilter.UnsharpMask(radius=0.32, percent=114, threshold=3))
+    source = ImageEnhance.Contrast(source).enhance(1.018)
+
     page = Image.new("RGB", (WIDTH, HEIGHT), "white")
     page.paste(source, ((WIDTH - source.width) // 2, (HEIGHT - source.height) // 2))
+    page = page.quantize(
+        colors=COLORS,
+        method=Image.Quantize.FASTOCTREE,
+        dither=Image.Dither.NONE,
+    ).convert("RGB")
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     page.save(output_path, "WEBP", quality=QUALITY, method=6, exact=True)
     return source_path.stat().st_size, output_path.stat().st_size
@@ -94,7 +106,7 @@ def main() -> None:
     if len(files) != 604:
         raise RuntimeError(f"Expected 604 pages, got {len(files)}")
     for sample in (files[0], files[1], files[430], files[439], files[-1]):
-        if sample.stat().st_size < 8_000:
+        if sample.stat().st_size < 6_000:
             raise RuntimeError(f"Generated page is suspiciously small: {sample}")
         with Image.open(sample) as image:
             if image.size != (WIDTH, HEIGHT):
@@ -107,9 +119,15 @@ def main() -> None:
         "Complete ready-scanned Hafs Mushaf page images were obtained from equran.me, "
         "whose page states that its Quran data comes from King Fahd Complex, with "
         "ummah.su as a matching fallback. Text and ornament are one source image; "
-        "no frame is generated at runtime. Confirm redistribution permission before "
-        "a public or commercial release.\n", encoding="utf-8")
-    print(f"Built 604 complete decorated pages: {output_bytes / 1048576:.2f} MiB")
+        "no frame is generated at runtime. Scanner noise was removed with a 32-color "
+        "palette while retaining black text, blue ornament and gold accents. Confirm "
+        "redistribution permission before a public or commercial release.\n",
+        encoding="utf-8",
+    )
+    print(
+        f"Built 604 complete decorated pages at {WIDTH}x{HEIGHT}, "
+        f"{COLORS} colors, WebP q={QUALITY}: {output_bytes / 1048576:.2f} MiB"
+    )
 
 
 if __name__ == "__main__":
