@@ -55,7 +55,8 @@ jobs:
               patch_m5_trend_strength.py \
               patch_m15_slope.py \
               patch_enforce_directional_revision.py \
-              patch_pullback_resumption.py; do
+              patch_pullback_resumption.py \
+              patch_close_location_relax.py; do
                 echo "=== RUNNING $p ==="
                 python "xau_lab/$p" || exit $?
             done
@@ -75,8 +76,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .hf_cache
-          key: xauusd-hf-window-${{ matrix.index }}-v9-${{ github.run_id }}
+          key: xauusd-hf-window-${{ matrix.index }}-v10-${{ github.run_id }}
           restore-keys: |
+            xauusd-hf-window-${{ matrix.index }}-v10-
             xauusd-hf-window-${{ matrix.index }}-v9-
             xauusd-hf-window-${{ matrix.index }}-v8-
             xauusd-hf-window-${{ matrix.index }}-v7-
@@ -146,7 +148,7 @@ jobs:
             : > xau_lab/real_tick_lab.py
             for f in xau_lab/chunks/part_*.b64; do base64 --decode "$f" >> xau_lab/real_tick_lab.py || exit $?; done
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
-            for p in patch_execution_order.py patch_revision_m5_only.py patch_adaptive_spread.py patch_spread_regime.py patch_trend_persistence.py patch_wide_noise_profile.py patch_london_newyork_session.py patch_strategy_revision.py patch_session_1619.py patch_protocol.py patch_m5_trend_strength.py patch_m15_slope.py patch_enforce_directional_revision.py patch_pullback_resumption.py; do
+            for p in patch_execution_order.py patch_revision_m5_only.py patch_adaptive_spread.py patch_spread_regime.py patch_trend_persistence.py patch_wide_noise_profile.py patch_london_newyork_session.py patch_strategy_revision.py patch_session_1619.py patch_protocol.py patch_m5_trend_strength.py patch_m15_slope.py patch_enforce_directional_revision.py patch_pullback_resumption.py patch_close_location_relax.py; do
               echo "=== RUNNING $p ==="
               python "xau_lab/$p" || exit $?
             done
