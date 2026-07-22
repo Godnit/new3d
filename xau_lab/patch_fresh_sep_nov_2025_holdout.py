@@ -8,26 +8,30 @@ import re
 engine_path = Path("xau_lab/real_tick_lab.py")
 engine = engine_path.read_text(encoding="utf-8")
 
-# Earlier research patches legitimately changed individual entry expressions,
-# so match the stable block boundaries instead of every internal line. This
-# preserves chronological integrity while avoiding a brittle exact-text patch.
-start_matches = list(re.finditer(
-    r"(?m)^        spread = float\(minute_asks\[0\] - minute_bids\[0\]\)\s*$",
-    engine,
-))
-if len(start_matches) != 1:
-    raise SystemExit(f"confirmation entry start found {len(start_matches)} times")
-start = start_matches[0].start()
+# This patch may run after an earlier research patch has already installed the
+# same chronological confirmation logic. Treat that state as success instead
+# of aborting the whole matrix. Only install the block when it is absent.
+already_confirmed = 'sig_name + "_CONF"' in engine
+if not already_confirmed:
+    start_matches = list(re.finditer(
+        r"(?m)^        spread = float\(minute_asks\[0\] - minute_bids\[0\]\)\s*$",
+        engine,
+    ))
+    if len(start_matches) != 1:
+        raise SystemExit(
+            f"confirmation entry start found {len(start_matches)} times and no existing _CONF entry was detected"
+        )
+    start = start_matches[0].start()
 
-end_match = re.search(
-    r"(?m)^        for k in range\(1, count\):\s*$",
-    engine[start:],
-)
-if end_match is None:
-    raise SystemExit("confirmation entry end loop not found")
-end = start + end_match.end()
+    end_match = re.search(
+        r"(?m)^        for k in range\(1, count\):\s*$",
+        engine[start:],
+    )
+    if end_match is None:
+        raise SystemExit("confirmation entry end loop not found")
+    end = start + end_match.end()
 
-replacement = '''        signal_bar = bars.iloc[i - 1]
+    replacement = '''        signal_bar = bars.iloc[i - 1]
         confirmation_buffer = atr * 0.05
         trigger_price = (
             float(signal_bar.high) + confirmation_buffer
@@ -69,13 +73,17 @@ replacement = '''        signal_bar = bars.iloc[i - 1]
         # Manage only ticks after the actual confirmation fill.
         for k in range(entry_tick + 1, count):'''
 
-engine = engine[:start] + replacement + engine[end:]
-if engine.count('sig_name + "_CONF"') != 1:
-    raise SystemExit("confirmation patch integrity check failed")
-engine_path.write_text(engine, encoding="utf-8")
+    engine = engine[:start] + replacement + engine[end:]
+    if engine.count('sig_name + "_CONF"') != 1:
+        raise SystemExit("confirmation patch integrity check failed")
+    engine_path.write_text(engine, encoding="utf-8")
+    print("Installed next-minute real-tick break confirmation")
+else:
+    print("Next-minute real-tick break confirmation already present; skipped duplicate installation")
 
-# Rotate the untouched holdout after the prior Sep/Nov result was observed.
-# August and December 2025 were not used by the preceding selection run.
+# Rotate the untouched holdout after the prior result was observed. August and
+# December 2025 were not used by the preceding selection run. Keep this update
+# idempotent so rebuilds remain reproducible.
 runner_path = Path("xau_lab/hf_window_runner.py")
 runner = runner_path.read_text(encoding="utf-8")
 windows = '''WINDOWS = [
@@ -100,4 +108,4 @@ runner, count = re.subn(
 if count != 1:
     raise SystemExit("could not rotate to fresh Aug/Dec 2025 holdout")
 runner_path.write_text(runner, encoding="utf-8")
-print("Applied robust next-minute break confirmation and fresh Aug/Dec 2025 holdout")
+print("Applied fresh Aug/Dec 2025 holdout protocol")
