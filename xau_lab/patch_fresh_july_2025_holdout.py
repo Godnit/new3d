@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import runpy
 
 runner = Path("xau_lab/hf_window_runner.py")
 text = runner.read_text(encoding="utf-8")
@@ -27,3 +28,9 @@ report = re.sub(
 )
 aggregate.write_text(report, encoding="utf-8")
 print("Rotated untouched holdout to July 2025")
+
+# The July outcome has now been inspected in run 96. Apply exactly one simple
+# strategy revision for this iteration, then rotate the final gate to fresh
+# September/November 2025 windows that remain selection-blind.
+runpy.run_path("xau_lab/patch_liquid_cross_reclaim.py", run_name="__main__")
+runpy.run_path("xau_lab/patch_fresh_sep_nov_2025_holdout.py", run_name="__main__")
