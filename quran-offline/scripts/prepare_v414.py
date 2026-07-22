@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
 
-import prepare_v412
-
 
 def replace_exact(path: Path, old: str, new: str, expected_min: int = 1) -> None:
     text = path.read_text(encoding="utf-8")
@@ -14,7 +12,6 @@ def replace_exact(path: Path, old: str, new: str, expected_min: int = 1) -> None
 
 
 def main() -> None:
-    prepare_v412.main()
     root = Path(__file__).resolve().parents[1]
     java = root / "app/src/main/java/com/mastermedia/quranoffline"
     assets = root / "app/src/main/assets"
@@ -22,7 +19,11 @@ def main() -> None:
     activity = java / "MainActivityV410.java"
     reader = assets / "app-v11.js"
 
+    # Keep MainActivity's original stable compass implementation unchanged.
+    # Only update the visible reciter labels and install optional downloads.
+    replace_exact(audio, "ياسر الدوسري", "عادل ريان", expected_min=3)
     replace_exact(audio, "import java.io.IOException;\n", "import java.io.File;\nimport java.io.IOException;\n")
+
     old_source = '''        try (AssetFileDescriptor descriptor = getAssets().openFd(
                 String.format(Locale.US, "quran-audio/%03d.ogg", currentSurah))) {
             created.setDataSource(descriptor.getFileDescriptor(), descriptor.getStartOffset(), descriptor.getLength());
@@ -116,17 +117,6 @@ def main() -> None:
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent);
                     else startService(intent);
                 } catch (RuntimeException ignored) {}
-            });
-        }
-
-        @JavascriptInterface
-        public void deleteSurahAudio(int number) {
-            if (number < 1 || number > 114 || AudioDownloadServiceV414.isBuiltIn(number)) return;
-            Intent intent = new Intent(MainActivityV410.this, AudioDownloadServiceV414.class)
-                    .setAction(AudioDownloadServiceV414.ACTION_DELETE)
-                    .putExtra(AudioDownloadServiceV414.EXTRA_SURAH, number);
-            runOnUiThread(() -> {
-                try { startService(intent); } catch (RuntimeException ignored) {}
             });
         }
 
