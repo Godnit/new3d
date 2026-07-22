@@ -1,4 +1,4 @@
-name: Build Rafiq Al-Huda v4.10 Stable Offline APK
+name: Build Rafiq Al-Huda v4.11 Clear Compact Offline APK
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
       - ".github/workflows/quran-apk.yml"
 
 concurrency:
-  group: rafiq-v410-${{ github.ref }}
+  group: rafiq-v411-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -79,7 +79,7 @@ jobs:
           python3 quran-offline/scripts/build_offline_assets.py --assets "$ASSETS" --pages "$PAGES" --qcf-pages "$QCF" --hadith "$HADITH"
           python3 quran-offline/scripts/curate_hadith.py "$ASSETS/hadith.json"
 
-      - name: Download Yasser Al-Dosari recitation
+      - name: Download clean Yasser Al-Dosari recitation source
         shell: bash
         run: |
           set -euxo pipefail
@@ -88,19 +88,67 @@ jobs:
           export SOURCE
           seq -w 1 114 | xargs -P 4 -I{} bash -c '
             set -euo pipefail
-            N="{}"; INPUT="$SOURCE/$N.opus"
+            N="{}"
+            INPUT="$SOURCE/$N.source"
+            PRIMARY="https://server11.mp3quran.net/download/yasser/$N.mp3"
             CDN="https://cdn.mualim.app/yasser-al-dosari-murattal/$N.opus"
             HF="https://huggingface.co/datasets/zaibihassan/Quranic-Recitation-Data/resolve/main/Yasser%20Al%20Dosari%20%28Murattal%29/$N/$N.opus?download=true"
-            if ! curl -fL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 1800 "$CDN" -o "$INPUT"; then
+            if curl -fL --retry 6 --retry-all-errors --connect-timeout 20 --max-time 1800 -A "Mozilla/5.0" "$PRIMARY" -o "$INPUT" \
+               && ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" >/dev/null; then
+              echo "surah=$N source=mp3quran" > "$SOURCE/$N.source.txt"
+            else
               rm -f "$INPUT"
-              curl -fL --retry 8 --retry-all-errors --connect-timeout 20 --max-time 1800 "$HF" -o "$INPUT"
+              if ! curl -fL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 1800 "$CDN" -o "$INPUT"; then
+                rm -f "$INPUT"
+                curl -fL --retry 8 --retry-all-errors --connect-timeout 20 --max-time 1800 "$HF" -o "$INPUT"
+              fi
+              ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" >/dev/null
+              echo "surah=$N source=mualim-opus-fallback" > "$SOURCE/$N.source.txt"
             fi
             test -s "$INPUT"
-            ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" >/dev/null
           '
-          test "$(find "$SOURCE" -type f -name '*.opus' | wc -l)" -eq 114
+          test "$(find "$SOURCE" -type f -name '*.source' | wc -l)" -eq 114
+          test "$(find "$SOURCE" -type f -name '*.source.txt' | wc -l)" -eq 114
 
-      - name: Encode clearer compact Opus audio
+      - name: Plan compact high-clarity Opus bitrate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+
+          source = Path('quran-offline/build-data/yasser-source')
+          durations = []
+          for number in range(1, 115):
+              path = source / f'{number:03d}.source'
+              probe = json.loads(subprocess.check_output([
+                  'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                  '-of', 'json', str(path)
+              ], text=True))
+              duration = float(probe['format']['duration'])
+              if duration < 8:
+                  raise RuntimeError(f'Suspiciously short source: {path} ({duration}s)')
+              durations.append(duration)
+
+          total_seconds = sum(durations)
+          if not 20 * 3600 < total_seconds < 40 * 3600:
+              raise RuntimeError(f'Unexpected complete-recitation duration: {total_seconds / 3600:.3f}h')
+
+          target_bytes = 108 * 1024 * 1024
+          bitrate = round((target_bytes * 8 / total_seconds) / 100) * 100
+          bitrate = max(8500, min(12000, bitrate))
+          Path('quran-offline/build-data/audio-plan.env').write_text(
+              f'OPUS_BITRATE={bitrate}\nTOTAL_SOURCE_SECONDS={total_seconds:.6f}\n',
+              encoding='utf-8'
+          )
+          print(f'total_source_hours={total_seconds/3600:.3f}')
+          print(f'opus_target_bitrate={bitrate}')
+          PY
+          cat quran-offline/build-data/audio-plan.env
+          cat quran-offline/build-data/audio-plan.env >> "$GITHUB_ENV"
+
+      - name: Encode clear compact Opus audio once
         shell: bash
         run: |
           set -euxo pipefail
@@ -108,24 +156,100 @@ jobs:
           SOURCE="quran-offline/build-data/yasser-source"
           AUDIO="$ASSETS/quran-audio"
           rm -rf "$AUDIO" && mkdir -p "$AUDIO"
+          export SOURCE AUDIO OPUS_BITRATE
+          seq -w 1 114 | xargs -P 6 -I{} bash -c '
+            set -euo pipefail
+            N="{}"
+            TMP="$AUDIO/$N.tmp.ogg"
+            ffmpeg -nostdin -hide_banner -loglevel error -y -i "$SOURCE/$N.source" \
+              -map_metadata -1 -vn -ac 1 -ar 24000 -c:a libopus \
+              -application voip -frame_duration 60 -b:a "$OPUS_BITRATE" \
+              -vbr on -compression_level 10 -packet_loss 0 -fec 0 "$TMP"
+            test -s "$TMP"
+            mv "$TMP" "$AUDIO/$N.ogg"
+          '
+          test "$(find "$AUDIO" -type f -name '*.ogg' | wc -l)" -eq 114
+
+      - name: Validate every source and encoded surah
+        shell: bash
+        run: |
+          set -euxo pipefail
+          SOURCE="quran-offline/build-data/yasser-source"
+          AUDIO="quran-offline/app/src/main/assets/quran-audio"
           export SOURCE AUDIO
           seq -w 1 114 | xargs -P 6 -I{} bash -c '
             set -euo pipefail
             N="{}"
-            ffmpeg -nostdin -hide_banner -loglevel error -y -i "$SOURCE/$N.opus" \
-              -map_metadata -1 -vn -ac 1 -ar 16000 -c:a libopus \
-              -application audio -frame_duration 20 -b:a 8000 \
-              -vbr constrained -compression_level 10 "$AUDIO/$N.ogg"
-            test -s "$AUDIO/$N.ogg"
+            ffmpeg -nostdin -hide_banner -loglevel error -v error -i "$SOURCE/$N.source" -f null -
+            ffmpeg -nostdin -hide_banner -loglevel error -v error -i "$AUDIO/$N.ogg" -f null -
           '
-          test "$(find "$AUDIO" -type f -name '*.ogg' | wc -l)" -eq 114
-          ffprobe -v error "$AUDIO/001.ogg" >/dev/null
-          ffprobe -v error "$AUDIO/114.ogg" >/dev/null
-          cat > "$ASSETS/AUDIO_SOURCE_NOTICE.txt" <<'NOTICE'
-          Offline recitation: Yasser Al-Dosari (Murattal), packaged for private personal testing only. Audio ownership remains with the reciter, studios and original sources. Do not sell or publicly redistribute this APK without confirming permission from the audio rights holders.
+          python3 - <<'PY'
+          import hashlib, json, subprocess
+          from pathlib import Path
+
+          source = Path('quran-offline/build-data/yasser-source')
+          audio = Path('quran-offline/app/src/main/assets/quran-audio')
+          manifest = []
+          total_source = 0.0
+          total_output = 0.0
+          total_bytes = 0
+
+          def duration(path: Path) -> float:
+              probe = json.loads(subprocess.check_output([
+                  'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                  '-of', 'json', str(path)
+              ], text=True))
+              return float(probe['format']['duration'])
+
+          for number in range(1, 115):
+              src = source / f'{number:03d}.source'
+              out = audio / f'{number:03d}.ogg'
+              src_duration = duration(src)
+              out_duration = duration(out)
+              delta = abs(src_duration - out_duration)
+              if delta > 0.25:
+                  raise RuntimeError(f'Duration mismatch for surah {number:03d}: {src_duration} vs {out_duration}')
+              size = out.stat().st_size
+              if size < 10000:
+                  raise RuntimeError(f'Encoded file too small: {out} ({size} bytes)')
+              digest = hashlib.sha256(out.read_bytes()).hexdigest()
+              source_note = (source / f'{number:03d}.source.txt').read_text(encoding='utf-8').strip()
+              manifest.append({
+                  'surah': number,
+                  'source': source_note,
+                  'source_duration': src_duration,
+                  'output_duration': out_duration,
+                  'bytes': size,
+                  'sha256': digest,
+              })
+              total_source += src_duration
+              total_output += out_duration
+              total_bytes += size
+
+          audio_mib = total_bytes / 1048576
+          if not 98 <= audio_mib <= 120:
+              raise RuntimeError(f'Audio package outside compact target: {audio_mib:.3f} MiB')
+          if abs(total_source - total_output) > 1.0:
+              raise RuntimeError('Total encoded duration does not match the source')
+          Path('quran-offline/app/src/main/assets/quran-audio-manifest.json').write_text(
+              json.dumps({
+                  'surahs': manifest,
+                  'total_source_seconds': total_source,
+                  'total_output_seconds': total_output,
+                  'total_bytes': total_bytes,
+                  'target_bitrate': int(Path('quran-offline/build-data/audio-plan.env').read_text().split('OPUS_BITRATE=')[1].splitlines()[0]),
+              }, ensure_ascii=False, indent=2),
+              encoding='utf-8'
+          )
+          print(f'audio_files={len(manifest)}')
+          print(f'audio_hours={total_output/3600:.3f}')
+          print(f'audio_MiB={audio_mib:.3f}')
+          PY
+          cat > "quran-offline/app/src/main/assets/AUDIO_SOURCE_NOTICE.txt" <<'NOTICE'
+          Offline recitation: Yasser Al-Dosari (Murattal), packaged for private personal testing only. The build prefers the MP3Quran source and falls back to the Mualim/Hugging Face dataset only when necessary. Audio ownership remains with the reciter, studios and original sources. Do not sell or publicly redistribute this APK without confirming permission from the audio rights holders.
           NOTICE
 
-      - name: Validate essential v4.10 files
+      - name: Validate essential v4.11 files
         shell: bash
         run: |
           set -euxo pipefail
@@ -135,63 +259,92 @@ jobs:
           test "$(find "$ASSETS/quran-audio" -name '*.ogg' | wc -l)" -eq 114
           test -s "$ASSETS/quran.json"
           test -s "$ASSETS/hadith.json"
+          test -s "$ASSETS/quran-audio-manifest.json"
           test -s quran-offline/app/src/main/res/raw/adhan_short.ogg
           grep -q 'app-v15.js' "$ASSETS/app-v7.js"
           grep -q 'app-v15.css' "$ASSETS/app-v7.js"
           grep -q '.MainActivityV410' quran-offline/app/src/main/AndroidManifest.xml
           grep -q '.AudioServiceV410' quran-offline/app/src/main/AndroidManifest.xml
+          grep -q "versionCode 15" quran-offline/app/build.gradle
+          grep -q "versionName '4.11.0'" quran-offline/app/build.gradle
           python3 - <<'PY'
           import json
           from pathlib import Path
           a=Path('quran-offline/app/src/main/assets')
           h=json.load(open(a/'hadith.json',encoding='utf-8'))
+          audio_manifest=json.load(open(a/'quran-audio-manifest.json',encoding='utf-8'))
           print('hadith_count=',len(h))
           print('mushaf_MiB=',sum(p.stat().st_size for p in (a/'mushaf-pages').glob('*.webp'))/1048576)
-          print('audio_MiB=',sum(p.stat().st_size for p in (a/'quran-audio').glob('*.ogg'))/1048576)
+          print('audio_MiB=',audio_manifest['total_bytes']/1048576)
           assert len(h)>100
+          assert len(audio_manifest['surahs'])==114
           PY
 
-      - name: Build optimized APK
+      - name: Build optimized release APK
         working-directory: quran-offline
         run: gradle :app:assembleRelease --stacktrace
 
-      - name: Stage and inspect APK
+      - name: Zipalign, sign when the existing release key is configured, and verify
+        id: package
         shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
-          set -euxo pipefail
-          APK="quran-offline/app/build/outputs/apk/release/app-release-unsigned.apk"
-          test -f "$APK"
-          unzip -t "$APK" >/dev/null
-          cp "$APK" Rafiq-AlHuda-v4.10-Stable-Offline-unsigned.apk
-          unzip -l "$APK" | grep -q 'assets/quran-audio/114.ogg'
-          unzip -l "$APK" | grep -q 'assets/mushaf-pages/page604.webp'
-          unzip -l "$APK" | grep -q 'assets/app-v15.js'
-          stat -c 'APK bytes: %s' "$APK"
-          sha256sum Rafiq-AlHuda-v4.10-Stable-Offline-unsigned.apk
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          UNSIGNED="quran-offline/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ALIGNED="$RUNNER_TEMP/Rafiq-AlHuda-v4.11-Clear-Compact-Offline-aligned-unsigned.apk"
+          SIGNED="Rafiq-AlHuda-v4.11-Clear-Compact-Offline.apk"
+          UNSIGNED_FINAL="Rafiq-AlHuda-v4.11-Clear-Compact-Offline-unsigned-aligned.apk"
+          test -f "$UNSIGNED"
+          unzip -t "$UNSIGNED" >/dev/null
+          "$BT/zipalign" -f -p 4 "$UNSIGNED" "$ALIGNED"
+          "$BT/zipalign" -c -v 4 "$ALIGNED"
 
-      - name: Upload completed APK
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$RELEASE_KEYSTORE_PASSWORD" ] && [ -n "$RELEASE_KEY_ALIAS" ] && [ -n "$RELEASE_KEY_PASSWORD" ]; then
+            KEYSTORE="$RUNNER_TEMP/release-keystore.jks"
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+            test -s "$KEYSTORE"
+            "$BT/apksigner" sign \
+              --ks "$KEYSTORE" \
+              --ks-pass "pass:$RELEASE_KEYSTORE_PASSWORD" \
+              --ks-key-alias "$RELEASE_KEY_ALIAS" \
+              --key-pass "pass:$RELEASE_KEY_PASSWORD" \
+              --out "$SIGNED" "$ALIGNED"
+            "$BT/apksigner" verify --verbose --print-certs "$SIGNED" | tee signing-report.txt
+            FINAL_PATH="$SIGNED"
+            SIGNED_STATE=true
+            rm -f "$KEYSTORE"
+          else
+            cp "$ALIGNED" "$UNSIGNED_FINAL"
+            printf '%s\n' 'NOT SIGNED: the existing release keystore secrets are not configured.' | tee signing-report.txt
+            FINAL_PATH="$UNSIGNED_FINAL"
+            SIGNED_STATE=false
+          fi
+
+          unzip -t "$FINAL_PATH" >/dev/null
+          unzip -l "$FINAL_PATH" > apk-contents.txt
+          grep -q 'assets/quran-audio/001.ogg' apk-contents.txt
+          grep -q 'assets/quran-audio/114.ogg' apk-contents.txt
+          grep -q 'assets/quran-audio-manifest.json' apk-contents.txt
+          grep -q 'assets/mushaf-pages/page604.webp' apk-contents.txt
+          sha256sum "$FINAL_PATH" | tee SHA256SUMS.txt
+          stat -c 'APK bytes: %s' "$FINAL_PATH" | tee APK-SIZE.txt
+          echo "final_path=$FINAL_PATH" >> "$GITHUB_OUTPUT"
+          echo "signed=$SIGNED_STATE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload verified APK build
         uses: actions/upload-artifact@v4
         with:
-          name: Rafiq-AlHuda-v4.10-Stable-Offline-Unsigned-APK
-          path: Rafiq-AlHuda-v4.10-Stable-Offline-unsigned.apk
+          name: Rafiq-AlHuda-v4.11-Clear-Compact-Offline-Build
+          path: |
+            ${{ steps.package.outputs.final_path }}
+            SHA256SUMS.txt
+            APK-SIZE.txt
+            signing-report.txt
+            quran-offline/app/src/main/assets/quran-audio-manifest.json
           if-no-files-found: error
           retention-days: 30
-
-      - name: Package Android signing tools
-        shell: bash
-        run: |
-          set -euxo pipefail
-          BT="$ANDROID_HOME/build-tools/35.0.0"
-          mkdir -p android-sign-tools/lib android-sign-tools/lib64
-          cp "$BT/apksigner" "$BT/zipalign" android-sign-tools/
-          cp "$BT/lib/apksigner.jar" android-sign-tools/lib/
-          if [ -f "$BT/lib64/libc++.so" ]; then cp "$BT/lib64/libc++.so" android-sign-tools/lib64/; fi
-          chmod +x android-sign-tools/apksigner android-sign-tools/zipalign
-          ./android-sign-tools/apksigner version
-
-      - name: Upload signing tools
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-Build-Tools-35-Signing-v410
-          path: android-sign-tools
-          retention-days: 7
