@@ -41,10 +41,9 @@ public class AudioDownloadServiceV414 extends Service {
     private static final Set<Integer> BUILT_IN = new HashSet<>();
 
     static {
-        BUILT_IN.add(1);
-        BUILT_IN.add(2);
-        BUILT_IN.add(3);
-        BUILT_IN.add(4);
+        // Juz 26 starts at Al-Ahqaf. Complete Surahs 46-114 are bundled so no
+        // Surah is cut in the middle and the user can listen through An-Nas offline.
+        for (int surah = 46; surah <= 114; surah++) BUILT_IN.add(surah);
     }
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -64,7 +63,7 @@ public class AudioDownloadServiceV414 extends Service {
     }
 
     public static File audioFile(Context context, int surah) {
-        return new File(audioDirectory(context), String.format(Locale.US, "%03d.mp3", surah));
+        return new File(audioDirectory(context), String.format(Locale.US, "%03d.ogg", surah));
     }
 
     public static boolean isDownloaded(Context context, int surah) {
@@ -104,7 +103,8 @@ public class AudioDownloadServiceV414 extends Service {
                 items.put(item);
             }
             root.put("reciter", manifest.optString("reciter", "عادل ريان"));
-            root.put("builtInJuz", 5);
+            root.put("builtInJuzFrom", 26);
+            root.put("builtInJuzTo", 30);
             root.put("items", items);
         } catch (Exception error) {
             try {
@@ -158,8 +158,9 @@ public class AudioDownloadServiceV414 extends Service {
             return START_NOT_STICKY;
         }
         if (isAvailable(this, surah)) {
-            broadcast(surah, "completed", 100, audioFile(this, surah).length(),
-                    audioFile(this, surah).length(), "");
+            File file = audioFile(this, surah);
+            long size = file.isFile() ? file.length() : 0L;
+            broadcast(surah, "completed", 100, size, size, "");
             stopSelf(startId);
             return START_NOT_STICKY;
         }
@@ -186,7 +187,7 @@ public class AudioDownloadServiceV414 extends Service {
     private void download(int surah) {
         File destination = audioFile(this, surah);
         File part = new File(destination.getParentFile(), destination.getName() + ".part");
-        HttpsURLConnection connection = null;
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         try {
             JSONObject source = sourceFor(this, surah);
             String url = source.getString("url");
@@ -194,61 +195,114 @@ public class AudioDownloadServiceV414 extends Service {
             String expectedHash = source.optString("sha256", "");
             if (!url.startsWith("https://")) throw new SecurityException("Only HTTPS audio sources are allowed");
 
-            broadcast(surah, "downloading", 0, 0L, expectedBytes, "");
-            NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            broadcast(surah, "downloading", progress(part.length(), expectedBytes), part.length(), expectedBytes, "");
             if (manager != null) manager.notify(NOTIFICATION_ID,
-                    notification(surah, 0, true, "جارٍ بدء التنزيل"));
+                    notification(surah, progress(part.length(), expectedBytes), expectedBytes <= 0, "جارٍ بدء التنزيل"));
 
-            connection = (HttpsURLConnection) new java.net.URL(url).openConnection();
-            connection.setConnectTimeout(25_000);
-            connection.setReadTimeout(45_000);
-            connection.setRequestProperty("User-Agent", "RafiqAlHuda/4.14 Android");
-            connection.setInstanceFollowRedirects(true);
-            int response = connection.getResponseCode();
-            if (response < 200 || response >= 300) throw new java.io.IOException("HTTP " + response);
-            long total = expectedBytes > 0 ? expectedBytes : connection.getContentLengthLong();
+            Exception lastError = null;
+            for (int attempt = 1; attempt <= 4; attempt++) {
+                HttpsURLConnection connection = null;
+                try {
+                    long existing = part.isFile() ? part.length() : 0L;
+                    if (expectedBytes > 0 && existing > expectedBytes) {
+                        part.delete();
+                        existing = 0L;
+                    }
 
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            long written = 0L;
-            int lastPercent = -1;
-            if (part.exists()) part.delete();
-            try (InputStream input = new BufferedInputStream(connection.getInputStream(), 64 * 1024);
-                 BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(part), 64 * 1024)) {
-                byte[] buffer = new byte[64 * 1024];
-                int count;
-                while ((count = input.read(buffer)) >= 0) {
-                    output.write(buffer, 0, count);
-                    digest.update(buffer, 0, count);
-                    written += count;
-                    int percent = total > 0 ? (int) Math.min(99, written * 100L / total) : 0;
-                    if (percent != lastPercent) {
-                        lastPercent = percent;
-                        broadcast(surah, "downloading", percent, written, total, "");
-                        if (manager != null && (percent % 2 == 0 || percent >= 98)) {
-                            manager.notify(NOTIFICATION_ID,
-                                    notification(surah, percent, total <= 0, "جارٍ تنزيل سورة رقم " + surah));
+                    connection = (HttpsURLConnection) new java.net.URL(url).openConnection();
+                    connection.setConnectTimeout(20_000);
+                    connection.setReadTimeout(60_000);
+                    connection.setRequestProperty("User-Agent", "RafiqAlHuda/4.15 Android");
+                    connection.setRequestProperty("Accept-Encoding", "identity");
+                    if (existing > 0) connection.setRequestProperty("Range", "bytes=" + existing + "-");
+                    connection.setInstanceFollowRedirects(true);
+
+                    int response = connection.getResponseCode();
+                    boolean append = existing > 0 && response == HttpsURLConnection.HTTP_PARTIAL;
+                    if (response == HttpsURLConnection.HTTP_OK && existing > 0) {
+                        if (!part.delete()) throw new java.io.IOException("Cannot restart partial download");
+                        existing = 0L;
+                        append = false;
+                    } else if (response != HttpsURLConnection.HTTP_OK && response != HttpsURLConnection.HTTP_PARTIAL) {
+                        throw new java.io.IOException("HTTP " + response);
+                    }
+
+                    long written = existing;
+                    int lastPercent = progress(written, expectedBytes);
+                    try (InputStream input = new BufferedInputStream(connection.getInputStream(), 128 * 1024);
+                         BufferedOutputStream output = new BufferedOutputStream(
+                                 new FileOutputStream(part, append), 128 * 1024)) {
+                        byte[] buffer = new byte[128 * 1024];
+                        int count;
+                        while ((count = input.read(buffer)) >= 0) {
+                            output.write(buffer, 0, count);
+                            written += count;
+                            int percent = progress(written, expectedBytes);
+                            if (percent != lastPercent) {
+                                lastPercent = percent;
+                                broadcast(surah, "downloading", percent, written, expectedBytes, "");
+                                if (manager != null && (percent % 3 == 0 || percent >= 98)) {
+                                    manager.notify(NOTIFICATION_ID,
+                                            notification(surah, percent, expectedBytes <= 0,
+                                                    "جارٍ تنزيل سورة رقم " + surah));
+                                }
+                            }
                         }
                     }
+
+                    if (expectedBytes > 0 && part.length() != expectedBytes) {
+                        throw new java.io.IOException("Incomplete download: " + part.length() + " != " + expectedBytes);
+                    }
+                    String hash = sha256(part);
+                    if (!expectedHash.isEmpty() && !expectedHash.equalsIgnoreCase(hash)) {
+                        part.delete();
+                        throw new java.io.IOException("Downloaded checksum mismatch");
+                    }
+                    if (destination.exists() && !destination.delete()) {
+                        throw new java.io.IOException("Cannot replace old file");
+                    }
+                    if (!part.renameTo(destination)) throw new java.io.IOException("Cannot finish downloaded file");
+
+                    broadcast(surah, "completed", 100, destination.length(), destination.length(), "");
+                    if (manager != null) manager.notify(NOTIFICATION_ID,
+                            notification(surah, 100, false, "اكتمل تنزيل السورة"));
+                    return;
+                } catch (Exception error) {
+                    lastError = error;
+                    if (attempt < 4) {
+                        long stored = part.isFile() ? part.length() : 0L;
+                        broadcast(surah, "downloading", progress(stored, expectedBytes), stored, expectedBytes, "");
+                        try { Thread.sleep(1200L * attempt); }
+                        catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            throw interrupted;
+                        }
+                    }
+                } finally {
+                    if (connection != null) connection.disconnect();
                 }
             }
-            if (expectedBytes > 0 && written != expectedBytes) {
-                throw new java.io.IOException("Downloaded size mismatch: " + written + " != " + expectedBytes);
-            }
-            String hash = hex(digest.digest());
-            if (!expectedHash.isEmpty() && !expectedHash.equalsIgnoreCase(hash)) {
-                throw new java.io.IOException("Downloaded checksum mismatch");
-            }
-            if (destination.exists() && !destination.delete()) throw new java.io.IOException("Cannot replace old file");
-            if (!part.renameTo(destination)) throw new java.io.IOException("Cannot finish downloaded file");
-            broadcast(surah, "completed", 100, written, written, "");
-            if (manager != null) manager.notify(NOTIFICATION_ID,
-                    notification(surah, 100, false, "اكتمل تنزيل السورة"));
+            throw lastError != null ? lastError : new java.io.IOException("Download failed");
         } catch (Exception error) {
-            if (part.exists()) part.delete();
-            broadcast(surah, "error", 0, 0L, 0L, "فشل التنزيل. تحقق من الإنترنت ثم أعد المحاولة.");
-        } finally {
-            if (connection != null) connection.disconnect();
+            // Keep the .part file so a later tap resumes instead of restarting on weak networks.
+            broadcast(surah, "error", 0, part.isFile() ? part.length() : 0L, 0L,
+                    "توقف التنزيل مؤقتًا. اضغط تحميل مجددًا ليكمل من حيث توقف.");
         }
+    }
+
+    private static int progress(long bytes, long total) {
+        if (total <= 0) return 0;
+        return (int) Math.max(0, Math.min(99, bytes * 100L / total));
+    }
+
+    private static String sha256(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream input = new BufferedInputStream(new FileInputStream(file), 128 * 1024)) {
+            byte[] buffer = new byte[128 * 1024];
+            int count;
+            while ((count = input.read(buffer)) >= 0) digest.update(buffer, 0, count);
+        }
+        return hex(digest.digest());
     }
 
     private static String hex(byte[] bytes) {
