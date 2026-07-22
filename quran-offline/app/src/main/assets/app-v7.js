@@ -23,4 +23,5 @@
   document.write('<script src="app-v17.js"><\/script>');
   document.write('<script src="app-v18.js"><\/script>');
   document.write('<script src="app-v19.js"><\/script>');
+  document.write('<script src="app-v20.js"><\/script>');
 })();
