@@ -7,6 +7,14 @@ on:
     paths:
       - "quran-offline/**"
       - ".github/workflows/quran-apk.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "quran-offline/**"
+      - ".github/workflows/quran-apk.yml"
+
+env:
+  AUDIO_RELEASE_TAG: rafiq-audio-adel-rayan-v1
 
 concurrency:
   group: rafiq-v415-${{ github.ref }}
@@ -81,8 +89,7 @@ jobs:
           test -d "$TMP/rayed-quran/img"
           test -s "$TMP/rayed-quran/img/1.jpg"
           test -s "$TMP/rayed-quran/img/604.jpg"
-          python3 quran-offline/scripts/build_mushaf_images.py \
-            --source "$TMP/rayed-quran/img" --destination "$MUSHAF"
+          python3 quran-offline/scripts/build_mushaf_images.py --source "$TMP/rayed-quran/img" --destination "$MUSHAF"
           test "$(find "$MUSHAF" -name 'page*.webp' | wc -l)" -eq 604
 
           curl -fL --retry 6 --retry-all-errors "https://commons.wikimedia.org/wiki/Special:Redirect/file/Oraci%C3%B3n%20Al-Azzan.ogg" -o "$RAW/adhan_short.ogg"
@@ -102,8 +109,7 @@ jobs:
           set -euxo pipefail
           DATA="quran-offline/build-data"
           mkdir -p "$DATA"
-          curl -fsSL --retry 8 --retry-all-errors -A "Mozilla/5.0" \
-            "https://www.mp3quran.net/api/v3/reciters?language=ar" -o "$DATA/mp3quran-reciter-list.json"
+          curl -fsSL --retry 8 --retry-all-errors -A "Mozilla/5.0" "https://www.mp3quran.net/api/v3/reciters?language=ar" -o "$DATA/mp3quran-reciter-list.json"
           python3 - <<'PY'
           import json,re,unicodedata
           from pathlib import Path
@@ -125,8 +131,7 @@ jobs:
           reciter,moshaf=selected
           server=str(moshaf['server']).strip()
           if not server.endswith('/'): server+='/'
-          Path('quran-offline/build-data/adel-source.env').write_text(
-              f"ADEL_SERVER={server}\nRECITER_API_NAME={reciter['name']}\nRECITER_MOSHAF={moshaf['name']}\n",encoding='utf-8')
+          Path('quran-offline/build-data/adel-source.env').write_text(f"ADEL_SERVER={server}\nRECITER_API_NAME={reciter['name']}\nRECITER_MOSHAF={moshaf['name']}\n",encoding='utf-8')
           print(server)
           PY
           cat "$DATA/adel-source.env" >> "$GITHUB_ENV"
@@ -181,8 +186,7 @@ jobs:
             N="{}"; TMP="$COMPACT/$N.tmp.ogg"
             ffmpeg -nostdin -hide_banner -loglevel error -y -i "$SOURCE/$N.source" \
               -map_metadata -1 -vn -ac 1 -ar 24000 -c:a libopus -application audio \
-              -frame_duration 40 -b:a "$OPUS_BITRATE" -vbr on -compression_level 10 \
-              -packet_loss 0 -fec 0 "$TMP"
+              -frame_duration 40 -b:a "$OPUS_BITRATE" -vbr on -compression_level 10 -packet_loss 0 -fec 0 "$TMP"
             test -s "$TMP"; mv "$TMP" "$COMPACT/$N.ogg"
           '
           test "$(find "$COMPACT" -type f -name '*.ogg' | wc -l)" -eq 114
@@ -190,21 +194,18 @@ jobs:
           seq -w 1 114 | xargs -P 6 -I{} bash -c 'ffmpeg -nostdin -hide_banner -loglevel error -v error -i "$COMPACT/{}.ogg" -f null -'
 
       - name: Publish compact downloadable Surahs to GitHub Release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euxo pipefail
-          TAG="rafiq-audio-adel-rayan-v1"
           COMPACT="quran-offline/build-data/compact-audio"
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --title "رفيق الهدى — ملفات صوت عادل ريان المضغوطة" \
-              --notes "ملفات Ogg Opus صغيرة تستخدمها أزرار التنزيل داخل رفيق الهدى. تحقق من حقوق إعادة التوزيع قبل النشر التجاري."
+          if ! gh release view "$AUDIO_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$AUDIO_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "رفيق الهدى — ملفات صوت عادل ريان المضغوطة" --notes "ملفات Ogg Opus صغيرة تستخدمها أزرار التنزيل داخل رفيق الهدى. تحقق من حقوق إعادة التوزيع قبل النشر التجاري."
           fi
-          gh release upload "$TAG" "$COMPACT"/*.ogg --repo "$GITHUB_REPOSITORY" --clobber
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length' | grep -q '^114$'
-          echo "AUDIO_RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+          gh release upload "$AUDIO_RELEASE_TAG" "$COMPACT"/*.ogg --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view "$AUDIO_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length' | grep -q '^114$'
 
       - name: Build download manifest and package Juz 26-30
         shell: bash
@@ -218,39 +219,23 @@ jobs:
           assets=Path('quran-offline/app/src/main/assets')
           audio=assets/'quran-audio'
           shutil.rmtree(audio,ignore_errors=True);audio.mkdir(parents=True)
-          tag=os.environ['AUDIO_RELEASE_TAG']
-          repo=os.environ['GITHUB_REPOSITORY']
+          tag=os.environ['AUDIO_RELEASE_TAG'];repo=os.environ['GITHUB_REPOSITORY']
           def duration(path):
               data=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','json',str(path)],text=True))
               return float(data['format']['duration'])
           items=[]
           for n in range(1,115):
-              encoded=compact/f'{n:03d}.ogg'
-              src=source/f'{n:03d}.source'
+              encoded=compact/f'{n:03d}.ogg';src=source/f'{n:03d}.source'
               out_duration=duration(encoded);src_duration=duration(src)
               if abs(out_duration-src_duration)>.25: raise RuntimeError(f'duration mismatch {n}')
-              items.append({
-                  'surah':n,
-                  'url':f'https://github.com/{repo}/releases/download/{tag}/{n:03d}.ogg',
-                  'bytes':encoded.stat().st_size,
-                  'sha256':hashlib.sha256(encoded.read_bytes()).hexdigest(),
-                  'duration':out_duration
-              })
+              items.append({'surah':n,'url':f'https://github.com/{repo}/releases/download/{tag}/{n:03d}.ogg','bytes':encoded.stat().st_size,'sha256':hashlib.sha256(encoded.read_bytes()).hexdigest(),'duration':out_duration})
           built=[]
           for n in range(46,115):
-              src=compact/f'{n:03d}.ogg';dst=audio/src.name
-              shutil.copy2(src,dst)
+              src=compact/f'{n:03d}.ogg';dst=audio/src.name;shutil.copy2(src,dst)
               built.append({'surah':n,'bytes':dst.stat().st_size,'sha256':hashlib.sha256(dst.read_bytes()).hexdigest(),'duration':duration(dst)})
           built_bytes=sum(x['bytes'] for x in built)
           if not 12*1048576<built_bytes<35*1048576: raise RuntimeError(f'Unexpected built-in audio size {built_bytes/1048576:.2f} MiB')
-          manifest={
-              'reciter':'عادل ريان',
-              'built_in_surahs':list(range(46,115)),
-              'built_in_juz_from':26,
-              'built_in_juz_to':30,
-              'note':'Complete Surahs Al-Ahqaf through An-Nas are packaged so no Surah is cut.',
-              'surahs':items
-          }
+          manifest={'reciter':'عادل ريان','built_in_surahs':list(range(46,115)),'built_in_juz_from':26,'built_in_juz_to':30,'note':'Complete Surahs Al-Ahqaf through An-Nas are packaged so no Surah is cut.','surahs':items}
           (assets/'audio-download-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
           (assets/'quran-audio-manifest.json').write_text(json.dumps({'reciter':'عادل ريان','built_in_surahs':built,'total_bytes':built_bytes},ensure_ascii=False,indent=2),encoding='utf-8')
           print('built_in_audio_MiB=',built_bytes/1048576)
