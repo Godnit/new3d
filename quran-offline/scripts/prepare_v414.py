@@ -265,7 +265,7 @@ def main() -> None:
                     @Override public void onProviderDisabled(String provider) {}
                 }, Looper.getMainLooper());
             }
-        } catch (SecurityException | RuntimeException ignored) {}
+        } catch (RuntimeException ignored) {}
     }
 
     @Override
