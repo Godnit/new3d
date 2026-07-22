@@ -4,29 +4,43 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
-from concurrent.futures import ProcessPoolExecutor
+import urllib.request
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
-# The source files are already scanned Mushaf pages with their original ornament.
-# We only resize and encode them. No frame or decoration is drawn by this script.
+# These are already-composed page scans: Quran text, Surah header, Juz label,
+# verse markers and the original blue floral border are all in the same JPG.
+# The script only downloads, resizes and encodes the complete page image.
+SOURCE_TEMPLATE = "https://ummah.su/img/mushaf/{page}.jpg"
 WIDTH = 620
 HEIGHT = 930
-QUALITY = 70
+QUALITY = 72
 
 
-def find_source(directory: Path, page: int) -> Path:
-    names = (
-        f"{page}.jpg", f"{page:03d}.jpg", f"page{page:03d}.jpg",
-        f"{page}.jpeg", f"{page:03d}.jpeg", f"page{page:03d}.jpeg",
-        f"{page}.png", f"{page:03d}.png", f"page{page:03d}.png",
+def download_page(arguments: tuple[int, str]) -> str:
+    page_number, destination_text = arguments
+    destination = Path(destination_text)
+    request = urllib.request.Request(
+        SOURCE_TEMPLATE.format(page=page_number),
+        headers={"User-Agent": "RafiqAlHuda-MushafBuilder/4.15"},
     )
-    for name in names:
-        candidate = directory / name
-        if candidate.is_file():
-            return candidate
-    raise FileNotFoundError(f"No scanned source image for page {page} in {directory}")
+    last_error: Exception | None = None
+    for _ in range(5):
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                payload = response.read()
+            if len(payload) < 8_000:
+                raise RuntimeError(f"Page {page_number} download is suspiciously small")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(payload)
+            with Image.open(destination) as image:
+                image.verify()
+            return str(destination)
+        except Exception as error:
+            last_error = error
+    raise RuntimeError(f"Failed to download complete Mushaf page {page_number}: {last_error}")
 
 
 def process(arguments: tuple[str, str]) -> tuple[int, int]:
@@ -34,10 +48,10 @@ def process(arguments: tuple[str, str]) -> tuple[int, int]:
     with Image.open(source_path) as opened:
         source = ImageOps.exif_transpose(opened).convert("RGB")
 
-    # Keep the complete scanned page, including its original decorative border.
+    # Preserve the entire printed page including all four decorated edges.
     source = ImageOps.contain(source, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-    source = source.filter(ImageFilter.UnsharpMask(radius=0.42, percent=108, threshold=3))
-    source = ImageEnhance.Contrast(source).enhance(1.015)
+    source = source.filter(ImageFilter.UnsharpMask(radius=0.38, percent=106, threshold=3))
+    source = ImageEnhance.Contrast(source).enhance(1.01)
 
     page = Image.new("RGB", (WIDTH, HEIGHT), "white")
     x = (WIDTH - source.width) // 2
@@ -51,19 +65,28 @@ def process(arguments: tuple[str, str]) -> tuple[int, int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--source", type=Path, required=True,
+                        help="Compatibility argument; remote complete scans are used.")
     parser.add_argument("--destination", type=Path, required=True)
     args = parser.parse_args()
 
     shutil.rmtree(args.destination, ignore_errors=True)
     args.destination.mkdir(parents=True, exist_ok=True)
+    remote_source = args.destination.parent / "mushaf-complete-blue-source"
+    shutil.rmtree(remote_source, ignore_errors=True)
+    remote_source.mkdir(parents=True, exist_ok=True)
 
-    tasks = []
-    for page_number in range(1, 605):
-        source = find_source(args.source, page_number)
-        destination = args.destination / f"page{page_number:03d}.webp"
-        tasks.append((str(source), str(destination)))
+    downloads = [
+        (page, str(remote_source / f"{page:03d}.jpg"))
+        for page in range(1, 605)
+    ]
+    with ThreadPoolExecutor(max_workers=14) as pool:
+        downloaded = list(pool.map(download_page, downloads))
 
+    tasks = [
+        (downloaded[page - 1], str(args.destination / f"page{page:03d}.webp"))
+        for page in range(1, 605)
+    ]
     workers = min(8, os.cpu_count() or 2)
     with ProcessPoolExecutor(max_workers=workers) as pool:
         sizes = list(pool.map(process, tasks, chunksize=5))
@@ -72,20 +95,28 @@ def main() -> None:
     if len(files) != 604:
         raise RuntimeError(f"Expected 604 pages, got {len(files)}")
 
-    for sample in (files[0], files[1], files[427], files[-1]):
-        if sample.stat().st_size < 8_000:
+    for sample in (files[0], files[1], files[430], files[439], files[-1]):
+        if sample.stat().st_size < 10_000:
             raise RuntimeError(f"Generated page is suspiciously small: {sample}")
         with Image.open(sample) as image:
             if image.size != (WIDTH, HEIGHT):
                 raise RuntimeError(f"Wrong dimensions: {sample} {image.size}")
             gray = image.convert("L")
-            if ImageStat.Stat(gray).var[0] < 120:
+            if ImageStat.Stat(gray).var[0] < 150:
                 raise RuntimeError(f"Page appears empty: {sample}")
 
     original_bytes = sum(item[0] for item in sizes)
     output_bytes = sum(item[1] for item in sizes)
+    notice = args.destination.parent / "MUSHAF_SOURCE_NOTICE.txt"
+    notice.write_text(
+        "Complete ready-scanned Madinah Mushaf page images were retrieved from "
+        "https://ummah.su/quran/medinskiy-muskhaf/ . Text and the original blue "
+        "ornament are one source image; no frame is generated at runtime. Confirm "
+        "redistribution permission before a public or commercial release.\n",
+        encoding="utf-8",
+    )
     print(
-        f"Compressed 604 ready-scanned decorated pages at {WIDTH}x{HEIGHT}, "
+        f"Built 604 complete blue-border scanned Mushaf pages at {WIDTH}x{HEIGHT}, "
         f"WebP q={QUALITY}: {original_bytes} -> {output_bytes} bytes "
         f"({output_bytes / 1048576:.2f} MiB)"
     )
