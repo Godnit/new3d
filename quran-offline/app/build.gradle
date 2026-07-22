@@ -10,9 +10,9 @@ android {
         applicationId 'com.mastermedia.quranoffline.lite'
         minSdk 26
         targetSdk 35
-        // Previous signed release: versionCode 18, versionName '4.14.0'
-        versionCode 19
-        versionName '4.15.0'
+        // Previous signed release: versionCode 19, versionName '4.15.0'
+        versionCode 20
+        versionName '4.16.0'
         resourceConfigurations += ['ar']
     }
 
