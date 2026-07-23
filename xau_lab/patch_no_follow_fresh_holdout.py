@@ -95,3 +95,9 @@ report = re.sub(
     report,
 )
 aggregate_path.write_text(report, encoding="utf-8")
+
+# Chain the current iteration's single strategy revision and fresh holdout
+# rotation. Keeping it at the end ensures it supersedes the retired holdout
+# windows above while leaving all earlier research candidates reproducible.
+next_patch = Path("xau_lab/patch_cont_sell_liquid_session_fresh_holdout.py")
+exec(compile(next_patch.read_text(encoding="utf-8"), str(next_patch), "exec"))
