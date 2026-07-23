@@ -41,10 +41,13 @@ if 'name="rev_cont_sell_only"' not in text:
     text = text[:return_pos] + candidate + text[return_pos:]
 
 signal_anchor = "    # Exact baseline keeps its report-driven special hour rules.\n    hour = bars.index[i].tz_convert(SERVER_TZ).hour\n"
-if 'if c.name == "rev_cont_sell_only":' not in text:
+if 'if c.name.startswith("rev_cont_sell_only"):' not in text:
     if signal_anchor not in text:
         raise SystemExit("signal anchor not found for sell-only revision")
-    signal_insert = '''    if c.name == "rev_cont_sell_only":
+    signal_insert = '''    # Later protocol patches append suffixes such as _cl55 to candidate names.
+    # Use prefix matching so the directional rule survives those systematic
+    # renames. The previous exact-name check silently allowed long trades.
+    if c.name.startswith("rev_cont_sell_only"):
         buy_trigger = False
         sell_trigger = cont_sell
 
@@ -53,11 +56,8 @@ if 'if c.name == "rev_cont_sell_only":' not in text:
 '''
     text = text.replace(signal_anchor, signal_insert, 1)
 
-# Run-100 revision: across development plus validation, the selected robust
-# profile's long side lost -16.79 USD over 18 trades, while all short signals
-# were approximately breakeven (-0.11 USD). Preserve the same broad signal and
-# risk logic but disable longs. This is one directional asymmetry revision,
-# with no date, weekday, news, or additional-indicator rule.
+# Broad sell-only diagnostic candidate. Its original exact-name comparison was
+# also invalidated by protocol suffixes, so enforce the rule by prefix.
 if 'name="rev_sell_only_all"' not in text:
     boundary = text.find("\ndef in_session")
     if boundary < 0:
@@ -93,10 +93,10 @@ if 'name="rev_sell_only_all"' not in text:
     text = text[:return_pos] + candidate + text[return_pos:]
 
 signal_anchor = "    # Exact baseline keeps its report-driven special hour rules.\n    hour = bars.index[i].tz_convert(SERVER_TZ).hour\n"
-if 'if c.name == "rev_sell_only_all":' not in text:
+if 'if c.name.startswith("rev_sell_only_all"):' not in text:
     if signal_anchor not in text:
         raise SystemExit("signal anchor not found for sell-only-all revision")
-    signal_insert = '''    if c.name == "rev_sell_only_all":
+    signal_insert = '''    if c.name.startswith("rev_sell_only_all"):
         buy_trigger = False
 
     # Exact baseline keeps its report-driven special hour rules.
@@ -105,4 +105,4 @@ if 'if c.name == "rev_sell_only_all":' not in text:
     text = text.replace(signal_anchor, signal_insert, 1)
 
 path.write_text(text, encoding="utf-8")
-print("Added sell-only continuation and broad sell-only diagnostic candidates")
+print("Added suffix-safe sell-only continuation and broad sell-only candidates")
