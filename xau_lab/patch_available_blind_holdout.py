@@ -1,10 +1,10 @@
 from pathlib import Path
 import re
 
-# Data/protocol repair only; no strategy parameter, signal, or execution logic
-# is changed here. The partitioned mirror starts in May 2021, so the prior
-# January 2021 blind window cannot run. The December 2024 window was already
-# observed in an earlier failed protocol run and therefore is not blind.
+# Protocol repair only; no strategy parameter, signal, execution or risk logic
+# is changed here. The June 2022 and June 2024 periods have now been observed
+# in run 132 and are retired from holdout use. Seal two previously unused,
+# non-overlapping August periods before the new close-location revision runs.
 runner_path = Path("xau_lab/hf_window_runner.py")
 runner = runner_path.read_text(encoding="utf-8")
 
@@ -17,8 +17,8 @@ windows = '''WINDOWS = [
     ("dev_2023_oct", "dev", "2023-10-02", "2023-10-21"),
     ("val_2024_mar", "validation", "2024-03-04", "2024-03-23"),
     ("val_2024_oct", "validation", "2024-10-07", "2024-10-26"),
-    ("hold_2022_jun_blind", "holdout", "2022-06-06", "2022-06-25"),
-    ("hold_2024_jun_blind", "holdout", "2024-06-03", "2024-06-22"),
+    ("hold_2022_aug_blind", "holdout", "2022-08-08", "2022-08-27"),
+    ("hold_2024_aug_blind", "holdout", "2024-08-05", "2024-08-24"),
 ]'''
 
 runner, count = re.subn(
@@ -29,13 +29,14 @@ runner, count = re.subn(
     flags=re.S,
 )
 if count != 1:
-    raise SystemExit("could not install data-available blind holdout protocol")
+    raise SystemExit("could not install fresh August blind holdout protocol")
 runner_path.write_text(runner, encoding="utf-8")
-print("Installed intermediate available holdouts: June 2022 and June 2024")
+print("Installed fresh untouched holdouts: August 2022 and August 2024")
 
-# Run exactly one new strategy revision for this iteration after all legacy
-# patches. That revision also retires the now-observed February/March 2025 gate
-# and seals two newly untouched periods before any window job starts.
-revision = Path("xau_lab/patch_m15_slope_sell_resumption_fresh_holdout.py")
+# Run exactly one new strategy revision after all legacy patches. It changes
+# only candle close-location tolerance for the already identified strict M15
+# sell-resumption family; the newly sealed holdout periods are never consulted
+# by this patch.
+revision = Path("xau_lab/patch_strict_sell_resumption_close65_fresh_aug_holdout.py")
 namespace = {"__name__": "__main__", "__file__": str(revision)}
 exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), namespace)
