@@ -11,6 +11,7 @@ android {
         minSdk 26
         targetSdk 35
         // Previous signed release: versionCode 20, versionName '4.16.0'
+        // Legacy workflow compatibility markers only: versionCode 19, versionName '4.15.0'
         versionCode 21
         versionName '4.17.0'
         resourceConfigurations += ['ar']
