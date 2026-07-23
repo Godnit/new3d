@@ -82,3 +82,7 @@ text = text.replace(
 
 path.write_text(text, encoding="utf-8")
 print("Added one close-location revision (0.55 -> 0.45) and rotated blind holdout to May 2025")
+
+# Run the current iteration's single strategy revision and fresh sealed holdout.
+revision = Path("xau_lab/patch_m15_strict_sell_resumption_fresh_apr_holdout.py")
+exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), {"__name__": "__main__"})
