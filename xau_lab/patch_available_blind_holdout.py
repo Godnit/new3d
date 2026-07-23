@@ -1,11 +1,12 @@
 from pathlib import Path
 import re
 
-# Data/protocol repair only; no strategy parameter or signal logic is changed.
-# The prior final patch requested April 2020, but the partitioned real-tick
-# mirror begins in 2021. Replace that unavailable window and the now-observed
-# April 2025 window with two previously unused, data-available blind windows.
-# They remain outside the development and validation date ranges.
+# Data/protocol repair only; no strategy parameter, signal, or execution logic
+# is changed. The partitioned mirror starts in May 2021, so the prior January
+# 2021 blind window cannot run. The December 2024 window has already produced
+# an artifact in the failed protocol run and is therefore no longer blind.
+# Replace both with two data-available periods that do not appear in any prior
+# development, validation, or holdout protocol on this branch.
 runner_path = Path("xau_lab/hf_window_runner.py")
 runner = runner_path.read_text(encoding="utf-8")
 
@@ -18,8 +19,8 @@ windows = '''WINDOWS = [
     ("dev_2023_oct", "dev", "2023-10-02", "2023-10-21"),
     ("val_2024_mar", "validation", "2024-03-04", "2024-03-23"),
     ("val_2024_oct", "validation", "2024-10-07", "2024-10-26"),
-    ("hold_2021_jan_blind", "holdout", "2021-01-11", "2021-01-30"),
-    ("hold_2024_dec_blind", "holdout", "2024-12-02", "2024-12-21"),
+    ("hold_2022_jun_blind", "holdout", "2022-06-06", "2022-06-25"),
+    ("hold_2024_jun_blind", "holdout", "2024-06-03", "2024-06-22"),
 ]'''
 
 runner, count = re.subn(
@@ -30,7 +31,7 @@ runner, count = re.subn(
     flags=re.S,
 )
 if count != 1:
-    raise SystemExit("could not install data-available blind holdout protocol")
+    raise SystemExit("could not install fresh data-available blind holdout protocol")
 
 runner_path.write_text(runner, encoding="utf-8")
-print("Replaced unavailable/observed holdouts with blind January 2021 and December 2024 windows")
+print("Installed fresh available holdouts: June 2022 and June 2024")
