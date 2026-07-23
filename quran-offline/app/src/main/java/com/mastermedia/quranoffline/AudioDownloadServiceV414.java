@@ -41,14 +41,16 @@ public class AudioDownloadServiceV414 extends Service {
     private static final Set<Integer> BUILT_IN = new HashSet<>();
 
     static {
-        // Juz 26 starts at Al-Ahqaf. Complete Surahs 46-114 are bundled so no
-        // Surah is cut in the middle and the user can listen through An-Nas offline.
         for (int surah = 46; surah <= 114; surah++) BUILT_IN.add(surah);
     }
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Set<Integer> queued = java.util.Collections.synchronizedSet(new HashSet<>());
     private final AtomicInteger pending = new AtomicInteger();
+
+    private static final class IntegrityException extends Exception {
+        IntegrityException(String message) { super(message); }
+    }
 
     public static boolean isBuiltIn(int surah) {
         return BUILT_IN.contains(surah);
@@ -184,16 +186,51 @@ public class AudioDownloadServiceV414 extends Service {
         return START_NOT_STICKY;
     }
 
+    private boolean finishPart(File part, File destination, long expectedBytes, String expectedHash)
+            throws Exception {
+        if (!part.isFile()) return false;
+        if (expectedBytes > 0 && part.length() != expectedBytes) return false;
+        if (part.length() <= 10_000L) return false;
+        String actualHash = sha256(part);
+        if (!expectedHash.isEmpty() && !expectedHash.equalsIgnoreCase(actualHash)) {
+            if (!part.delete()) part.deleteOnExit();
+            throw new IntegrityException("Downloaded checksum mismatch");
+        }
+        if (destination.exists() && !destination.delete()) {
+            throw new java.io.IOException("Cannot replace old file");
+        }
+        if (!part.renameTo(destination)) {
+            copyFile(part, destination);
+            if (!part.delete()) part.deleteOnExit();
+        }
+        return destination.isFile() && destination.length() > 10_000L;
+    }
+
+    private static void copyFile(File source, File destination) throws Exception {
+        try (InputStream input = new BufferedInputStream(new FileInputStream(source), 128 * 1024);
+             BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(destination), 128 * 1024)) {
+            byte[] buffer = new byte[128 * 1024];
+            int count;
+            while ((count = input.read(buffer)) >= 0) output.write(buffer, 0, count);
+        }
+    }
+
     private void download(int surah) {
         File destination = audioFile(this, surah);
         File part = new File(destination.getParentFile(), destination.getName() + ".part");
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        long expectedBytes = 0L;
         try {
             JSONObject source = sourceFor(this, surah);
-            String url = source.getString("url");
-            long expectedBytes = source.optLong("bytes", 0L);
+            String sourceUrl = source.getString("url");
+            expectedBytes = source.optLong("bytes", 0L);
             String expectedHash = source.optString("sha256", "");
-            if (!url.startsWith("https://")) throw new SecurityException("Only HTTPS audio sources are allowed");
+            if (!sourceUrl.startsWith("https://")) throw new SecurityException("Only HTTPS audio sources are allowed");
+
+            if (finishPart(part, destination, expectedBytes, expectedHash)) {
+                broadcast(surah, "completed", 100, destination.length(), destination.length(), "");
+                return;
+            }
 
             broadcast(surah, "downloading", progress(part.length(), expectedBytes), part.length(), expectedBytes, "");
             if (manager != null) manager.notify(NOTIFICATION_ID,
@@ -208,16 +245,32 @@ public class AudioDownloadServiceV414 extends Service {
                         part.delete();
                         existing = 0L;
                     }
+                    if (finishPart(part, destination, expectedBytes, expectedHash)) {
+                        broadcast(surah, "completed", 100, destination.length(), destination.length(), "");
+                        return;
+                    }
 
-                    connection = (HttpsURLConnection) new java.net.URL(url).openConnection();
-                    connection.setConnectTimeout(20_000);
-                    connection.setReadTimeout(60_000);
-                    connection.setRequestProperty("User-Agent", "RafiqAlHuda/4.15 Android");
+                    String cacheToken = expectedHash.length() >= 16 ? expectedHash.substring(0, 16) : expectedHash;
+                    String requestUrl = sourceUrl + (sourceUrl.contains("?") ? "&" : "?") + "integrity=" + cacheToken;
+                    connection = (HttpsURLConnection) new java.net.URL(requestUrl).openConnection();
+                    connection.setConnectTimeout(25_000);
+                    connection.setReadTimeout(90_000);
+                    connection.setRequestProperty("User-Agent", "RafiqAlHuda/4.17 Android");
                     connection.setRequestProperty("Accept-Encoding", "identity");
+                    connection.setRequestProperty("Cache-Control", "no-cache");
+                    connection.setRequestProperty("Pragma", "no-cache");
                     if (existing > 0) connection.setRequestProperty("Range", "bytes=" + existing + "-");
                     connection.setInstanceFollowRedirects(true);
 
                     int response = connection.getResponseCode();
+                    if (response == 416) {
+                        if (finishPart(part, destination, expectedBytes, expectedHash)) {
+                            broadcast(surah, "completed", 100, destination.length(), destination.length(), "");
+                            return;
+                        }
+                        if (part.exists()) part.delete();
+                        throw new java.io.IOException("Server rejected partial range");
+                    }
                     boolean append = existing > 0 && response == HttpsURLConnection.HTTP_PARTIAL;
                     if (response == HttpsURLConnection.HTTP_OK && existing > 0) {
                         if (!part.delete()) throw new java.io.IOException("Cannot restart partial download");
@@ -229,10 +282,10 @@ public class AudioDownloadServiceV414 extends Service {
 
                     long written = existing;
                     int lastPercent = progress(written, expectedBytes);
-                    try (InputStream input = new BufferedInputStream(connection.getInputStream(), 128 * 1024);
+                    try (InputStream input = new BufferedInputStream(connection.getInputStream(), 256 * 1024);
                          BufferedOutputStream output = new BufferedOutputStream(
-                                 new FileOutputStream(part, append), 128 * 1024)) {
-                        byte[] buffer = new byte[128 * 1024];
+                                 new FileOutputStream(part, append), 256 * 1024)) {
+                        byte[] buffer = new byte[256 * 1024];
                         int count;
                         while ((count = input.read(buffer)) >= 0) {
                             output.write(buffer, 0, count);
@@ -241,7 +294,7 @@ public class AudioDownloadServiceV414 extends Service {
                             if (percent != lastPercent) {
                                 lastPercent = percent;
                                 broadcast(surah, "downloading", percent, written, expectedBytes, "");
-                                if (manager != null && (percent % 3 == 0 || percent >= 98)) {
+                                if (manager != null && (percent % 4 == 0 || percent >= 98)) {
                                     manager.notify(NOTIFICATION_ID,
                                             notification(surah, percent, expectedBytes <= 0,
                                                     "جارٍ تنزيل سورة رقم " + surah));
@@ -253,26 +306,22 @@ public class AudioDownloadServiceV414 extends Service {
                     if (expectedBytes > 0 && part.length() != expectedBytes) {
                         throw new java.io.IOException("Incomplete download: " + part.length() + " != " + expectedBytes);
                     }
-                    String hash = sha256(part);
-                    if (!expectedHash.isEmpty() && !expectedHash.equalsIgnoreCase(hash)) {
-                        part.delete();
-                        throw new java.io.IOException("Downloaded checksum mismatch");
+                    if (!finishPart(part, destination, expectedBytes, expectedHash)) {
+                        throw new java.io.IOException("Downloaded file is incomplete");
                     }
-                    if (destination.exists() && !destination.delete()) {
-                        throw new java.io.IOException("Cannot replace old file");
-                    }
-                    if (!part.renameTo(destination)) throw new java.io.IOException("Cannot finish downloaded file");
 
                     broadcast(surah, "completed", 100, destination.length(), destination.length(), "");
                     if (manager != null) manager.notify(NOTIFICATION_ID,
                             notification(surah, 100, false, "اكتمل تنزيل السورة"));
                     return;
+                } catch (IntegrityException integrity) {
+                    throw integrity;
                 } catch (Exception error) {
                     lastError = error;
                     if (attempt < 4) {
                         long stored = part.isFile() ? part.length() : 0L;
                         broadcast(surah, "downloading", progress(stored, expectedBytes), stored, expectedBytes, "");
-                        try { Thread.sleep(1200L * attempt); }
+                        try { Thread.sleep(1400L * attempt); }
                         catch (InterruptedException interrupted) {
                             Thread.currentThread().interrupt();
                             throw interrupted;
@@ -283,10 +332,13 @@ public class AudioDownloadServiceV414 extends Service {
                 }
             }
             throw lastError != null ? lastError : new java.io.IOException("Download failed");
+        } catch (IntegrityException error) {
+            broadcast(surah, "error", 0, 0L, expectedBytes,
+                    "تعذر التحقق من الملف. اضغط تحميل مرة أخرى لتنزيل نسخة جديدة.");
         } catch (Exception error) {
-            // Keep the .part file so a later tap resumes instead of restarting on weak networks.
-            broadcast(surah, "error", 0, part.isFile() ? part.length() : 0L, 0L,
-                    "توقف التنزيل مؤقتًا. اضغط تحميل مجددًا ليكمل من حيث توقف.");
+            long stored = part.isFile() ? part.length() : 0L;
+            broadcast(surah, "error", progress(stored, expectedBytes), stored, expectedBytes,
+                    "توقف التنزيل مؤقتًا. اضغط متابعة ليكمل من حيث توقف.");
         }
     }
 
