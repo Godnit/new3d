@@ -2,6 +2,11 @@ name: XAU Real Tick Validation Lab
 
 on:
   workflow_dispatch:
+  push:
+    branches: [xau-real-tick-lab]
+    paths:
+      - 'xau_lab/**'
+      - '.github/workflows/xau-real-tick-lab.yml'
   pull_request:
     branches: [main]
     paths:
