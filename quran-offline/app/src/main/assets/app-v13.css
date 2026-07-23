@@ -1,0 +1,18 @@
+/* v4.7 — no artificial border over Quran pages; compact offline audio player. */
+.real-mushaf-border{display:none!important}
+.mushaf-image-shell{background:#fff!important;padding:0!important;border:0!important;box-shadow:none!important}
+.page-content-image{width:100%!important;height:100%!important;object-fit:contain!important;background:#fff!important}
+
+.audio-notice{line-height:1.8!important;background:linear-gradient(135deg,#07372d,#0b5947)!important;color:#f7edd8!important;border:1px solid rgba(216,169,67,.55)!important}
+.audio-notice b{color:#f0c866!important}
+.audio-surah-row small{color:#78958d!important}
+.audio-surah-row.active small{color:#d9eadf!important}
+
+.audio-mini-player{display:grid!important;grid-template-columns:auto auto auto 1fr auto!important;grid-template-rows:auto auto!important;align-items:center!important;gap:8px!important;padding-bottom:max(10px,env(safe-area-inset-bottom))!important}
+.offline-audio-progress{grid-column:1/-1;direction:ltr;width:100%;padding:0 4px 2px}
+.offline-audio-track{height:4px;border-radius:999px;background:rgba(255,255,255,.22);overflow:hidden}
+.offline-audio-track span{display:block;height:100%;width:0;border-radius:inherit;background:#e6b94d;transition:width .25s linear}
+.offline-audio-times{display:flex;justify-content:space-between;margin-top:3px;color:#d7e6df;font-variant-numeric:tabular-nums}
+.offline-audio-times small{font-size:10px}
+
+:root[data-offline-audio="1"] #page-audio .pill{background:#d5a43d!important;color:#082e26!important;border-color:#e8c875!important}

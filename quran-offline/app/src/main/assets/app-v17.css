@@ -1,0 +1,19 @@
+/* v4.14 — compact downloadable recitation rows and one real-image Mushaf set. */
+.audio-notice{line-height:1.7}
+.audio-surah-list{display:grid;gap:8px}
+.compact-audio-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid var(--line);border-radius:18px;background:var(--surface);overflow:hidden}
+.audio-row-main{min-width:0;width:100%;display:flex;align-items:center;gap:11px;padding:12px;border:0;background:transparent;color:var(--text);text-align:right}
+.audio-row-main .audio-number{width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;border-radius:13px;background:var(--surface2);color:var(--primary);font-weight:bold}
+.audio-row-copy{min-width:0;flex:1}.audio-row-copy b,.audio-row-copy small{display:block}.audio-row-copy b{font-size:16px}.audio-row-copy small{margin-top:4px;color:var(--muted);font-size:11px;white-space:normal;line-height:1.45}.audio-row-main i{font-style:normal;color:var(--primary)}
+.audio-row-action{margin-left:9px;border:0;border-radius:13px;padding:9px 10px;font-size:11px;font-weight:bold;white-space:nowrap}
+.audio-row-action.download{background:var(--primary);color:#fff}.audio-row-action.delete{background:rgba(189,60,72,.10);color:var(--danger)}.audio-row-action.progress{min-width:58px;background:var(--surface2);color:var(--primary)}
+.audio-local-badge{margin-left:9px;padding:8px 9px;border-radius:13px;background:var(--surface2);color:var(--primary);font-size:10px;font-weight:bold;white-space:nowrap}
+.compact-audio-row.missing .audio-row-main i{color:var(--muted)}
+
+/* The only packaged page set is a complete decorated WebP image. */
+html[data-mushaf-image-style] body.reader-mode .image-page-layer .mushaf-image-shell{width:min(100vw,calc((100dvh - 66px - env(safe-area-inset-top) - env(safe-area-inset-bottom))*0.666667))!important;aspect-ratio:2/3!important}
+html[data-mushaf-image-style] body.reader-mode .image-page-layer{background:#e7edf0!important}
+
+@media(max-width:390px){
+  .compact-audio-row{gap:4px}.audio-row-main{padding:10px 8px}.audio-row-action,.audio-local-badge{margin-left:7px;padding:8px 7px}
+}

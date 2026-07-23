@@ -1,0 +1,72 @@
+/* v4.15 — unified audio page, one Mushaf appearance and correctly scrolling drawer. */
+
+#mushafImageStyleSetting,
+#readerMushafStyleSetting,
+#mushafFrameSwatches,
+#readerBackdropSwatches{display:none!important}
+
+html.drawer-open,body.drawer-open{
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+  height:100%!important;
+}
+
+.drawer{
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  touch-action:pan-y!important;
+  -webkit-overflow-scrolling:touch;
+  max-height:100dvh!important;
+}
+
+body.drawer-open .app{
+  overflow:hidden!important;
+  height:100dvh!important;
+  touch-action:none!important;
+}
+body.drawer-open .drawer{touch-action:pan-y!important}
+
+body.audio-page-active,
+body.audio-page-active .app,
+body.audio-page-active main,
+body.audio-page-active #page-audio,
+#page-audio.audio-page{
+  background:var(--bg)!important;
+}
+
+#page-audio{
+  min-height:calc(100dvh - 74px)!important;
+  padding-bottom:170px!important;
+}
+
+#page-audio .audio-surah-list,
+#page-audio .compact-audio-row{
+  background:transparent;
+}
+
+.audio-local-badge.downloaded{
+  background:rgba(36,177,133,.16)!important;
+  color:var(--primary)!important;
+}
+
+/* The source page is already a complete decorated scan. Never add another frame. */
+html[data-mushaf-image-style] body.reader-mode .image-page-layer .mushaf-image-shell{
+  width:min(100vw,calc((100dvh - 66px - env(safe-area-inset-top) - env(safe-area-inset-bottom))*0.666667))!important;
+  aspect-ratio:2/3!important;
+  background:#fff!important;
+}
+html[data-mushaf-image-style] body.reader-mode .image-page-layer{background:#eef1ef!important}
+body.reader-mode .real-mushaf-border,
+body.reader-mode .mushaf-theme-frame,
+body.reader-mode .page-curl{display:none!important}
+
+/* Restore the uncomplicated compass appearance used by the stable version. */
+.qibla-arrow{
+  transition:transform 90ms linear!important;
+  opacity:1!important;
+  will-change:transform;
+}
+
+@media(max-width:390px){
+  #page-audio{padding-bottom:160px!important}
+}

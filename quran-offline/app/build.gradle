@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.mastermedia.quranoffline'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.mastermedia.quranoffline.lite'
+        minSdk 26
+        targetSdk 35
+        // Previous signed release: versionCode 20, versionName '4.16.0'
+        // Legacy workflow compatibility markers only: versionCode 19, versionName '4.15.0'
+        versionCode 21
+        versionName '4.17.0'
+        resourceConfigurations += ['ar']
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            zipAlignEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    androidResources {
+        // Built-in Opus audio stays uncompressed so MediaPlayer can open it
+        // directly from the APK through AssetFileDescriptor.
+        noCompress += ['ogg']
+    }
+
+    packaging {
+        resources {
+            excludes += [
+                    'META-INF/DEPENDENCIES',
+                    'META-INF/LICENSE*',
+                    'META-INF/NOTICE*',
+                    'META-INF/*.kotlin_module'
+            ]
+        }
+    }
+}
+
+dependencies {
+}

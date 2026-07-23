@@ -1,0 +1,127 @@
+/* v4.16 — real themes, stable audio rendering, seek control and edge-to-edge Mushaf. */
+
+/* ---------- Complete app themes ---------- */
+:root[data-theme="light"]{
+  --bg:#f3f5f2!important;--surface:#ffffff!important;--surface2:#eaf2ee!important;
+  --text:#153b30!important;--muted:#6d8179!important;--line:#d7e2dc!important;
+  --theme-top:#073d31;--theme-top2:#0b5743;--theme-nav:#062a22;--theme-page:#f3f5f2;
+}
+:root[data-theme="dark"]{
+  --bg:#031712!important;--surface:#09271f!important;--surface2:#0d352a!important;
+  --text:#f5f0e3!important;--muted:#a8bbb3!important;--line:#285044!important;
+  --theme-top:#031d17;--theme-top2:#073f31;--theme-nav:#021b15;--theme-page:#041a15;
+}
+:root[data-theme="sepia"]{
+  --bg:#e9dfcc!important;--surface:#f8f0df!important;--surface2:#ecdfc7!important;
+  --text:#493e30!important;--muted:#796c59!important;--line:#d3c4a8!important;
+  --theme-top:#5b4a31;--theme-top2:#79613d;--theme-nav:#493b29;--theme-page:#e9dfcc;
+}
+html,body{background:var(--bg)!important;color:var(--text)!important}
+body:not(.reader-mode){background:var(--bg)!important;color:var(--text)!important}
+body:not(.reader-mode) .app{
+  background:linear-gradient(180deg,var(--theme-top) 0,var(--theme-top2) 180px,var(--theme-page) 180px,var(--theme-page) 100%)!important;
+  color:var(--text)!important;
+}
+body:not(.reader-mode) main{color:var(--text)!important}
+body:not(.reader-mode) .topbar{background:linear-gradient(135deg,var(--theme-top),var(--theme-top2))!important}
+body:not(.reader-mode) .bottom-nav{background:var(--theme-nav)!important}
+:root[data-theme="light"] body:not(.reader-mode) .bottom-nav .nav,
+:root[data-theme="sepia"] body:not(.reader-mode) .bottom-nav .nav{color:#cad8d3!important}
+:root[data-theme="dark"] body:not(.reader-mode) .bottom-nav .nav{color:#aac0b7!important}
+.card,.list-card,.settings-card,.continue-card,.quick,.mini,.hadith-card,.dhikr-card,.search-box,.segmented,
+.setting,.select,.soft-btn,.wide-btn,.reader-sheet{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important}
+.search-box input,.select,input{color:var(--text)!important}
+.search-box input::placeholder{color:var(--muted)!important;opacity:.82}
+.surah-row,.prayer-row,.page-cell{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important}
+.number-badge,.pill,.segmented button.active,.page-cell{background:var(--surface2)!important}
+#page-prayer .card.row,#page-prayer .select,#page-prayer .prayer-list,#page-prayer .prayer-row,
+#page-hadith .search-box,#page-quran .search-box,#page-audio .search-box{
+  background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important;
+}
+#page-prayer .prayer-row strong,#page-prayer .prayer-row span,#page-prayer .select,
+#page-hadith .search-box input,#page-quran .search-box input,#page-audio .search-box input{color:var(--text)!important}
+:root[data-theme="dark"] .quick,
+:root[data-theme="dark"] #page-home.official-home .quick{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important}
+:root[data-theme="dark"] #page-home.official-home .quick small{color:var(--muted)!important}
+
+/* ---------- Stable audio page ---------- */
+body.audio-page-active,body.audio-page-active .app,body.audio-page-active main,body.audio-page-active #page-audio{
+  background:var(--bg)!important;color:var(--text)!important;
+}
+#page-audio{min-height:100dvh!important;padding-bottom:190px!important}
+#page-audio .audio-notice{background:var(--surface2)!important;color:var(--text)!important;border-color:var(--line)!important}
+.audio-availability-filters{
+  position:relative;z-index:8;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;
+  padding:5px;margin:0 0 10px;border:1px solid var(--line);border-radius:17px;background:var(--surface);box-shadow:var(--shadow);
+}
+.audio-availability-filters button{
+  min-height:42px;border:0;border-radius:13px;background:transparent;color:var(--muted);font-weight:700;
+}
+.audio-availability-filters button.active{background:var(--primary)!important;color:#fff!important}
+#page-audio .audio-surah-list{display:grid!important;gap:9px!important;background:transparent!important}
+#page-audio .compact-audio-row.v416-row{
+  display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;
+  min-height:80px!important;gap:5px!important;overflow:hidden!important;background:var(--surface)!important;
+  color:var(--text)!important;border:1px solid var(--line)!important;border-radius:20px!important;
+  box-shadow:0 5px 16px rgba(10,52,42,.08)!important;transition:border-color .16s ease,box-shadow .16s ease!important;
+}
+#page-audio .compact-audio-row.v416-row.current{border-color:var(--accent)!important;box-shadow:0 7px 20px rgba(174,127,23,.16)!important}
+#page-audio .audio-row-main{background:transparent!important;color:var(--text)!important;min-height:78px!important}
+#page-audio .audio-row-main:active{background:var(--surface2)!important}
+#page-audio .audio-row-copy b{color:var(--text)!important}
+#page-audio .audio-row-copy small{color:var(--muted)!important}
+#page-audio .audio-number{background:var(--surface2)!important;color:var(--primary)!important}
+#page-audio .audio-local-badge{background:var(--surface2)!important;color:var(--primary)!important}
+#page-audio .audio-local-badge.downloaded{background:rgba(36,177,133,.16)!important;color:var(--primary)!important}
+.v416-download-progress{margin-inline-end:9px;padding:9px 10px;border-radius:13px;background:var(--surface2);color:var(--primary);font-size:11px;font-weight:800;white-space:nowrap}
+
+/* Player remains one stable dark panel in every app theme. */
+.audio-mini-player{
+  grid-template-columns:38px 48px 38px minmax(0,1fr) 38px!important;
+  grid-template-rows:auto auto!important;min-height:112px!important;padding:10px 11px 8px!important;
+  background:rgba(3,48,37,.985)!important;color:#fff!important;
+}
+.audio-mini-player .audio-mini-info b{color:#fff!important}.audio-mini-player .audio-mini-info small{color:#c8d9d2!important}
+.v416-audio-seek{grid-column:1/-1;direction:ltr;width:100%;padding:2px 3px 0}
+#audioSeekRange{
+  display:block;width:100%;height:28px;margin:0;appearance:none;-webkit-appearance:none;background:transparent;touch-action:none;cursor:pointer;
+}
+#audioSeekRange::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:linear-gradient(to right,var(--accent) 0,var(--accent) var(--seek-progress,0%),#56756b var(--seek-progress,0%),#56756b 100%)}
+#audioSeekRange::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;margin-top:-7px;border-radius:50%;border:3px solid #fff;background:var(--accent);box-shadow:0 2px 7px rgba(0,0,0,.35)}
+#audioSeekRange::-moz-range-track{height:6px;border-radius:999px;background:#56756b}
+#audioSeekRange::-moz-range-progress{height:6px;border-radius:999px;background:var(--accent)}
+#audioSeekRange::-moz-range-thumb{width:16px;height:16px;border-radius:50%;border:3px solid #fff;background:var(--accent)}
+.v416-audio-times{display:flex;justify-content:space-between;margin-top:-2px;color:#d6e3de;direction:ltr}.v416-audio-times small{font-size:10px}
+
+/* ---------- Edge-to-edge complete Mushaf scan ---------- */
+body.reader-mode{background:#fff!important;overflow:hidden!important}
+body.reader-mode .mushaf-stage.image-mushaf-stage,
+body.reader-mode .image-page-layer{background:#fff!important}
+body.reader-mode .image-page-layer{
+  padding:max(55px,calc(env(safe-area-inset-top) + 49px)) 0 0!important;
+  align-items:flex-start!important;justify-content:center!important;
+}
+body.reader-mode .image-page-layer .mushaf-image-shell{
+  width:100vw!important;max-width:100vw!important;height:calc(100dvh - max(55px,calc(env(safe-area-inset-top) + 49px)))!important;
+  aspect-ratio:auto!important;background:#fff!important;overflow:hidden!important;
+}
+body.reader-mode .image-page-layer .page-content-image{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;
+  object-fit:contain!important;object-position:center top!important;background:#fff!important;border:0!important;
+}
+body.reader-mode .reader-floating-chrome{padding-inline:10px!important}
+body.reader-mode .reader-page-chip{background:rgba(255,255,255,.96)!important;color:#173d32!important}
+
+/* ---------- Qibla ---------- */
+.qibla-arrow{transition:transform 110ms linear!important;transform-origin:50% 100%!important;will-change:transform}
+.qibla-arrow.waiting-heading{opacity:.34!important}
+.qibla-sensor-status{margin:13px 0;padding:10px 12px;border-radius:14px;background:var(--surface2);color:var(--muted);font-size:12px;line-height:1.6;text-align:center}
+
+@media(max-width:390px){
+  #page-audio{padding-bottom:180px!important}
+  #page-audio .compact-audio-row.v416-row{grid-template-columns:minmax(0,1fr) auto!important}
+  #page-audio .audio-row-main{padding:10px 8px!important}
+  .audio-mini-player{right:6px!important;left:6px!important;gap:4px!important;padding-inline:7px!important}
+  body.reader-mode .image-page-layer{padding-top:max(51px,calc(env(safe-area-inset-top) + 45px))!important}
+  body.reader-mode .image-page-layer .mushaf-image-shell{height:calc(100dvh - max(51px,calc(env(safe-area-inset-top) + 45px)))!important}
+}

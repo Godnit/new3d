@@ -1,0 +1,64 @@
+/* v4.13 — full precomposed Mushaf page images and live Qibla sensor states. */
+
+body.reader-mode .image-page-layer{
+  padding:max(58px,calc(env(safe-area-inset-top) + 48px)) 0 max(4px,env(safe-area-inset-bottom))!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  background:#eef1ef!important;
+}
+
+html[data-mushaf-image-style] body.reader-mode .image-page-layer .mushaf-image-shell{
+  position:relative!important;flex:0 0 auto!important;margin:0 auto!important;
+  height:auto!important;max-width:100vw!important;
+  max-height:calc(100dvh - 64px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+  padding:0!important;background:#fff!important;overflow:hidden!important;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
+}
+
+html[data-mushaf-image-style="blue"] body.reader-mode .image-page-layer .mushaf-image-shell,
+html[data-mushaf-image-style="gold"] body.reader-mode .image-page-layer .mushaf-image-shell{
+  width:min(100vw,calc((100dvh - 66px - env(safe-area-inset-top) - env(safe-area-inset-bottom))*0.666667))!important;
+  aspect-ratio:2/3!important;
+}
+
+html[data-mushaf-image-style="plain"] body.reader-mode .image-page-layer .mushaf-image-shell{
+  width:min(100vw,calc((100dvh - 66px - env(safe-area-inset-top) - env(safe-area-inset-bottom))*0.618557))!important;
+  aspect-ratio:540/873!important;
+}
+
+html[data-mushaf-image-style] body.reader-mode .image-page-layer img.page-content-image{
+  position:absolute!important;z-index:1!important;inset:0!important;
+  display:block!important;width:100%!important;height:100%!important;
+  max-width:none!important;max-height:none!important;
+  object-fit:contain!important;object-position:center!important;
+  background:#fff!important;border:0!important;border-radius:0!important;
+  outline:0!important;box-shadow:none!important;filter:none!important;
+  opacity:1!important;visibility:visible!important;
+  user-select:none!important;-webkit-user-drag:none!important;
+}
+
+body.reader-mode .real-mushaf-border,
+body.reader-mode .mushaf-theme-frame{display:none!important}
+html[data-mushaf-image-style="blue"] body.reader-mode .image-page-layer{background:#e7edf0!important}
+html[data-mushaf-image-style="gold"] body.reader-mode .image-page-layer{background:#eee8dc!important}
+html[data-mushaf-image-style="plain"] body.reader-mode .image-page-layer{background:#f5f5f3!important}
+
+.mushaf-image-style-setting small{display:block;margin-top:7px;color:var(--muted);font-size:11px;line-height:1.6}
+.reader-mushaf-style-setting{display:grid!important;gap:7px;margin:8px 0 13px;font-weight:bold}
+.reader-mushaf-style-setting .select{background:var(--surface);color:var(--text)}
+
+.qibla-arrow{transition:none!important;will-change:transform!important}
+.qibla-arrow.waiting-heading{opacity:.18!important;transform:translate(-50%,-100%) rotate(0deg)!important}
+.compass{overflow:visible!important}
+.compass-cardinals{position:absolute;inset:0;pointer-events:none;color:var(--text);font-size:10px;font-weight:900}
+.compass-cardinals b{position:absolute;display:grid;place-items:center;min-width:48px;height:30px;padding:0 7px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.09)}
+.compass-cardinals .north{top:-17px;left:50%;transform:translateX(-50%);color:#b54040}
+.compass-cardinals .south{bottom:-17px;left:50%;transform:translateX(-50%)}
+.compass-cardinals .east{right:-29px;top:50%;transform:translateY(-50%)}
+.compass-cardinals .west{left:-29px;top:50%;transform:translateY(-50%)}
+.compass-status{min-height:48px;margin:10px auto 13px;max-width:330px;color:var(--muted);font-size:13px;line-height:1.65}
+.compass-reset-button{margin-top:9px;width:100%}
+
+@media(max-width:390px){
+  body.reader-mode .image-page-layer{padding-top:max(54px,calc(env(safe-area-inset-top) + 44px))!important}
+  .compass-cardinals .east{right:-24px}.compass-cardinals .west{left:-24px}
+}

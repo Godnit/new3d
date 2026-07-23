@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#031f19">
+  <title>رفيق الهدى</title>
+  <script>
+    (function(){
+      try{
+        var preference=localStorage.getItem('theme')||'system';
+        var theme=preference==='system'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):preference;
+        if(['light','dark','sepia'].indexOf(theme)<0)theme='light';
+        document.documentElement.dataset.theme=theme;
+        document.documentElement.dataset.themePreference=preference;
+        document.documentElement.dataset.accent=localStorage.getItem('accent')||'emerald';
+      }catch(ignore){document.documentElement.dataset.theme='light';document.documentElement.dataset.accent='emerald'}
+    })();
+  </script>
+  <link rel="stylesheet" href="app-v2.css">
+  <link rel="stylesheet" href="app-v3.css">
+  <link rel="stylesheet" href="app-v4.css">
+  <link rel="stylesheet" href="app-v5.css">
+  <link rel="stylesheet" href="app-v20.css">
+  <script src="adhan.umd.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <button class="icon-btn" aria-label="القائمة" onclick="toggleDrawer(true)">☰</button>
+    <div class="brand"><strong id="topTitle">رفيق الهدى</strong><small>يعمل دون إنترنت</small></div>
+    <button class="icon-btn" aria-label="الوضع الليلي" onclick="cycleTheme()">◐</button>
+  </header>
+
+  <main>
+    <section id="page-home" class="page">
+      <div class="hero">
+        <span class="hero-mark">۞</span>
+        <p class="eyebrow">رفيقك اليومي</p>
+        <h1>رفيق الهدى</h1>
+        <p>القرآن الكريم والسنة النبوية والأذكار والصلاة والقبلة — كامل دون إنترنت.</p>
+        <div class="hero-next"><div><small>الصلاة القادمة</small><strong id="homeNextName">—</strong></div><b id="homeNextTime">--:--</b></div>
+      </div>
+      <div id="lastReadCard" class="continue-card hidden"></div>
+      <div class="quick-grid">
+        <button class="quick" onclick="showPage('quran',true)"><span>📖</span><b>القرآن الكريم</b><small>صفحات المصحف الشريف</small></button>
+        <button class="quick" onclick="showPage('hadith',true)"><span>📜</span><b>الأحاديث</b><small>مكتبة وبحث دقيق</small></button>
+        <button class="quick" onclick="showPage('adhkar',true)"><span>📿</span><b>الأذكار</b><small>الصباح والمساء</small></button>
+        <button class="quick" onclick="showPage('prayer',true)"><span>🕌</span><b>مواقيت الصلاة</b><small>المواقيت اليومية</small></button>
+      </div>
+      <div class="section-head"><h2>الوصول السريع</h2></div>
+      <div class="mini-grid">
+        <button class="mini" onclick="showPage('bookmarks',true)">🔖 العلامات</button>
+        <button class="mini" onclick="showPage('qibla',true)">🧭 القبلة</button>
+        <button class="mini" onclick="showPage('settings',true)">⚙️ الإعدادات</button>
+      </div>
+    </section>
+
+    <section id="page-quran" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">المصحف الشريف</p><h2>السور والبحث</h2></div><button class="soft-btn" onclick="openMushafPage(Number(localStorage.getItem('lastPage')||1))">متابعة الصفحة</button></div>
+      <div class="search-box"><span>⌕</span><input id="quranSearch" placeholder="ابحث باسم السورة أو بكلمة من الآيات..."></div>
+      <div class="segmented"><button class="active" data-quran-tab="surahs" onclick="setQuranTab('surahs')">السور</button><button data-quran-tab="pages" onclick="setQuranTab('pages')">الصفحات</button><button data-quran-tab="juz" onclick="setQuranTab('juz')">الأجزاء</button></div>
+      <div id="surahList" class="list-card"><div class="empty">جارٍ تحميل المصحف...</div></div>
+    </section>
+
+    <section id="page-reader" class="page hidden reader-page">
+      <div class="reader-tools"><div><strong id="readerTitle">مصحف المدينة</strong><small id="readerSubtitle">الصفحة ١</small></div></div>
+      <div id="mushafStage" class="mushaf-stage">
+        <article id="mushafPage" class="mushaf-page">
+          <div class="page-curl"></div>
+          <header><span id="pageSurah">سورة الفاتحة</span><span id="pageJuz">الجزء ١</span></header>
+          <div id="pageText" class="page-text mushaf-lines"></div>
+          <footer><button id="pageBookmark" onclick="togglePageBookmark()">☆</button><b id="pageNumber">١</b><button onclick="showReaderSettings()">Aa</button></footer>
+        </article>
+      </div>
+      <p class="gesture-hint">اسحب الصفحة أفقيًا مثل معرض الصور.</p>
+      <div id="readerSettings" class="reader-sheet hidden">
+        <div class="sheet-head"><strong>مظهر المصحف</strong><button onclick="showReaderSettings(false)">✕</button></div>
+        <label>حجم خط الصفحة <input id="readerFontRange" type="range" min="20" max="38" oninput="setFontSize(this.value)"></label>
+        <div class="swatches" id="readerSwatches"></div>
+        <label class="switch-row"><span>السحب السلس بين الصفحات</span><input id="pageTurnToggle" type="checkbox" onchange="setPageTurn(this.checked)"></label>
+      </div>
+    </section>
+
+    <section id="page-hadith" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">السنة النبوية</p><h2>موسوعة الأحاديث</h2></div><span id="hadithCount" class="pill">جارٍ التحميل</span></div>
+      <div class="search-box"><span>⌕</span><input id="hadithSearch" placeholder="ابحث مثل: الصلاة، الصيام، الصدق..."></div>
+      <div class="filter-scroll">
+        <button class="chip active" data-book="all" onclick="setHadithBook('all')">الكل</button>
+        <button class="chip" data-book="صحيح البخاري" onclick="setHadithBook('صحيح البخاري')">البخاري</button>
+        <button class="chip" data-book="صحيح مسلم" onclick="setHadithBook('صحيح مسلم')">مسلم</button>
+        <button class="chip" data-book="الأربعون النووية" onclick="setHadithBook('الأربعون النووية')">النووية</button>
+        <button class="chip" data-book="الأربعون القدسية" onclick="setHadithBook('الأربعون القدسية')">القدسية</button>
+      </div>
+      <div id="hadithResults"><div class="empty card">جارٍ تجهيز مكتبة الأحاديث...</div></div>
+      <button id="loadMoreHadith" class="wide-btn hidden" onclick="loadMoreHadith()">عرض المزيد</button>
+    </section>
+
+    <section id="page-adhkar" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">ذكر الله</p><h2>الأذكار والتسبيح</h2></div><button class="soft-btn" onclick="resetDhikr()">تصفير اليوم</button></div>
+      <div id="adhkarCategories" class="filter-scroll"></div>
+      <div id="adhkarList"></div>
+    </section>
+
+    <section id="page-prayer" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">مواقيت اليوم</p><h2>الصلاة</h2></div><button class="soft-btn" onclick="showPage('qibla',true)">القبلة</button></div>
+      <div class="card row"><select id="citySelect" class="select" onchange="selectCity(this.value)"><option value="15.3694,44.1910,صنعاء">صنعاء</option><option value="12.7855,45.0187,عدن">عدن</option><option value="21.4225,39.8262,مكة المكرمة">مكة المكرمة</option><option value="24.7136,46.6753,الرياض">الرياض</option><option value="30.0444,31.2357,القاهرة">القاهرة</option></select><button class="primary-btn" onclick="locateMe()">موقعي</button></div>
+      <p id="locationLabel" class="muted"></p>
+      <div class="next-prayer"><small>الصلاة القادمة</small><h3 id="nextPrayerName">—</h3><strong id="nextPrayerClock">--:--</strong><span id="countdown">--:--:--</span></div>
+      <div id="prayerList" class="prayer-list"></div>
+    </section>
+
+    <section id="page-qibla" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">اتجاه مكة</p><h2>القبلة</h2></div></div>
+      <div class="card qibla-card"><p id="qiblaLocation" class="muted"></p><div class="compass"><div id="qiblaArrow" class="qibla-arrow"></div><span>الكعبة</span></div><h3><span id="qiblaDegrees">—</span>° من الشمال</h3><button class="primary-btn" onclick="locateMe()">تحديث الموقع</button></div>
+    </section>
+
+    <section id="page-bookmarks" class="page hidden"><div class="section-head"><div><p class="eyebrow">محفوظاتك</p><h2>العلامات</h2></div></div><div id="bookmarksList"></div></section>
+
+    <section id="page-settings" class="page hidden">
+      <div class="section-head"><div><p class="eyebrow">تخصيص التطبيق</p><h2>الإعدادات</h2></div></div>
+      <div class="settings-card">
+        <div class="setting"><label>مظهر التطبيق</label><select id="themeSelect" class="select" onchange="setTheme(this.value)"><option value="system">حسب الهاتف</option><option value="light">فاتح</option><option value="dark">ليلي</option><option value="sepia">ورقي دافئ</option></select></div>
+        <div class="setting"><label>لون التطبيق</label><div id="accentSwatches" class="swatches"></div></div>
+        <div class="setting"><label>لون صفحات المصحف</label><div id="mushafSwatches" class="swatches"></div></div>
+        <div class="setting"><label>حجم خط المصحف: <span id="fontValue"></span></label><input id="fontRange" type="range" min="20" max="38" oninput="setFontSize(this.value)"></div>
+        <div class="setting"><label class="switch-row"><span>السحب السلس بين الصفحات</span><input id="settingsTurnToggle" type="checkbox" onchange="setPageTurn(this.checked)"></label></div>
+        <div class="setting"><label class="switch-row"><span>تقليل الحركة</span><input id="reduceMotionToggle" type="checkbox" onchange="setReduceMotion(this.checked)"></label></div>
+        <div class="setting"><label>طريقة حساب الصلاة</label><select id="methodSelect" class="select" onchange="setPrayerMethod(this.value)"><option value="MWL">رابطة العالم الإسلامي</option><option value="UmmAlQura">أم القرى</option><option value="Egyptian">الهيئة المصرية</option><option value="Karachi">كراتشي</option></select></div>
+        <div class="setting danger-zone"><label>البيانات</label><button class="danger-btn" onclick="clearAppData()">مسح العلامات والإعدادات</button></div>
+        <div class="setting"><strong>حول رفيق الهدى</strong><p class="muted">الإصدار 4.17 — ثيم ثابت، تنزيل صوت مستقر، قبلة بلا دوران كامل، وصفحات مصحف مزخرفة ممتلئة.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav active" data-page="home" onclick="showPage('home',true)"><span>⌂</span>الرئيسية</button>
+    <button class="nav" data-page="quran" onclick="showPage('quran',true)"><span>📖</span>المصحف</button>
+    <button class="nav" data-page="hadith" onclick="showPage('hadith',true)"><span>📜</span>الحديث</button>
+    <button class="nav" data-page="adhkar" onclick="showPage('adhkar',true)"><span>📿</span>الأذكار</button>
+    <button class="nav" data-page="prayer" onclick="showPage('prayer',true)"><span>🕌</span>الصلاة</button>
+  </nav>
+</div>
+
+<aside id="drawer" class="drawer">
+  <div class="drawer-brand"><span>۞</span><div><strong>رفيق الهدى</strong><small>رفيقك اليومي دون إنترنت</small></div></div>
+  <button onclick="drawerGo('home')">⌂ الرئيسية</button><button onclick="drawerGo('quran')">📖 المصحف والبحث</button><button onclick="drawerGo('hadith')">📜 موسوعة الأحاديث</button><button onclick="drawerGo('adhkar')">📿 الأذكار</button><button onclick="drawerGo('prayer')">🕌 مواقيت الصلاة</button><button onclick="drawerGo('qibla')">🧭 اتجاه القبلة</button><button onclick="drawerGo('bookmarks')">🔖 العلامات</button><button onclick="drawerGo('settings')">⚙️ الإعدادات</button>
+</aside>
+<div id="overlay" class="overlay hidden" onclick="toggleDrawer(false)"></div>
+<div id="toast" class="toast hidden"></div>
+<script src="app-v2.js"></script>
+<script src="app-v3.js"></script>
+<script src="app-v4.js"></script>
+<script src="app-v6.js"></script>
+<script src="app-v7.js"></script>
+</body>
+</html>
