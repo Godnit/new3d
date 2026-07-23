@@ -1,0 +1,1 @@
+Retry the current real-tick protocol after replacing unavailable January 2025 holdout partitions with untouched May and December 2025 holdouts. No strategy parameter or selection rule changed in this marker commit.
