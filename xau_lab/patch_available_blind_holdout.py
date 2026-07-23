@@ -35,3 +35,10 @@ if count != 1:
 
 runner_path.write_text(runner, encoding="utf-8")
 print("Installed fresh available holdouts: June 2022 and June 2024")
+
+# Run the current iteration's single strategy revision last, after all legacy
+# patches. It also retires the now-observed June audit windows and seals the new
+# February/March 2025 holdout before the window jobs start.
+revision = Path("xau_lab/patch_m15_strict_all_sell_resumption_fresh_febmar_holdout.py")
+namespace = {"__name__": "__main__", "__file__": str(revision)}
+exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), namespace)
