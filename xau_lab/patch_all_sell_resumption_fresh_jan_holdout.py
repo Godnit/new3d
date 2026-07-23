@@ -45,22 +45,36 @@ if f'name="{name}"' not in engine:
 '''
     engine = engine[:return_pos] + candidate + engine[return_pos:]
 
+# Candidate names receive harmless protocol suffixes later (for example _cl55).
+# Direction enforcement must therefore be suffix-safe. The old exact-name guard
+# silently stopped working after renaming and allowed BUY trades into a strategy
+# intended to be sell-only, invalidating the statistical test.
 anchor = '''    if c.name.startswith("rev_global_sell_cont_follow"):
         buy_trigger = False
         sell_trigger = cont_sell or follow_sell
 '''
 replacement = anchor + f'''
-    if c.name == "{name}":
+    if c.name.startswith("{name}"):
         buy_trigger = False
         sell_trigger = cross_sell or cont_sell or follow_sell
 '''
-if f'if c.name == "{name}":' not in engine:
+
+# Remove any obsolete exact-name block before installing the suffix-safe guard.
+engine = engine.replace(
+    f'''    if c.name == "{name}":
+        buy_trigger = False
+        sell_trigger = cross_sell or cont_sell or follow_sell
+''',
+    "",
+)
+
+if f'if c.name.startswith("{name}"):' not in engine:
     if anchor not in engine:
         raise SystemExit("global sell trigger anchor not found")
     engine = engine.replace(anchor, replacement, 1)
 
-if engine.count(f'name="{name}"') != 1 or engine.count(f'if c.name == "{name}":') != 1:
-    raise SystemExit("all-sell resumption revision integrity check failed")
+if engine.count(f'name="{name}"') != 1 or engine.count(f'if c.name.startswith("{name}"):') != 1:
+    raise SystemExit("all-sell resumption suffix-safe integrity check failed")
 engine_path.write_text(engine, encoding="utf-8")
 
 # August holdouts from run 136 are now observed and retired. Seal two previously
@@ -100,4 +114,4 @@ aggregate = re.sub(
 )
 aggregate_path.write_text(aggregate, encoding="utf-8")
 
-print("Added strict-M15 all-sell resumption revision and sealed fresh January holdouts")
+print("Added suffix-safe strict-M15 sell-only resumption revision and sealed January holdouts")
