@@ -12,13 +12,9 @@ import real_tick_lab as lab
 
 REPO_ID = "CarlosSilva1/xauusd-ticks"
 
-# All windows are independent of the 2026 Headway report period.
-# The previous five-day windows produced only 12 trades for the selected
-# candidate, which is too small for a meaningful validation decision. This
-# protocol-only revision expands every window to about three trading weeks
-# inside the same calendar month. It does not alter entry, exit, risk, session,
-# spread, or direction rules, and the 2025 holdout remains untouched by
-# development/validation selection.
+# Development and validation windows remain unchanged. The prior 2025 holdout
+# months have now been observed and are retired. Two previously unused date
+# windows become the fresh selection-blind holdout for this single revision.
 WINDOWS = [
     ("dev_2021_jun", "dev", "2021-06-07", "2021-06-26"),
     ("dev_2021_oct", "dev", "2021-10-04", "2021-10-23"),
@@ -28,10 +24,8 @@ WINDOWS = [
     ("dev_2023_oct", "dev", "2023-10-02", "2023-10-21"),
     ("val_2024_mar", "validation", "2024-03-04", "2024-03-23"),
     ("val_2024_oct", "validation", "2024-10-07", "2024-10-26"),
-    # Fresh 2025 holdout months remain selection-blind. Only their sample
-    # length is increased; their outcomes are not used to choose candidates.
-    ("hold_2025_may", "holdout", "2025-05-05", "2025-05-24"),
-    ("hold_2025_dec", "holdout", "2025-12-01", "2025-12-20"),
+    ("hold_2021_feb", "holdout", "2021-02-01", "2021-02-20"),
+    ("hold_2022_dec", "holdout", "2022-12-01", "2022-12-20"),
 ]
 
 
