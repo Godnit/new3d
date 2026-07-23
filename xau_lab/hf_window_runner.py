@@ -49,13 +49,23 @@ def build_window_hf(name: str, split: str, eval_start_s: str, eval_end_s: str) -
         prefix = f"year={year}/month={month:02d}/"
         matches = [f for f in files if f.startswith(prefix) and f.endswith(".parquet")]
         if not matches:
-            raise RuntimeError(f"No parquet file found for {prefix}")
+            month_start = pd.Timestamp(year=year, month=month, day=1, tz="UTC")
+            month_end = month_start + pd.offsets.MonthBegin(1)
+            # Some mirrors start at the evaluation month and omit the preceding
+            # warm-up month. Missing warm-up-only data is safe to skip: EMA/ATR
+            # min-period rules suppress entries until enough closed bars exist.
+            if month_end <= eval_start:
+                print(f"Skipping unavailable warm-up-only partition {prefix}", flush=True)
+                continue
+            raise RuntimeError(f"No parquet file found for required partition {prefix}")
         for filename in matches:
             path = hf_hub_download(REPO_ID, filename=filename, repo_type="dataset")
             frame = pd.read_parquet(path, columns=["timestamp", "bid_price", "ask_price"])
             frames.append(frame)
             print(f"Loaded {filename}: {len(frame):,} ticks", flush=True)
 
+    if not frames:
+        raise RuntimeError(f"No parquet frames loaded for {name}")
     ticks = pd.concat(frames, ignore_index=True)
     ticks["timestamp"] = pd.to_datetime(ticks["timestamp"], utc=True)
     ticks = ticks[(ticks.timestamp >= load_start) & (ticks.timestamp < load_end)]
