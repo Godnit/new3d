@@ -44,19 +44,23 @@ if f'name="{name}"' not in engine:
 '''
     engine = engine[:return_pos] + candidate + engine[return_pos:]
 
-trigger_anchor = '''    if c.name == "rev_global_all_sell_resumption_m15strict":
+# Install the sell-only trigger without depending on a legacy candidate name.
+# Earlier iterations renamed or removed that anchor, so locate the stable final
+# buy/sell expression inside signal_at and place the override immediately before it.
+trigger_signature = f'    if c.name == "{name}":\n        buy_trigger = False\n'
+if trigger_signature not in engine:
+    signal_start = engine.find("def signal_at")
+    if signal_start < 0:
+        raise SystemExit("signal_at not found")
+    buy_expr = engine.find("    buy = (", signal_start)
+    if buy_expr < 0:
+        raise SystemExit("final buy expression not found")
+    trigger_block = f'''    if c.name == "{name}":
         buy_trigger = False
         sell_trigger = cross_sell or cont_sell or follow_sell
+
 '''
-trigger_add = trigger_anchor + f'''
-    if c.name == "{name}":
-        buy_trigger = False
-        sell_trigger = cross_sell or cont_sell or follow_sell
-'''
-if f'if c.name == "{name}":' not in engine:
-    if trigger_anchor not in engine:
-        raise SystemExit("all-sell resumption trigger anchor not found")
-    engine = engine.replace(trigger_anchor, trigger_add, 1)
+    engine = engine[:buy_expr] + trigger_block + engine[buy_expr:]
 
 # Apply slope persistence after the generic sell expression is evaluated. The
 # M15 value aligned to i-16 belongs to the prior completed M15 bar, so this does
@@ -77,41 +81,7 @@ if engine.count(f'name="{name}"') != 1:
     raise SystemExit("candidate integrity check failed")
 engine_path.write_text(engine, encoding="utf-8")
 
-# The February/March 2025 gate has now been observed. Rotate only the final gate
-# to two periods not referenced by any earlier protocol on this branch. The
-# strategy rule above was chosen before opening these periods.
-runner_path = Path("xau_lab/hf_window_runner.py")
-runner = runner_path.read_text(encoding="utf-8")
-windows = '''WINDOWS = [
-    ("dev_2021_jun", "dev", "2021-06-07", "2021-06-26"),
-    ("dev_2021_oct", "dev", "2021-10-04", "2021-10-23"),
-    ("dev_2022_mar", "dev", "2022-03-07", "2022-03-26"),
-    ("dev_2022_sep", "dev", "2022-09-05", "2022-09-24"),
-    ("dev_2023_mar", "dev", "2023-03-06", "2023-03-25"),
-    ("dev_2023_oct", "dev", "2023-10-02", "2023-10-21"),
-    ("val_2024_mar", "validation", "2024-03-04", "2024-03-23"),
-    ("val_2024_oct", "validation", "2024-10-07", "2024-10-26"),
-    ("hold_2021_may_blind", "holdout", "2021-05-10", "2021-05-29"),
-    ("hold_2024_aug_blind", "holdout", "2024-08-05", "2024-08-24"),
-]'''
-runner, count = re.subn(
-    r"WINDOWS\s*=\s*\[.*?\]\n\n\ndef iter_months",
-    windows + "\n\n\ndef iter_months",
-    runner,
-    count=1,
-    flags=re.S,
-)
-if count != 1:
-    raise SystemExit("could not install fresh May-2021/August-2024 holdout")
-runner_path.write_text(runner, encoding="utf-8")
-
-aggregate_path = Path("xau_lab/aggregate_results.py")
-aggregate = aggregate_path.read_text(encoding="utf-8")
-aggregate = re.sub(
-    r"The candidate is considered acceptable only when .*? passes\.",
-    "The candidate is considered acceptable only when the newly untouched May 2021 and August 2024 holdout gate passes.",
-    aggregate,
-)
-aggregate_path.write_text(aggregate, encoding="utf-8")
-
-print("Added one M15-slope all-sell resumption revision and sealed fresh holdout")
+# Do not rotate the protocol here. patch_available_blind_holdout.py installs the
+# data-available holdout windows before invoking this strategy-only revision.
+# Keeping protocol selection separate prevents an accidental window override.
+print("Added one M15-slope all-sell resumption revision; preserved installed protocol")
