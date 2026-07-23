@@ -96,15 +96,21 @@
     }else if(status==='error')delete audioDownloadStates[number];
   };
 
+  function removeMisleadingPageColorControls(){
+    var photographed=document.getElementById('mushafSwatches');
+    if(photographed){var row=photographed.closest?photographed.closest('.setting'):null;if(row)row.remove();else photographed.remove()}
+    var reader=document.getElementById('readerSwatches');if(reader)reader.remove();
+  }
+
   function init(){
-    applyAppearance417();
+    applyAppearance417();removeMisleadingPageColorControls();
     if(window.matchMedia){
       var media=window.matchMedia('(prefers-color-scheme: dark)');
       var changed=function(){if((localStorage.getItem('theme')||'system')==='system')applyAppearance417()};
       if(media.addEventListener)media.addEventListener('change',changed);
     }
     if(window.state&&state.page==='audio')markAudioReady();
-    setTimeout(applyAppearance417,250);
+    setTimeout(function(){applyAppearance417();removeMisleadingPageColorControls()},250);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
