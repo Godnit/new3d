@@ -3,13 +3,11 @@ from pathlib import Path
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
 
-# One simple strategy revision for this iteration:
+# Archived strategy revision retained for reproducibility:
 # - keep every existing sell signal family (cross, continuation, follow)
 # - remove the historically weak long side
 # - trade only the broad European/US liquid session
-# - veto entries only when M15 is explicitly bullish, rather than requiring a
-#   strict bearish M15 trend. This increases opportunities without adding a new
-#   indicator or any date-specific rule.
+# - veto entries only when M15 is explicitly bullish.
 if 'name="rev_sell_only_liquid_veto"' not in text:
     boundary = text.find("\ndef in_session")
     if boundary < 0:
@@ -57,4 +55,10 @@ if 'c.name.startswith("rev_sell_only_liquid_veto")' not in text:
     text = text.replace(anchor, replacement, 1)
 
 path.write_text(text, encoding="utf-8")
-print("Added broad-liquid-session sell-only M15-veto revision")
+print("Added archived broad-liquid-session sell-only M15-veto revision")
+
+# Exactly one new strategy revision for the current iteration. This downstream
+# patch also seals fresh December holdouts before the workflow starts testing.
+revision = Path("xau_lab/patch_focused_sell_resumption_fresh_dec_holdout.py")
+namespace = {"__name__": "__main__", "__file__": str(revision)}
+exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), namespace)
