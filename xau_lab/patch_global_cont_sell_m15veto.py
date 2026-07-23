@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
@@ -56,5 +57,59 @@ if 'if c.name.startswith("rev_global_cont_sell_m15veto"):' not in text:
 '''
     text = text.replace(anchor, replacement, 1)
 
+# Clean this iteration after run 158: compare the frozen v5.60 reference with
+# one revision only. The revision is a global continuation sell after a
+# pullback, accepted only when M15 is strictly bearish. This is a market-logic
+# rule, not a date/hour exception. Filtering is appended after all historical
+# candidate patches, so previous experiments cannot influence selection.
+protocol = r'''
+
+_PROTOCOL_ALL_CANDIDATES = candidates()
+_PROTOCOL_WANTED = {
+    "v560_baseline_cl55",
+    "rev_global_cont_sell_m15strict_freshmay_cl55",
+}
+
+def candidates():
+    selected = [c for c in _PROTOCOL_ALL_CANDIDATES if c.name in _PROTOCOL_WANTED]
+    missing = _PROTOCOL_WANTED - {c.name for c in selected}
+    if missing:
+        raise RuntimeError(f"Protocol candidates missing after patch chain: {sorted(missing)}")
+    return selected
+'''
+if "_PROTOCOL_WANTED" not in text:
+    text += protocol
+
 path.write_text(text, encoding="utf-8")
-print("Added global continuation-sell candidate with M15 veto")
+
+# Increase statistical power without changing strategy rules. Six full-month
+# development windows and two full-month validation windows are used. The two
+# 2020 holdout months are not used for candidate selection and were not part of
+# the prior 2021-2025 tuning sequence.
+runner = Path("xau_lab/hf_window_runner.py")
+rtext = runner.read_text(encoding="utf-8")
+monthly_windows = '''WINDOWS = [
+    ("dev_2021_feb", "dev", "2021-02-01", "2021-03-01"),
+    ("dev_2021_jun", "dev", "2021-06-01", "2021-07-01"),
+    ("dev_2022_feb", "dev", "2022-02-01", "2022-03-01"),
+    ("dev_2022_jun", "dev", "2022-06-01", "2022-07-01"),
+    ("dev_2023_feb", "dev", "2023-02-01", "2023-03-01"),
+    ("dev_2023_jun", "dev", "2023-06-01", "2023-07-01"),
+    ("val_2024_feb", "validation", "2024-02-01", "2024-03-01"),
+    ("val_2024_jun", "validation", "2024-06-01", "2024-07-01"),
+    ("hold_2020_feb", "holdout", "2020-02-01", "2020-03-01"),
+    ("hold_2020_jun", "holdout", "2020-06-01", "2020-07-01"),
+]
+'''
+rtext, count = re.subn(
+    r"WINDOWS\s*=\s*\[.*?\]\n\n\ndef iter_months",
+    monthly_windows + "\n\ndef iter_months",
+    rtext,
+    count=1,
+    flags=re.S,
+)
+if count != 1:
+    raise SystemExit("could not replace hf_window_runner WINDOWS")
+runner.write_text(rtext, encoding="utf-8")
+
+print("Added M15-veto candidate and clean two-candidate full-month protocol")
