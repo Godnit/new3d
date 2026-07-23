@@ -10,24 +10,25 @@ import urllib.request
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
+from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
-# Ready-made Madinah Mushaf scans. Quran text and ornament are already combined.
+# The Quran text and ornament always remain one complete page image. The colored
+# ornament is converted to a calm blue palette at build time; no frame is layered
+# over the page by the Android app.
 WIDTH = 480
 HEIGHT = 720
-QUALITY = 64
+QUALITY = 68
 
 
 def source_urls(page_number: int) -> list[tuple[str, str]]:
-    # Prefer the blue decorated scan requested by the user; keep the gold scan as fallback.
-    blue = f"https://ummah.su/img/mushaf/{page_number}.jpg"
-    encoded = urllib.parse.quote(blue, safe="")
-    gold = f"https://equran.me/assets/images/pages/{page_number:04d}.jpg"
+    first = f"https://ummah.su/img/mushaf/{page_number}.jpg"
+    encoded = urllib.parse.quote(first, safe="")
+    fallback = f"https://equran.me/assets/images/pages/{page_number:04d}.jpg"
     return [
         ("https://images.weserv.nl/?url=" + encoded + "&output=jpg&q=92", "https://images.weserv.nl/"),
         ("https://wsrv.nl/?url=" + encoded + "&output=jpg&q=92", "https://wsrv.nl/"),
-        (blue, f"https://ummah.su/quran/medinskiy-muskhaf/{page_number}"),
-        (gold, f"https://equran.me/page-img-{page_number}.html"),
+        (first, f"https://ummah.su/quran/medinskiy-muskhaf/{page_number}"),
+        (fallback, f"https://equran.me/page-img-{page_number}.html"),
     ]
 
 
@@ -58,8 +59,6 @@ def download_page(arguments: tuple[int, str]) -> str:
 
 
 def crop_outer_paper(source: Image.Image) -> Image.Image:
-    # Remove only the empty scanner margin around the printed ornament. The ornament
-    # itself remains untouched and receives a small safety padding.
     gray = source.convert("L")
     mask = gray.point(lambda value: 255 if value < 246 else 0)
     box = mask.getbbox()
@@ -69,11 +68,21 @@ def crop_outer_paper(source: Image.Image) -> Image.Image:
     if right - left < source.width * 0.55 or bottom - top < source.height * 0.55:
         return source
     padding = max(6, round(min(source.size) * 0.012))
-    left = max(0, left - padding)
-    top = max(0, top - padding)
-    right = min(source.width, right + padding)
-    bottom = min(source.height, bottom + padding)
-    return source.crop((left, top, right, bottom))
+    return source.crop((
+        max(0, left - padding), max(0, top - padding),
+        min(source.width, right + padding), min(source.height, bottom + padding),
+    ))
+
+
+def blue_ornament(source: Image.Image) -> Image.Image:
+    # Select only genuinely colored pixels. Black Quran text and white paper have
+    # low saturation and stay unchanged. Ornament detail and shading are retained.
+    _, saturation, value = source.convert("HSV").split()
+    colored = saturation.point(lambda level: 255 if level >= 28 else 0)
+    visible = value.point(lambda level: 255 if 30 < level < 250 else 0)
+    mask = ImageChops.multiply(colored, visible)
+    blue = ImageOps.colorize(source.convert("L"), black="#0b3856", white="#c9e6ef")
+    return Image.composite(blue, source, mask)
 
 
 def process(arguments: tuple[str, str]) -> tuple[int, int]:
@@ -86,6 +95,7 @@ def process(arguments: tuple[str, str]) -> tuple[int, int]:
     source = ImageOps.autocontrast(source, cutoff=(0.05, 0.05))
     source = source.filter(ImageFilter.UnsharpMask(radius=0.27, percent=114, threshold=3))
     source = ImageEnhance.Contrast(source).enhance(1.012)
+    source = blue_ornament(source)
 
     page = Image.new("RGB", (WIDTH, HEIGHT), "white")
     page.paste(source, ((WIDTH - source.width) // 2, (HEIGHT - source.height) // 2))
@@ -124,6 +134,15 @@ def main() -> None:
                 raise RuntimeError(f"Wrong dimensions: {sample} {image.size}")
             if ImageStat.Stat(image.convert("L")).var[0] < 120:
                 raise RuntimeError(f"Page appears empty: {sample}")
+            # Confirm that the final page actually contains a meaningful blue ornament.
+            hsv = image.convert("HSV")
+            hue, saturation, _ = hsv.split()
+            blue_mask = ImageChops.multiply(
+                saturation.point(lambda level: 255 if level >= 35 else 0),
+                hue.point(lambda level: 255 if 125 <= level <= 175 else 0),
+            )
+            if blue_mask.getbbox() is None:
+                raise RuntimeError(f"Blue ornament is missing: {sample}")
 
     output_bytes = sum(item[1] for item in sizes)
     if output_bytes >= 45 * 1024 * 1024:
@@ -133,14 +152,14 @@ def main() -> None:
         shutil.rmtree(args.destination.parent / stale, ignore_errors=True)
 
     (args.destination.parent / "MUSHAF_SOURCE_NOTICE.txt").write_text(
-        "The app uses complete ready-scanned Hafs Mushaf page images, preferring the "
-        "blue decorated ummah.su scan with equran.me as fallback. Quran text and the "
-        "ornament are one source image; no frame is generated at runtime. Empty outer "
-        "scanner margins are cropped while the complete ornament is preserved. Confirm "
+        "The app contains 604 complete ready-scanned Hafs Mushaf pages. Quran text and "
+        "the ornament remain one image; no empty frame is layered at runtime. At build "
+        "time only the already-existing colored ornament is normalized to a calm blue "
+        "palette, while black Quran text and white paper remain unchanged. Confirm "
         "redistribution permission before a public or commercial release.\n",
         encoding="utf-8",
     )
-    print(f"Built 604 full blue-decorated pages: {output_bytes / 1048576:.2f} MiB")
+    print(f"Built 604 complete blue decorated pages: {output_bytes / 1048576:.2f} MiB")
 
 
 if __name__ == "__main__":
