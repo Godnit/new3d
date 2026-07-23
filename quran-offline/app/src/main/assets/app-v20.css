@@ -1,0 +1,65 @@
+/* v4.17 — complete theme/accent coverage, stable audio cards and fuller Mushaf pages. */
+
+/* Accent colors now drive the complete interface instead of only the selected ring. */
+:root[data-accent="emerald"]{--primary:#0f775b!important;--primary2:#09543f!important;--accent:#e0ae43!important}
+:root[data-accent="teal"]{--primary:#118f88!important;--primary2:#08645f!important;--accent:#e6b64d!important}
+:root[data-accent="indigo"]{--primary:#5267bd!important;--primary2:#35478d!important;--accent:#e4b34b!important}
+:root[data-accent="burgundy"]{--primary:#a24861!important;--primary2:#743044!important;--accent:#e0b052!important}
+:root[data-accent="sand"]{--primary:#9b7845!important;--primary2:#6d512f!important;--accent:#e4bd68!important}
+
+html,body,.app,main,.page{background-color:var(--bg)!important;color:var(--text)!important}
+body:not(.reader-mode) .app{background:linear-gradient(180deg,var(--theme-top) 0,var(--theme-top2) 170px,var(--theme-page) 170px,var(--theme-page) 100%)!important}
+.topbar{border-color:color-mix(in srgb,var(--accent) 38%,transparent)!important}
+.icon-btn,.primary-btn,.audio-row-action.download,.audio-availability-filters button.active{background:var(--primary)!important;color:#fff!important;border-color:color-mix(in srgb,var(--accent) 52%,transparent)!important}
+.bottom-nav .nav.active{color:var(--accent)!important}
+
+/* All previously hard-coded light cards and labels now follow the selected theme. */
+.section-head h2,.section-head strong,.setting>label,.setting strong,.surah-info strong,.hadith-text,.dhikr-card h3,.adhkar-card h3,
+.card h3,.card h2,.reader-sheet strong,.drawer button,.drawer strong{color:var(--text)!important}
+.eyebrow,.muted,.section-head p,.surah-info small,.hadith-meta,.dhikr-card small,.adhkar-card small,.setting p,.setting small,
+.audio-row-copy small,.drawer small,.qibla-card p{color:var(--muted)!important;opacity:1!important}
+.settings-card,.setting,.card,.list-card,.continue-card,.quick,.mini,.hadith-card,.dhikr-card,.adhkar-card,.search-box,.segmented,
+.reader-sheet,.prayer-list,.surah-row,.page-cell,.drawer{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important}
+.select,.search-box input,input,textarea{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important}
+.select option{background:var(--surface)!important;color:var(--text)!important}
+.segmented button,.filter-scroll .chip,.soft-btn,.wide-btn{background:var(--surface2)!important;color:var(--text)!important;border-color:var(--line)!important}
+.segmented button.active,.filter-scroll .chip.active{background:var(--primary)!important;color:#fff!important}
+.number-badge,.tag,.pill{background:var(--surface2)!important;color:var(--primary)!important}
+:root[data-theme="dark"] .next-prayer,:root[data-theme="dark"] .hero{background:linear-gradient(145deg,var(--primary2),#031d17)!important;color:#fff!important}
+:root[data-theme="dark"] .hadith-card,:root[data-theme="dark"] .dhikr-card,:root[data-theme="dark"] .adhkar-card{box-shadow:0 8px 24px rgba(0,0,0,.22)!important}
+
+/* Application color selector. */
+#accentSwatches{display:flex!important;flex-wrap:wrap!important;gap:12px!important;opacity:1!important}
+#accentSwatches .swatch{width:54px!important;height:54px!important;border:3px solid var(--line)!important;border-radius:50%!important;opacity:1!important;box-shadow:0 3px 10px rgba(0,0,0,.18)!important}
+#accentSwatches .swatch.active{border-color:var(--accent)!important;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 28%,transparent)!important}
+/* Page-color controls cannot recolor photographed Mushaf pages, so hide the misleading row. */
+#mushafSwatches{display:none!important}
+.setting:has(#mushafSwatches){display:none!important}
+
+/* Audio cards never expose legacy white/gray frames while the stable list is being created. */
+body.audio-page-active:not(.v417-audio-ready) #audioSurahList{opacity:0!important;min-height:68vh!important}
+body.audio-page-active.v417-audio-ready #audioSurahList{opacity:1!important;transition:opacity .12s ease!important}
+#page-audio,#page-audio .audio-surah-list{background:var(--bg)!important;color:var(--text)!important}
+#page-audio .compact-audio-row.v416-row,
+#page-audio .compact-audio-row.v416-row.available,
+#page-audio .compact-audio-row.v416-row.missing{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important;transition:none!important}
+#page-audio .compact-audio-row.v416-row.current{background:color-mix(in srgb,var(--surface) 88%,var(--accent) 12%)!important;border-color:var(--accent)!important}
+#page-audio .audio-row-main,#page-audio .audio-row-main:hover,#page-audio .audio-row-main:focus{background:transparent!important;color:var(--text)!important}
+#page-audio .audio-row-main:active{background:var(--surface2)!important}
+#page-audio .audio-number,#page-audio .audio-local-badge,.v416-download-progress{background:var(--surface2)!important;color:var(--primary)!important}
+#page-audio .audio-row-action.download{background:var(--primary)!important;color:#fff!important}
+.audio-mini-player{background:#063b2f!important;color:#fff!important}
+
+/* Avoid full-circle animation at the north boundary; JS supplies a continuous angle. */
+.qibla-arrow{transition:transform 90ms linear!important;will-change:transform!important}
+
+/* The prepared image is cropped around the printed ornament, then fills the available reader width. */
+body.reader-mode .mushaf-stage.image-mushaf-stage,body.reader-mode .image-page-layer{background:#fff!important}
+body.reader-mode .image-page-layer{padding:max(52px,calc(env(safe-area-inset-top) + 46px)) 0 0!important;align-items:flex-start!important}
+body.reader-mode .image-page-layer .mushaf-image-shell{width:100vw!important;max-width:100vw!important;height:calc(100dvh - max(52px,calc(env(safe-area-inset-top) + 46px)))!important;background:#fff!important}
+body.reader-mode .image-page-layer .page-content-image{inset:0!important;width:100%!important;height:100%!important;object-fit:contain!important;object-position:center top!important;background:#fff!important}
+
+@media(max-width:390px){
+  body.reader-mode .image-page-layer{padding-top:max(48px,calc(env(safe-area-inset-top) + 43px))!important}
+  body.reader-mode .image-page-layer .mushaf-image-shell{height:calc(100dvh - max(48px,calc(env(safe-area-inset-top) + 43px)))!important}
+}
