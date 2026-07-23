@@ -5,10 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#031f19">
   <title>رفيق الهدى</title>
+  <script>
+    (function(){
+      try{
+        var preference=localStorage.getItem('theme')||'system';
+        var theme=preference==='system'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):preference;
+        if(['light','dark','sepia'].indexOf(theme)<0)theme='light';
+        document.documentElement.dataset.theme=theme;
+        document.documentElement.dataset.themePreference=preference;
+        document.documentElement.dataset.accent=localStorage.getItem('accent')||'emerald';
+      }catch(ignore){document.documentElement.dataset.theme='light';document.documentElement.dataset.accent='emerald'}
+    })();
+  </script>
   <link rel="stylesheet" href="app-v2.css">
   <link rel="stylesheet" href="app-v3.css">
   <link rel="stylesheet" href="app-v4.css">
   <link rel="stylesheet" href="app-v5.css">
+  <link rel="stylesheet" href="app-v20.css">
   <script src="adhan.umd.min.js"></script>
 </head>
 <body>
@@ -115,7 +128,7 @@
         <div class="setting"><label class="switch-row"><span>تقليل الحركة</span><input id="reduceMotionToggle" type="checkbox" onchange="setReduceMotion(this.checked)"></label></div>
         <div class="setting"><label>طريقة حساب الصلاة</label><select id="methodSelect" class="select" onchange="setPrayerMethod(this.value)"><option value="MWL">رابطة العالم الإسلامي</option><option value="UmmAlQura">أم القرى</option><option value="Egyptian">الهيئة المصرية</option><option value="Karachi">كراتشي</option></select></div>
         <div class="setting danger-zone"><label>البيانات</label><button class="danger-btn" onclick="clearAppData()">مسح العلامات والإعدادات</button></div>
-        <div class="setting"><strong>حول رفيق الهدى</strong><p class="muted">الإصدار 4.1 — تصميم زمردي ذهبي، صفحات 2D سلسة، بحث دقيق، أحاديث كاملة، وقبلة مستقرة. يعمل دون إنترنت.</p></div>
+        <div class="setting"><strong>حول رفيق الهدى</strong><p class="muted">الإصدار 4.17 — ثيم ثابت، تنزيل صوت مستقر، قبلة بلا دوران كامل، وصفحات مصحف مزخرفة ممتلئة.</p></div>
       </div>
     </section>
   </main>
