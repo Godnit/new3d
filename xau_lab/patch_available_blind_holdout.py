@@ -4,7 +4,7 @@ import re
 # Protocol repair only; no strategy parameter, signal, execution or risk logic
 # is changed here. The June 2022 and June 2024 periods have now been observed
 # in run 132 and are retired from holdout use. Seal two previously unused,
-# non-overlapping August periods before the new close-location revision runs.
+# non-overlapping August periods before the archived close-location revision.
 runner_path = Path("xau_lab/hf_window_runner.py")
 runner = runner_path.read_text(encoding="utf-8")
 
@@ -29,14 +29,18 @@ runner, count = re.subn(
     flags=re.S,
 )
 if count != 1:
-    raise SystemExit("could not install fresh August blind holdout protocol")
+    raise SystemExit("could not install archived August blind holdout protocol")
 runner_path.write_text(runner, encoding="utf-8")
-print("Installed fresh untouched holdouts: August 2022 and August 2024")
+print("Installed archived holdouts: August 2022 and August 2024")
 
-# Run exactly one new strategy revision after all legacy patches. It changes
-# only candle close-location tolerance for the already identified strict M15
-# sell-resumption family; the newly sealed holdout periods are never consulted
-# by this patch.
-revision = Path("xau_lab/patch_strict_sell_resumption_close65_fresh_aug_holdout.py")
+# Rebuild the previously tested close-location candidate for continuity.
+archived_revision = Path("xau_lab/patch_strict_sell_resumption_close65_fresh_aug_holdout.py")
+namespace = {"__name__": "__main__", "__file__": str(archived_revision)}
+exec(compile(archived_revision.read_text(encoding="utf-8"), str(archived_revision), "exec"), namespace)
+
+# Run exactly one new economically defensible strategy revision for this
+# iteration. This final patch also retires the now-observed August gates and
+# seals fresh January 2022/2024 holdouts before the run starts.
+revision = Path("xau_lab/patch_all_sell_resumption_fresh_jan_holdout.py")
 namespace = {"__name__": "__main__", "__file__": str(revision)}
 exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), namespace)
