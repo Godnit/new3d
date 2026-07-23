@@ -12,22 +12,22 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
-# Ready-made Madinah Mushaf scans. Quran text and the original blue ornament are
-# already combined in each source image; the app never draws a frame at runtime.
+# Ready-made Madinah Mushaf scans. Quran text and ornament are already combined.
 WIDTH = 480
 HEIGHT = 720
 QUALITY = 64
 
 
 def source_urls(page_number: int) -> list[tuple[str, str]]:
-    equran = f"https://equran.me/assets/images/pages/{page_number:04d}.jpg"
-    ummah = f"https://ummah.su/img/mushaf/{page_number}.jpg"
-    encoded = urllib.parse.quote(ummah, safe="")
+    # Prefer the blue decorated scan requested by the user; keep the gold scan as fallback.
+    blue = f"https://ummah.su/img/mushaf/{page_number}.jpg"
+    encoded = urllib.parse.quote(blue, safe="")
+    gold = f"https://equran.me/assets/images/pages/{page_number:04d}.jpg"
     return [
-        (equran, f"https://equran.me/page-img-{page_number}.html"),
-        (ummah, f"https://ummah.su/quran/medinskiy-muskhaf/{page_number}"),
-        ("https://images.weserv.nl/?url=" + encoded + "&output=jpg&q=90", "https://images.weserv.nl/"),
-        ("https://wsrv.nl/?url=" + encoded + "&output=jpg&q=90", "https://wsrv.nl/"),
+        ("https://images.weserv.nl/?url=" + encoded + "&output=jpg&q=92", "https://images.weserv.nl/"),
+        ("https://wsrv.nl/?url=" + encoded + "&output=jpg&q=92", "https://wsrv.nl/"),
+        (blue, f"https://ummah.su/quran/medinskiy-muskhaf/{page_number}"),
+        (gold, f"https://equran.me/page-img-{page_number}.html"),
     ]
 
 
@@ -40,7 +40,7 @@ def download_page(arguments: tuple[int, str]) -> str:
             try:
                 request = urllib.request.Request(url, headers={
                     "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/132 Safari/537.36",
-                    "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
                     "Referer": referer,
                 })
                 with urllib.request.urlopen(request, timeout=75) as response:
@@ -57,15 +57,34 @@ def download_page(arguments: tuple[int, str]) -> str:
     raise RuntimeError(f"Failed to download decorated Mushaf page {page_number}: {last_error}")
 
 
+def crop_outer_paper(source: Image.Image) -> Image.Image:
+    # Remove only the empty scanner margin around the printed ornament. The ornament
+    # itself remains untouched and receives a small safety padding.
+    gray = source.convert("L")
+    mask = gray.point(lambda value: 255 if value < 246 else 0)
+    box = mask.getbbox()
+    if not box:
+        return source
+    left, top, right, bottom = box
+    if right - left < source.width * 0.55 or bottom - top < source.height * 0.55:
+        return source
+    padding = max(6, round(min(source.size) * 0.012))
+    left = max(0, left - padding)
+    top = max(0, top - padding)
+    right = min(source.width, right + padding)
+    bottom = min(source.height, bottom + padding)
+    return source.crop((left, top, right, bottom))
+
+
 def process(arguments: tuple[str, str]) -> tuple[int, int]:
     source_path, output_path = map(Path, arguments)
     with Image.open(source_path) as opened:
         source = ImageOps.exif_transpose(opened).convert("RGB")
 
-    # Preserve the full printed page and every decorated edge without cropping.
+    source = crop_outer_paper(source)
     source = ImageOps.contain(source, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-    source = ImageOps.autocontrast(source, cutoff=(0.06, 0.06))
-    source = source.filter(ImageFilter.UnsharpMask(radius=0.28, percent=112, threshold=3))
+    source = ImageOps.autocontrast(source, cutoff=(0.05, 0.05))
+    source = source.filter(ImageFilter.UnsharpMask(radius=0.27, percent=114, threshold=3))
     source = ImageEnhance.Contrast(source).enhance(1.012)
 
     page = Image.new("RGB", (WIDTH, HEIGHT), "white")
@@ -85,19 +104,12 @@ def main() -> None:
     shutil.rmtree(args.destination, ignore_errors=True)
     args.destination.mkdir(parents=True, exist_ok=True)
 
-    # IMPORTANT: temporary JPGs stay under the system temp directory, never under
-    # app/src/main/assets. This prevents the original scans from being packaged a
-    # second time inside the APK.
     with tempfile.TemporaryDirectory(prefix="rafiq-mushaf-") as temporary:
         source_dir = Path(temporary)
         downloads = [(n, str(source_dir / f"{n:03d}.jpg")) for n in range(1, 605)]
         with ThreadPoolExecutor(max_workers=10) as pool:
             downloaded = list(pool.map(download_page, downloads))
-
-        tasks = [
-            (downloaded[n - 1], str(args.destination / f"page{n:03d}.webp"))
-            for n in range(1, 605)
-        ]
+        tasks = [(downloaded[n - 1], str(args.destination / f"page{n:03d}.webp")) for n in range(1, 605)]
         with ProcessPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
             sizes = list(pool.map(process, tasks, chunksize=6))
 
@@ -117,22 +129,18 @@ def main() -> None:
     if output_bytes >= 45 * 1024 * 1024:
         raise RuntimeError(f"Decorated Mushaf is unexpectedly large: {output_bytes / 1048576:.2f} MiB")
 
-    # Remove leftovers accidentally packaged by the previous implementation.
     for stale in ("mushaf-480-bundle", "mushaf-complete-blue-source"):
         shutil.rmtree(args.destination.parent / stale, ignore_errors=True)
 
     (args.destination.parent / "MUSHAF_SOURCE_NOTICE.txt").write_text(
-        "The app uses complete ready-scanned Hafs Mushaf page images from equran.me, "
-        "with ummah.su as a fallback. Quran text and the original blue ornament are "
-        "one source image; no frame is generated at runtime. Temporary source scans "
-        "are kept outside app assets and are not packaged in the APK. Confirm "
+        "The app uses complete ready-scanned Hafs Mushaf page images, preferring the "
+        "blue decorated ummah.su scan with equran.me as fallback. Quran text and the "
+        "ornament are one source image; no frame is generated at runtime. Empty outer "
+        "scanner margins are cropped while the complete ornament is preserved. Confirm "
         "redistribution permission before a public or commercial release.\n",
         encoding="utf-8",
     )
-    print(
-        f"Built 604 complete blue-decorated pages at {WIDTH}x{HEIGHT}, WebP q={QUALITY}: "
-        f"{output_bytes / 1048576:.2f} MiB"
-    )
+    print(f"Built 604 full blue-decorated pages: {output_bytes / 1048576:.2f} MiB")
 
 
 if __name__ == "__main__":
