@@ -12,6 +12,7 @@
   document.write('<link rel="stylesheet" href="app-v17.css">');
   document.write('<link rel="stylesheet" href="app-v18.css">');
   document.write('<link rel="stylesheet" href="app-v19.css">');
+  document.write('<link rel="stylesheet" href="app-v20.css">');
   document.write('<script src="app-v8.js"><\/script>');
   document.write('<script src="app-v9.js"><\/script>');
   document.write('<script src="app-v11.js"><\/script>');
@@ -24,4 +25,5 @@
   document.write('<script src="app-v18.js"><\/script>');
   document.write('<script src="app-v19.js"><\/script>');
   document.write('<script src="app-v20.js"><\/script>');
+  document.write('<script src="app-v21.js"><\/script>');
 })();
