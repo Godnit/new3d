@@ -2,11 +2,9 @@ from pathlib import Path
 import re
 
 # Data/protocol repair only; no strategy parameter, signal, or execution logic
-# is changed. The partitioned mirror starts in May 2021, so the prior January
-# 2021 blind window cannot run. The December 2024 window has already produced
-# an artifact in the failed protocol run and is therefore no longer blind.
-# Replace both with two data-available periods that do not appear in any prior
-# development, validation, or holdout protocol on this branch.
+# is changed here. The partitioned mirror starts in May 2021, so the prior
+# January 2021 blind window cannot run. The December 2024 window was already
+# observed in an earlier failed protocol run and therefore is not blind.
 runner_path = Path("xau_lab/hf_window_runner.py")
 runner = runner_path.read_text(encoding="utf-8")
 
@@ -31,14 +29,13 @@ runner, count = re.subn(
     flags=re.S,
 )
 if count != 1:
-    raise SystemExit("could not install fresh data-available blind holdout protocol")
-
+    raise SystemExit("could not install data-available blind holdout protocol")
 runner_path.write_text(runner, encoding="utf-8")
-print("Installed fresh available holdouts: June 2022 and June 2024")
+print("Installed intermediate available holdouts: June 2022 and June 2024")
 
-# Run the current iteration's single strategy revision last, after all legacy
-# patches. It also retires the now-observed June audit windows and seals the new
-# February/March 2025 holdout before the window jobs start.
-revision = Path("xau_lab/patch_m15_strict_all_sell_resumption_fresh_febmar_holdout.py")
+# Run exactly one new strategy revision for this iteration after all legacy
+# patches. That revision also retires the now-observed February/March 2025 gate
+# and seals two newly untouched periods before any window job starts.
+revision = Path("xau_lab/patch_m15_slope_sell_resumption_fresh_holdout.py")
 namespace = {"__name__": "__main__", "__file__": str(revision)}
 exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), namespace)
