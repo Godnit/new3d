@@ -12,9 +12,10 @@ import real_tick_lab as lab
 
 REPO_ID = "CarlosSilva1/xauusd-ticks"
 
-# Development and validation windows remain unchanged. The prior 2025 holdout
-# months have now been observed and are retired. Two previously unused date
-# windows become the fresh selection-blind holdout for this single revision.
+# Fixed diagnostic protocol. Development/validation windows remain frozen.
+# The mirror begins on 2021-05-24, so the unavailable February window is
+# replaced by the earliest available non-overlapping interval. These dates are
+# not strategy parameters and are not referenced by the signal logic.
 WINDOWS = [
     ("dev_2021_jun", "dev", "2021-06-07", "2021-06-26"),
     ("dev_2021_oct", "dev", "2021-10-04", "2021-10-23"),
@@ -24,7 +25,7 @@ WINDOWS = [
     ("dev_2023_oct", "dev", "2023-10-02", "2023-10-21"),
     ("val_2024_mar", "validation", "2024-03-04", "2024-03-23"),
     ("val_2024_oct", "validation", "2024-10-07", "2024-10-26"),
-    ("hold_2021_feb", "holdout", "2021-02-01", "2021-02-20"),
+    ("hold_2021_may_available", "holdout", "2021-05-24", "2021-06-05"),
     ("hold_2022_dec", "holdout", "2022-12-01", "2022-12-20"),
 ]
 
@@ -51,9 +52,6 @@ def build_window_hf(name: str, split: str, eval_start_s: str, eval_end_s: str) -
         if not matches:
             month_start = pd.Timestamp(year=year, month=month, day=1, tz="UTC")
             month_end = month_start + pd.offsets.MonthBegin(1)
-            # Some mirrors start at the evaluation month and omit the preceding
-            # warm-up month. Missing warm-up-only data is safe to skip: EMA/ATR
-            # min-period rules suppress entries until enough closed bars exist.
             if month_end <= eval_start:
                 print(f"Skipping unavailable warm-up-only partition {prefix}", flush=True)
                 continue
@@ -126,9 +124,15 @@ def build_window_hf(name: str, split: str, eval_start_s: str, eval_end_s: str) -
     bars[["m15_close", "m15_ema20", "m15_ema50"]] = m15a.to_numpy()
     bars["server_time"] = bars.index.tz_convert(lab.SERVER_TZ)
 
+    spread = bars["spread_first"].dropna()
+    atr = bars["atr14"].dropna()
+    aligned = pd.concat([spread.rename("spread"), atr.rename("atr")], axis=1).dropna()
+    ratio = aligned["spread"] / aligned["atr"]
     print(
         f"Built {name}: ticks={len(ticks):,}, M1 bars={len(bars):,}, "
-        f"range={bars.index.min()}..{bars.index.max()}",
+        f"range={bars.index.min()}..{bars.index.max()}, "
+        f"spread_p50={spread.median():.4f}, spread_p95={spread.quantile(0.95):.4f}, "
+        f"spread_atr_p50={ratio.median():.3f}, spread_atr_p95={ratio.quantile(0.95):.3f}",
         flush=True,
     )
     return lab.WindowData(
@@ -147,6 +151,9 @@ def build_window_hf(name: str, split: str, eval_start_s: str, eval_end_s: str) -
 
 def main() -> int:
     index = int(os.environ["WINDOW_INDEX"])
+    if index < 0 or index >= len(WINDOWS):
+        raise SystemExit(f"WINDOW_INDEX out of range: {index}")
+
     out_dir = Path(os.environ.get("WINDOW_RESULTS_DIR", "window_results"))
     out_dir.mkdir(parents=True, exist_ok=True)
     name, split, start_s, end_s = WINDOWS[index]
@@ -155,6 +162,7 @@ def main() -> int:
     metric_rows: list[dict] = []
     trade_rows: list[dict] = []
     candidates = lab.candidates()
+    print(f"Window {index} {name}: evaluating {len(candidates)} candidates", flush=True)
     for pos, candidate in enumerate(candidates, 1):
         metrics, trades = lab.run_candidate(data, candidate)
         metric_rows.append(asdict(metrics))
