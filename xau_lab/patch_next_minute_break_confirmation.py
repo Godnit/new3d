@@ -10,8 +10,13 @@ text = path.read_text(encoding="utf-8")
 # high/low by 0.05 ATR before entering. This avoids buying/selling the first
 # quote of a minute after a signal that immediately fails, without introducing
 # a new indicator, date rule, or holdout-specific parameter.
+#
+# The entry-freshness patch may already have normalized the first quote into
+# first_ask/first_bid. Match either form so this patch remains idempotent and
+# does not fail merely because a preceding execution-quality patch changed one
+# assignment line.
 pattern = re.compile(
-    r'''        spread = float\(minute_asks\[0\] - minute_bids\[0\]\)\n'''
+    r'''        spread = (?:float\(minute_asks\[0\] - minute_bids\[0\]\)|first_ask - first_bid)\n'''
     r'''        if spread > c\.max_spread_price or \(atr > 0 and spread / atr > c\.max_spread_atr\):\n'''
     r'''            continue\n'''
     r'''        entry = .*?\n'''
@@ -76,7 +81,10 @@ replacement = '''        signal_bar = bars.iloc[i - 1]
 
 text, count = pattern.subn(replacement, text, count=1)
 if count != 1:
-    raise SystemExit(f"expected one entry block for confirmation patch, found {count}")
-
-path.write_text(text, encoding="utf-8")
-print("Applied next-minute high/low break confirmation entry")
+    if 'sig_name + "_CONF"' in text and "entry_tick + 1" in text:
+        print("Next-minute break confirmation already applied")
+    else:
+        raise SystemExit(f"expected one entry block for confirmation patch, found {count}")
+else:
+    path.write_text(text, encoding="utf-8")
+    print("Applied next-minute high/low break confirmation entry")
