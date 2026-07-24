@@ -48,6 +48,7 @@ jobs:
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
             python xau_lab/patch_execution_order.py || exit $?
             python xau_lab/patch_sell_only_devval_revision.py || exit $?
+            python xau_lab/patch_cross_sell_only_devval.py || exit $?
             python xau_lab/patch_available_holdout_window.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
@@ -125,6 +126,7 @@ jobs:
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
             python xau_lab/patch_execution_order.py || exit $?
             python xau_lab/patch_sell_only_devval_revision.py || exit $?
+            python xau_lab/patch_cross_sell_only_devval.py || exit $?
             python xau_lab/patch_available_holdout_window.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
