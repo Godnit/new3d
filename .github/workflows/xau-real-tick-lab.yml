@@ -52,6 +52,7 @@ jobs:
             python xau_lab/patch_fresh_dec2025_holdout.py || exit $?
             python xau_lab/patch_entry_freshness.py || exit $?
             python xau_lab/patch_liquid_session.py || exit $?
+            python xau_lab/patch_session_0616.py || exit $?
             python xau_lab/patch_m5_trend_strength.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
@@ -133,6 +134,7 @@ jobs:
             python xau_lab/patch_fresh_dec2025_holdout.py || exit $?
             python xau_lab/patch_entry_freshness.py || exit $?
             python xau_lab/patch_liquid_session.py || exit $?
+            python xau_lab/patch_session_0616.py || exit $?
             python xau_lab/patch_m5_trend_strength.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
