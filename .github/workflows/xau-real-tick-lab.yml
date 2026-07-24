@@ -55,6 +55,8 @@ jobs:
             python xau_lab/patch_session_0616.py || exit $?
             python xau_lab/patch_m5_trend_strength.py || exit $?
             python xau_lab/patch_m15_slope.py || exit $?
+            python xau_lab/patch_cross_buy_only_revision.py || exit $?
+            python xau_lab/patch_fresh_cross_buy_protocol.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -138,6 +140,8 @@ jobs:
             python xau_lab/patch_session_0616.py || exit $?
             python xau_lab/patch_m5_trend_strength.py || exit $?
             python xau_lab/patch_m15_slope.py || exit $?
+            python xau_lab/patch_cross_buy_only_revision.py || exit $?
+            python xau_lab/patch_fresh_cross_buy_protocol.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
