@@ -49,9 +49,10 @@ jobs:
             python xau_lab/patch_execution_order.py || exit $?
             python xau_lab/patch_cross_plus_strict_cont_sell.py || exit $?
             python xau_lab/patch_available_holdout_window.py || exit $?
-            python xau_lab/patch_fresh_2023_holdout.py || exit $?
+            python xau_lab/patch_fresh_dec2025_holdout.py || exit $?
             python xau_lab/patch_entry_freshness.py || exit $?
             python xau_lab/patch_liquid_session.py || exit $?
+            python xau_lab/patch_next_minute_break_confirmation.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -129,9 +130,10 @@ jobs:
             python xau_lab/patch_execution_order.py || exit $?
             python xau_lab/patch_cross_plus_strict_cont_sell.py || exit $?
             python xau_lab/patch_available_holdout_window.py || exit $?
-            python xau_lab/patch_fresh_2023_holdout.py || exit $?
+            python xau_lab/patch_fresh_dec2025_holdout.py || exit $?
             python xau_lab/patch_entry_freshness.py || exit $?
             python xau_lab/patch_liquid_session.py || exit $?
+            python xau_lab/patch_next_minute_break_confirmation.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
