@@ -1,1 +1,1 @@
-Decode with: cat bundle.b64.part-* | base64 -d > reference_mannequin_v03_bundle.tar.gz
+Decode with: cat bundle.b64.part-* | base64 -d > reference_mannequin_v04_bundle.tar.gz

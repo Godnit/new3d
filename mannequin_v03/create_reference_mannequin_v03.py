@@ -20,7 +20,7 @@ def parse_output_dir():
     return out
 
 OUT_DIR = parse_output_dir()
-MODEL_NAME = "reference_mannequin_v03"
+MODEL_NAME = "reference_mannequin_v04"
 
 
 def clear_scene():
@@ -143,9 +143,9 @@ scene.view_settings.look = 'AgX - Medium High Contrast'
 scene.unit_settings.system = 'METRIC'
 scene.unit_settings.scale_length = 1.0
 
-body_mat = make_material('Warm_Salmon_Body', (0.88, 0.39, 0.34, 1.0), 0.68)
-joint_mat = make_material('Muted_Rose_Joints', (0.62, 0.24, 0.22, 1.0), 0.72)
-light_mat = make_material('Soft_Highlight', (0.95, 0.50, 0.44, 1.0), 0.65)
+body_mat = make_material('Warm_Salmon_Body', (0.55, 0.15, 0.11, 1.0), 0.72)
+joint_mat = make_material('Muted_Rose_Joints', (0.28, 0.055, 0.040, 1.0), 0.76)
+light_mat = make_material('Soft_Highlight', (0.68, 0.22, 0.16, 1.0), 0.72)
 
 J = {
     'pelvis': (0.0, 0.0, 0.98),
@@ -153,50 +153,50 @@ J = {
     'chest': (0.0, 0.0, 1.58),
     'neck': (0.0, 0.0, 1.88),
     'head_top': (0.0, 0.0, 2.28),
-    'L_shoulder': (-0.38, 0.0, 1.75),
-    'R_shoulder': (0.38, 0.0, 1.75),
-    'L_elbow': (-0.43, -0.005, 1.34),
-    'R_elbow': (0.43, -0.005, 1.34),
-    'L_wrist': (-0.43, -0.015, 0.97),
-    'R_wrist': (0.43, -0.015, 0.97),
-    'L_hand': (-0.43, -0.025, 0.77),
-    'R_hand': (0.43, -0.025, 0.77),
-    'L_hip': (-0.18, 0.0, 0.92),
-    'R_hip': (0.18, 0.0, 0.92),
-    'L_knee': (-0.18, 0.0, 0.42),
-    'R_knee': (0.18, 0.0, 0.42),
-    'L_ankle': (-0.18, -0.01, 0.03),
-    'R_ankle': (0.18, -0.01, 0.03),
+    'L_shoulder': (-0.34, 0.0, 1.75),
+    'R_shoulder': (0.34, 0.0, 1.75),
+    'L_elbow': (-0.37, -0.005, 1.34),
+    'R_elbow': (0.37, -0.005, 1.34),
+    'L_wrist': (-0.37, -0.015, 0.97),
+    'R_wrist': (0.37, -0.015, 0.97),
+    'L_hand': (-0.37, -0.025, 0.79),
+    'R_hand': (0.37, -0.025, 0.79),
+    'L_hip': (-0.16, 0.0, 0.92),
+    'R_hip': (0.16, 0.0, 0.92),
+    'L_knee': (-0.16, 0.0, 0.40),
+    'R_knee': (0.16, 0.0, 0.40),
+    'L_ankle': (-0.16, -0.01, -0.02),
+    'R_ankle': (0.16, -0.01, -0.02),
 }
 
 objects_to_bones = []
 
 torso = add_ring_mesh('Torso_Breastplate', [
-    (1.34, 0.14, 0.10),
-    (1.43, 0.22, 0.14),
-    (1.62, 0.33, 0.17),
-    (1.78, 0.42, 0.19),
-    (1.84, 0.36, 0.17),
+    (1.36, 0.12, 0.09),
+    (1.44, 0.20, 0.13),
+    (1.62, 0.29, 0.16),
+    (1.77, 0.37, 0.18),
+    (1.83, 0.32, 0.16),
 ], body_mat)
 objects_to_bones.append((torso, 'chest'))
 
-collar = add_uv_ellipsoid('Shoulder_Collar_Plate', (0, 0, 1.79), (0.43, 0.18, 0.055), light_mat)
+collar = add_uv_ellipsoid('Shoulder_Collar_Plate', (0, 0, 1.79), (0.36, 0.15, 0.035), light_mat)
 objects_to_bones.append((collar, 'chest'))
 
-abdomen = add_uv_ellipsoid('Abdomen_Joint', (0, 0, 1.27), (0.18, 0.13, 0.20), joint_mat)
+abdomen = add_uv_ellipsoid('Abdomen_Joint', (0, 0, 1.27), (0.15, 0.11, 0.18), joint_mat)
 objects_to_bones.append((abdomen, 'spine'))
 
-pelvis = add_uv_ellipsoid('Pelvis_Core', (0, 0, 1.01), (0.28, 0.17, 0.21), body_mat)
+pelvis = add_uv_ellipsoid('Pelvis_Core', (0, 0, 1.01), (0.23, 0.15, 0.18), body_mat)
 objects_to_bones.append((pelvis, 'pelvis'))
 
 for side, sx in [('L', -1), ('R', 1)]:
-    hip_guard = add_uv_ellipsoid(f'{side}_Hip_Guard', (0.20*sx, -0.005, 0.95), (0.16, 0.105, 0.075), light_mat)
+    hip_guard = add_uv_ellipsoid(f'{side}_Hip_Guard', (0.17*sx, -0.005, 0.95), (0.13, 0.09, 0.055), body_mat)
     hip_guard.rotation_euler[1] = math.radians(-18*sx)
     objects_to_bones.append((hip_guard, 'pelvis'))
 
-neck = add_uv_ellipsoid('Neck_Joint', (0, 0, 1.90), (0.07, 0.065, 0.095), joint_mat)
+neck = add_uv_ellipsoid('Neck_Joint', (0, 0, 1.90), (0.06, 0.055, 0.080), joint_mat)
 objects_to_bones.append((neck, 'neck'))
-head = add_uv_ellipsoid('Featureless_Egg_Head', (0, 0, 2.10), (0.15, 0.125, 0.23), body_mat)
+head = add_uv_ellipsoid('Featureless_Egg_Head', (0, 0, 2.09), (0.14, 0.115, 0.205), body_mat)
 for v in head.data.vertices:
     if v.co.z < -0.25:
         factor = 0.78 + 0.22 * ((v.co.z + 1.0) / 0.75)
@@ -205,35 +205,35 @@ for v in head.data.vertices:
 objects_to_bones.append((head, 'head'))
 
 for side, sx in [('L', -1), ('R', 1)]:
-    shoulder = add_uv_ellipsoid(f'{side}_Shoulder_Joint', J[f'{side}_shoulder'], (0.105, 0.105, 0.105), joint_mat)
+    shoulder = add_uv_ellipsoid(f'{side}_Shoulder_Joint', J[f'{side}_shoulder'], (0.090, 0.090, 0.090), joint_mat)
     objects_to_bones.append((shoulder, f'{side}_upper_arm'))
-    upper = add_tapered_segment(f'{side}_Upper_Arm', J[f'{side}_shoulder'], J[f'{side}_elbow'], 0.085, 0.060, body_mat)
+    upper = add_tapered_segment(f'{side}_Upper_Arm', J[f'{side}_shoulder'], J[f'{side}_elbow'], 0.075, 0.052, body_mat)
     objects_to_bones.append((upper, f'{side}_upper_arm'))
-    elbow = add_uv_ellipsoid(f'{side}_Elbow_Joint', J[f'{side}_elbow'], (0.067, 0.065, 0.062), joint_mat)
+    elbow = add_uv_ellipsoid(f'{side}_Elbow_Joint', J[f'{side}_elbow'], (0.058, 0.056, 0.055), joint_mat)
     objects_to_bones.append((elbow, f'{side}_forearm'))
-    fore = add_tapered_segment(f'{side}_Forearm', J[f'{side}_elbow'], J[f'{side}_wrist'], 0.070, 0.045, body_mat)
+    fore = add_tapered_segment(f'{side}_Forearm', J[f'{side}_elbow'], J[f'{side}_wrist'], 0.060, 0.038, body_mat)
     objects_to_bones.append((fore, f'{side}_forearm'))
-    wrist = add_uv_ellipsoid(f'{side}_Wrist_Joint', J[f'{side}_wrist'], (0.045, 0.043, 0.044), joint_mat)
+    wrist = add_uv_ellipsoid(f'{side}_Wrist_Joint', J[f'{side}_wrist'], (0.038, 0.036, 0.038), joint_mat)
     objects_to_bones.append((wrist, f'{side}_hand'))
-    hand = add_uv_ellipsoid(f'{side}_Palm', J[f'{side}_hand'], (0.066, 0.050, 0.115), body_mat)
+    hand = add_uv_ellipsoid(f'{side}_Palm', J[f'{side}_hand'], (0.055, 0.043, 0.120), body_mat)
     hand.rotation_euler[1] = math.radians(4*sx)
     objects_to_bones.append((hand, f'{side}_hand'))
-    thumb = add_uv_ellipsoid(f'{side}_Thumb', (0.054*sx + J[f'{side}_hand'][0], -0.015, J[f'{side}_hand'][2] + 0.02), (0.030, 0.026, 0.070), body_mat, 20, 12)
+    thumb = add_uv_ellipsoid(f'{side}_Thumb', (0.054*sx + J[f'{side}_hand'][0], -0.015, J[f'{side}_hand'][2] + 0.02), (0.025, 0.022, 0.055), body_mat, 20, 12)
     thumb.rotation_euler[1] = math.radians(-28*sx)
     objects_to_bones.append((thumb, f'{side}_hand'))
 
 for side, sx in [('L', -1), ('R', 1)]:
-    hip = add_uv_ellipsoid(f'{side}_Hip_Joint', J[f'{side}_hip'], (0.105, 0.10, 0.105), joint_mat)
+    hip = add_uv_ellipsoid(f'{side}_Hip_Joint', J[f'{side}_hip'], (0.090, 0.085, 0.090), joint_mat)
     objects_to_bones.append((hip, f'{side}_thigh'))
-    thigh = add_tapered_segment(f'{side}_Thigh', J[f'{side}_hip'], J[f'{side}_knee'], 0.125, 0.085, body_mat)
+    thigh = add_tapered_segment(f'{side}_Thigh', J[f'{side}_hip'], J[f'{side}_knee'], 0.105, 0.072, body_mat)
     objects_to_bones.append((thigh, f'{side}_thigh'))
-    knee = add_uv_ellipsoid(f'{side}_Knee_Joint', J[f'{side}_knee'], (0.090, 0.085, 0.080), joint_mat)
+    knee = add_uv_ellipsoid(f'{side}_Knee_Joint', J[f'{side}_knee'], (0.075, 0.072, 0.070), joint_mat)
     objects_to_bones.append((knee, f'{side}_shin'))
-    shin = add_tapered_segment(f'{side}_Shin', J[f'{side}_knee'], J[f'{side}_ankle'], 0.085, 0.052, body_mat)
+    shin = add_tapered_segment(f'{side}_Shin', J[f'{side}_knee'], J[f'{side}_ankle'], 0.072, 0.044, body_mat)
     objects_to_bones.append((shin, f'{side}_shin'))
-    ankle = add_uv_ellipsoid(f'{side}_Ankle_Joint', J[f'{side}_ankle'], (0.052, 0.05, 0.045), joint_mat)
+    ankle = add_uv_ellipsoid(f'{side}_Ankle_Joint', J[f'{side}_ankle'], (0.044, 0.042, 0.040), joint_mat)
     objects_to_bones.append((ankle, f'{side}_foot'))
-    foot = add_uv_ellipsoid(f'{side}_Foot', (0.18*sx, -0.075, -0.02), (0.082, 0.155, 0.060), body_mat)
+    foot = add_uv_ellipsoid(f'{side}_Foot', (0.16*sx, -0.085, -0.08), (0.070, 0.160, 0.050), body_mat)
     foot.rotation_euler[0] = math.radians(4)
     objects_to_bones.append((foot, f'{side}_foot'))
 
@@ -256,19 +256,19 @@ for side, sx in [('L', -1), ('R', 1)]:
     hand_b = create_bone(arm_data, f'{side}_hand', J[f'{side}_wrist'], J[f'{side}_hand'], fa, True)
     thigh_b = create_bone(arm_data, f'{side}_thigh', J[f'{side}_hip'], J[f'{side}_knee'], root, False)
     shin_b = create_bone(arm_data, f'{side}_shin', J[f'{side}_knee'], J[f'{side}_ankle'], thigh_b, True)
-    foot_b = create_bone(arm_data, f'{side}_foot', J[f'{side}_ankle'], (0.18*sx,-0.16,-0.02), shin_b, False)
+    foot_b = create_bone(arm_data, f'{side}_foot', J[f'{side}_ankle'], (0.16*sx,-0.17,-0.08), shin_b, False)
 bpy.ops.object.mode_set(mode='OBJECT')
 arm.select_set(False)
 
 for obj, bone_name in objects_to_bones:
     bone_parent(obj, arm, bone_name)
 
-arm['model_version'] = 'R03'
+arm['model_version'] = 'R04'
 arm['reference'] = 'three.js stylized articulated mannequin supplied by user'
 arm['rig_type'] = 'rigid bone-parented body pieces'
 
 ground_mat = make_material('Warm_White_Background', (0.94, 0.94, 0.91, 1.0), 0.85)
-bpy.ops.mesh.primitive_plane_add(size=20, location=(0,0,-0.085))
+bpy.ops.mesh.primitive_plane_add(size=20, location=(0,0,-0.145))
 ground = bpy.context.object
 ground.name = 'Preview_Ground'
 ground.data.materials.append(ground_mat)
@@ -277,7 +277,7 @@ world = scene.world or bpy.data.worlds.new('World')
 scene.world = world
 world.use_nodes = True
 world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.92, 0.92, 0.89, 1)
-world.node_tree.nodes['Background'].inputs['Strength'].default_value = 0.75
+world.node_tree.nodes['Background'].inputs['Strength'].default_value = 0.45
 
 def add_area(name, loc, energy, size, color):
     data = bpy.data.lights.new(name, type='AREA')
@@ -291,15 +291,15 @@ def add_area(name, loc, energy, size, color):
     look_at(obj, (0,0,1.1))
     return obj
 
-add_area('Key_Light', (-3.2,-4.0,5.2), 850, 4.0, (1.0,0.78,0.70))
-add_area('Fill_Light', (3.2,-2.0,3.0), 420, 3.5, (0.72,0.82,1.0))
-add_area('Rim_Light', (0,3.0,4.0), 500, 2.8, (1.0,0.70,0.62))
+add_area('Key_Light', (-3.2,-4.0,5.2), 520, 4.0, (1.0,0.78,0.70))
+add_area('Fill_Light', (3.2,-2.0,3.0), 220, 3.5, (0.72,0.82,1.0))
+add_area('Rim_Light', (0,3.0,4.0), 300, 2.8, (1.0,0.70,0.62))
 
 cam_data = bpy.data.cameras.new('Preview_Camera')
 cam = bpy.data.objects.new('Preview_Camera', cam_data)
 bpy.context.collection.objects.link(cam)
-cam.location = (3.25, -6.2, 2.65)
-cam_data.lens = 64
+cam.location = (1.55, -6.8, 2.75)
+cam_data.lens = 70
 look_at(cam, (0, 0, 1.10))
 scene.camera = cam
 
