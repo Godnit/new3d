@@ -1,0 +1,96 @@
+name: Build Reference Mannequin
+
+on:
+  pull_request:
+    paths:
+      - 'mannequin_v03/create_reference_mannequin_v03.py'
+      - '.github/workflows/build-mannequin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Install Blender and export dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender python3-numpy xvfb libegl1 libgl1 libglx-mesa0
+          blender --version
+          python3 -c "import numpy; print(numpy.__version__)"
+
+      - name: Final silhouette refinement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('mannequin_v03/create_reference_mannequin_v03.py')
+          text = path.read_text()
+          replacements = [
+              ('MODEL_NAME = "reference_mannequin_v04"', 'MODEL_NAME = "reference_mannequin_v05"'),
+              ("    (1.36, 0.12, 0.09),\n    (1.44, 0.20, 0.13),\n    (1.62, 0.29, 0.16),\n    (1.77, 0.37, 0.18),\n    (1.83, 0.32, 0.16),", "    (1.30, 0.045, 0.055),\n    (1.38, 0.13, 0.10),\n    (1.48, 0.21, 0.13),\n    (1.64, 0.29, 0.16),\n    (1.78, 0.36, 0.18),\n    (1.83, 0.31, 0.16),"),
+              ("abdomen = add_uv_ellipsoid('Abdomen_Joint', (0, 0, 1.27), (0.15, 0.11, 0.18), joint_mat)", "abdomen = add_uv_ellipsoid('Abdomen_Joint', (0, 0, 1.25), (0.13, 0.10, 0.15), joint_mat)"),
+              ("pelvis = add_uv_ellipsoid('Pelvis_Core', (0, 0, 1.01), (0.23, 0.15, 0.18), body_mat)", "pelvis = add_uv_ellipsoid('Pelvis_Core', (0, 0, 1.00), (0.19, 0.13, 0.15), body_mat)"),
+              ("hip_guard = add_uv_ellipsoid(f'{side}_Hip_Guard', (0.17*sx, -0.005, 0.95), (0.13, 0.09, 0.055), body_mat)", "hip_guard = add_uv_ellipsoid(f'{side}_Hip_Guard', (0.165*sx, -0.005, 0.95), (0.115, 0.075, 0.045), body_mat)"),
+              ("head = add_uv_ellipsoid('Featureless_Egg_Head', (0, 0, 2.09), (0.14, 0.115, 0.205), body_mat)", "head = add_uv_ellipsoid('Featureless_Egg_Head', (0, 0, 2.065), (0.125, 0.105, 0.185), body_mat)"),
+              ("    'L_hand': (-0.37, -0.025, 0.79),", "    'L_hand': (-0.37, -0.025, 0.82),"),
+              ("    'R_hand': (0.37, -0.025, 0.79),", "    'R_hand': (0.37, -0.025, 0.82),"),
+              ("(0.055, 0.043, 0.120), body_mat", "(0.052, 0.040, 0.135), body_mat"),
+              ("(0.090, 0.090, 0.090), joint_mat", "(0.085, 0.085, 0.085), joint_mat"),
+              ("arm['model_version'] = 'R04'", "arm['model_version'] = 'R05'"),
+              ("cam.location = (1.55, -6.8, 2.75)", "cam.location = (0.85, -6.8, 2.70)"),
+          ]
+          for old, new in replacements:
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+
+      - name: Build and capture Blender log
+        run: |
+          rm -rf build/mannequin_v03 mannequin_v03/generated
+          mkdir -p build/mannequin_v03 mannequin_v03/generated
+          set +e
+          xvfb-run -a blender --background --python mannequin_v03/create_reference_mannequin_v03.py -- --output-dir build/mannequin_v03 > mannequin_v03/generated/blender_build.log 2>&1
+          echo $? > mannequin_v03/generated/blender_exit_code.txt
+          set -e
+          ls -lah build/mannequin_v03 >> mannequin_v03/generated/blender_build.log 2>&1 || true
+
+      - name: Package generated files when present
+        run: |
+          if compgen -G 'build/mannequin_v03/*' > /dev/null; then
+            tar -czf /tmp/reference_mannequin_v05_bundle.tar.gz -C build/mannequin_v03 .
+            sha256sum /tmp/reference_mannequin_v05_bundle.tar.gz > mannequin_v03/generated/bundle.sha256
+            base64 -w 0 /tmp/reference_mannequin_v05_bundle.tar.gz | split -b 70000 -d -a 3 - mannequin_v03/generated/bundle.b64.part-
+            printf '%s\n' 'Decode with: cat bundle.b64.part-* | base64 -d > reference_mannequin_v05_bundle.tar.gz' > mannequin_v03/generated/DECODE.txt
+          else
+            printf '%s\n' 'Blender produced no output files. See blender_build.log.' > mannequin_v03/generated/BUILD_ERROR.txt
+            exit 1
+          fi
+          ls -lah mannequin_v03/generated
+
+      - name: Upload generated Blender bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-mannequin-v05
+          path: /tmp/reference_mannequin_v05_bundle.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Commit diagnostics or generated bundle
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mannequin_v03/create_reference_mannequin_v03.py mannequin_v03/generated
+          if ! git diff --cached --quiet; then
+            git commit -m 'Finalize mannequin reference silhouette [skip ci]'
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
