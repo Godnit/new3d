@@ -29,6 +29,30 @@ jobs:
           blender --version
           python3 -c "import numpy; print(numpy.__version__)"
 
+      - name: Fix rigid bone parenting transform
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('mannequin_v03/create_reference_mannequin_v03.py')
+          text = path.read_text()
+          old = """def bone_parent(obj, armature, bone_name):
+              obj.parent = armature
+              obj.parent_type = 'BONE'
+              obj.parent_bone = bone_name
+              obj.matrix_parent_inverse = armature.matrix_world.inverted()
+          """
+          new = """def bone_parent(obj, armature, bone_name):
+              world_matrix = obj.matrix_world.copy()
+              obj.parent = armature
+              obj.parent_type = 'BONE'
+              obj.parent_bone = bone_name
+              obj.matrix_world = world_matrix
+          """
+          if old not in text:
+              raise SystemExit('Expected bone_parent block not found')
+          path.write_text(text.replace(old, new))
+          PY
+
       - name: Build and capture Blender log
         run: |
           rm -rf build/mannequin_v03 mannequin_v03/generated
