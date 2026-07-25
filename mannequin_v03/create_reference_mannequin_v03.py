@@ -20,7 +20,7 @@ def parse_output_dir():
     return out
 
 OUT_DIR = parse_output_dir()
-MODEL_NAME = "reference_mannequin_v04"
+MODEL_NAME = "reference_mannequin_v05"
 
 
 def clear_scene():
@@ -159,8 +159,8 @@ J = {
     'R_elbow': (0.37, -0.005, 1.34),
     'L_wrist': (-0.37, -0.015, 0.97),
     'R_wrist': (0.37, -0.015, 0.97),
-    'L_hand': (-0.37, -0.025, 0.79),
-    'R_hand': (0.37, -0.025, 0.79),
+    'L_hand': (-0.37, -0.025, 0.82),
+    'R_hand': (0.37, -0.025, 0.82),
     'L_hip': (-0.16, 0.0, 0.92),
     'R_hip': (0.16, 0.0, 0.92),
     'L_knee': (-0.16, 0.0, 0.40),
@@ -172,31 +172,32 @@ J = {
 objects_to_bones = []
 
 torso = add_ring_mesh('Torso_Breastplate', [
-    (1.36, 0.12, 0.09),
-    (1.44, 0.20, 0.13),
-    (1.62, 0.29, 0.16),
-    (1.77, 0.37, 0.18),
-    (1.83, 0.32, 0.16),
+    (1.30, 0.045, 0.055),
+    (1.38, 0.13, 0.10),
+    (1.48, 0.21, 0.13),
+    (1.64, 0.29, 0.16),
+    (1.78, 0.36, 0.18),
+    (1.83, 0.31, 0.16),
 ], body_mat)
 objects_to_bones.append((torso, 'chest'))
 
 collar = add_uv_ellipsoid('Shoulder_Collar_Plate', (0, 0, 1.79), (0.36, 0.15, 0.035), light_mat)
 objects_to_bones.append((collar, 'chest'))
 
-abdomen = add_uv_ellipsoid('Abdomen_Joint', (0, 0, 1.27), (0.15, 0.11, 0.18), joint_mat)
+abdomen = add_uv_ellipsoid('Abdomen_Joint', (0, 0, 1.25), (0.13, 0.10, 0.15), joint_mat)
 objects_to_bones.append((abdomen, 'spine'))
 
-pelvis = add_uv_ellipsoid('Pelvis_Core', (0, 0, 1.01), (0.23, 0.15, 0.18), body_mat)
+pelvis = add_uv_ellipsoid('Pelvis_Core', (0, 0, 1.00), (0.19, 0.13, 0.15), body_mat)
 objects_to_bones.append((pelvis, 'pelvis'))
 
 for side, sx in [('L', -1), ('R', 1)]:
-    hip_guard = add_uv_ellipsoid(f'{side}_Hip_Guard', (0.17*sx, -0.005, 0.95), (0.13, 0.09, 0.055), body_mat)
+    hip_guard = add_uv_ellipsoid(f'{side}_Hip_Guard', (0.165*sx, -0.005, 0.95), (0.115, 0.075, 0.045), body_mat)
     hip_guard.rotation_euler[1] = math.radians(-18*sx)
     objects_to_bones.append((hip_guard, 'pelvis'))
 
 neck = add_uv_ellipsoid('Neck_Joint', (0, 0, 1.90), (0.06, 0.055, 0.080), joint_mat)
 objects_to_bones.append((neck, 'neck'))
-head = add_uv_ellipsoid('Featureless_Egg_Head', (0, 0, 2.09), (0.14, 0.115, 0.205), body_mat)
+head = add_uv_ellipsoid('Featureless_Egg_Head', (0, 0, 2.065), (0.125, 0.105, 0.185), body_mat)
 for v in head.data.vertices:
     if v.co.z < -0.25:
         factor = 0.78 + 0.22 * ((v.co.z + 1.0) / 0.75)
@@ -205,7 +206,7 @@ for v in head.data.vertices:
 objects_to_bones.append((head, 'head'))
 
 for side, sx in [('L', -1), ('R', 1)]:
-    shoulder = add_uv_ellipsoid(f'{side}_Shoulder_Joint', J[f'{side}_shoulder'], (0.090, 0.090, 0.090), joint_mat)
+    shoulder = add_uv_ellipsoid(f'{side}_Shoulder_Joint', J[f'{side}_shoulder'], (0.085, 0.085, 0.085), joint_mat)
     objects_to_bones.append((shoulder, f'{side}_upper_arm'))
     upper = add_tapered_segment(f'{side}_Upper_Arm', J[f'{side}_shoulder'], J[f'{side}_elbow'], 0.075, 0.052, body_mat)
     objects_to_bones.append((upper, f'{side}_upper_arm'))
@@ -215,7 +216,7 @@ for side, sx in [('L', -1), ('R', 1)]:
     objects_to_bones.append((fore, f'{side}_forearm'))
     wrist = add_uv_ellipsoid(f'{side}_Wrist_Joint', J[f'{side}_wrist'], (0.038, 0.036, 0.038), joint_mat)
     objects_to_bones.append((wrist, f'{side}_hand'))
-    hand = add_uv_ellipsoid(f'{side}_Palm', J[f'{side}_hand'], (0.055, 0.043, 0.120), body_mat)
+    hand = add_uv_ellipsoid(f'{side}_Palm', J[f'{side}_hand'], (0.052, 0.040, 0.135), body_mat)
     hand.rotation_euler[1] = math.radians(4*sx)
     objects_to_bones.append((hand, f'{side}_hand'))
     thumb = add_uv_ellipsoid(f'{side}_Thumb', (0.054*sx + J[f'{side}_hand'][0], -0.015, J[f'{side}_hand'][2] + 0.02), (0.025, 0.022, 0.055), body_mat, 20, 12)
@@ -263,7 +264,7 @@ arm.select_set(False)
 for obj, bone_name in objects_to_bones:
     bone_parent(obj, arm, bone_name)
 
-arm['model_version'] = 'R04'
+arm['model_version'] = 'R05'
 arm['reference'] = 'three.js stylized articulated mannequin supplied by user'
 arm['rig_type'] = 'rigid bone-parented body pieces'
 
@@ -298,7 +299,7 @@ add_area('Rim_Light', (0,3.0,4.0), 300, 2.8, (1.0,0.70,0.62))
 cam_data = bpy.data.cameras.new('Preview_Camera')
 cam = bpy.data.objects.new('Preview_Camera', cam_data)
 bpy.context.collection.objects.link(cam)
-cam.location = (1.55, -6.8, 2.75)
+cam.location = (0.85, -6.8, 2.70)
 cam_data.lens = 70
 look_at(cam, (0, 0, 1.10))
 scene.camera = cam
