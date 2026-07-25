@@ -119,10 +119,11 @@ def create_bone(arm_data, name, head, tail, parent=None, connected=False):
 
 
 def bone_parent(obj, armature, bone_name):
+    world_matrix = obj.matrix_world.copy()
     obj.parent = armature
     obj.parent_type = 'BONE'
     obj.parent_bone = bone_name
-    obj.matrix_parent_inverse = armature.matrix_world.inverted()
+    obj.matrix_world = world_matrix
 
 
 def look_at(obj, target):

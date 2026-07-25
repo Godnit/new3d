@@ -4,133 +4,133 @@ Info: Total files 0 | Changed 0 | Failed 0
   regex_dot = re.compile("\.")
 /usr/share/blender/scripts/addons/io_scene_gltf2/io/exp/gltf2_io_image_data.py:27: SyntaxWarning: invalid escape sequence '\]'
   new_name = "".join([char for char in adjusted_name if char not in "!#$&'()*+,/:;<>?@[\]^`{|}~"])
-Fra:1 Mem:34.19M (Peak 35.28M) | Time:00:03.49 | Syncing Torso_Breastplate
-Fra:1 Mem:34.29M (Peak 35.28M) | Time:00:04.03 | Syncing Mannequin_Rig
-Fra:1 Mem:34.30M (Peak 35.28M) | Time:00:04.03 | Syncing Shoulder_Collar_Plate
-Fra:1 Mem:34.37M (Peak 35.28M) | Time:00:04.03 | Syncing Abdomen_Joint
-Fra:1 Mem:34.44M (Peak 35.28M) | Time:00:04.03 | Syncing Pelvis_Core
-Fra:1 Mem:34.51M (Peak 35.28M) | Time:00:04.03 | Syncing L_Hip_Guard
-Fra:1 Mem:34.58M (Peak 35.28M) | Time:00:04.03 | Syncing R_Hip_Guard
-Fra:1 Mem:34.64M (Peak 35.28M) | Time:00:04.03 | Syncing Neck_Joint
-Fra:1 Mem:34.71M (Peak 35.28M) | Time:00:04.03 | Syncing Featureless_Egg_Head
-Fra:1 Mem:34.78M (Peak 35.28M) | Time:00:04.03 | Syncing L_Shoulder_Joint
-Fra:1 Mem:34.85M (Peak 35.28M) | Time:00:04.03 | Syncing L_Upper_Arm
-Fra:1 Mem:34.86M (Peak 35.28M) | Time:00:04.03 | Syncing L_Elbow_Joint
-Fra:1 Mem:34.93M (Peak 35.28M) | Time:00:04.03 | Syncing L_Forearm
-Fra:1 Mem:34.95M (Peak 35.28M) | Time:00:04.03 | Syncing L_Wrist_Joint
-Fra:1 Mem:35.01M (Peak 35.28M) | Time:00:04.03 | Syncing L_Palm
-Fra:1 Mem:35.08M (Peak 35.28M) | Time:00:04.03 | Syncing L_Thumb
-Fra:1 Mem:35.11M (Peak 35.28M) | Time:00:04.03 | Syncing R_Shoulder_Joint
-Fra:1 Mem:35.18M (Peak 35.28M) | Time:00:04.03 | Syncing R_Upper_Arm
-Fra:1 Mem:35.19M (Peak 35.28M) | Time:00:04.03 | Syncing R_Elbow_Joint
-Fra:1 Mem:35.26M (Peak 35.28M) | Time:00:04.03 | Syncing R_Forearm
-Fra:1 Mem:35.28M (Peak 35.28M) | Time:00:04.03 | Syncing R_Wrist_Joint
-Fra:1 Mem:35.34M (Peak 35.34M) | Time:00:04.03 | Syncing R_Palm
-Fra:1 Mem:35.41M (Peak 35.41M) | Time:00:04.03 | Syncing R_Thumb
-Fra:1 Mem:35.44M (Peak 35.44M) | Time:00:04.03 | Syncing L_Hip_Joint
-Fra:1 Mem:35.51M (Peak 35.51M) | Time:00:04.03 | Syncing L_Thigh
-Fra:1 Mem:35.53M (Peak 35.53M) | Time:00:04.03 | Syncing L_Knee_Joint
-Fra:1 Mem:35.59M (Peak 35.59M) | Time:00:04.03 | Syncing L_Shin
-Fra:1 Mem:35.61M (Peak 35.61M) | Time:00:04.03 | Syncing L_Ankle_Joint
-Fra:1 Mem:35.68M (Peak 35.68M) | Time:00:04.03 | Syncing L_Foot
-Fra:1 Mem:35.74M (Peak 35.74M) | Time:00:04.03 | Syncing R_Hip_Joint
-Fra:1 Mem:35.81M (Peak 35.81M) | Time:00:04.03 | Syncing R_Thigh
-Fra:1 Mem:35.83M (Peak 35.83M) | Time:00:04.03 | Syncing R_Knee_Joint
-Fra:1 Mem:35.89M (Peak 35.89M) | Time:00:04.03 | Syncing R_Shin
-Fra:1 Mem:35.91M (Peak 35.91M) | Time:00:04.03 | Syncing R_Ankle_Joint
-Fra:1 Mem:35.98M (Peak 35.98M) | Time:00:04.03 | Syncing R_Foot
-Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:04.03 | Syncing Preview_Ground
-Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:04.03 | Syncing Key_Light
-Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:04.03 | Syncing Fill_Light
-Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:04.03 | Syncing Rim_Light
-Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:04.03 | Syncing Preview_Camera
-Fra:1 Mem:36.03M (Peak 36.05M) | Time:00:04.04 | Rendering 1 / 64 samples
-Fra:1 Mem:34.48M (Peak 36.05M) | Time:00:10.47 | Rendering 26 / 64 samples
-Fra:1 Mem:34.48M (Peak 36.05M) | Time:00:14.99 | Rendering 51 / 64 samples
-Fra:1 Mem:34.48M (Peak 36.05M) | Time:00:17.03 | Rendering 64 / 64 samples
+Fra:1 Mem:34.19M (Peak 35.28M) | Time:00:02.82 | Syncing Torso_Breastplate
+Fra:1 Mem:34.29M (Peak 35.28M) | Time:00:03.37 | Syncing Mannequin_Rig
+Fra:1 Mem:34.30M (Peak 35.28M) | Time:00:03.37 | Syncing Shoulder_Collar_Plate
+Fra:1 Mem:34.37M (Peak 35.28M) | Time:00:03.38 | Syncing Abdomen_Joint
+Fra:1 Mem:34.44M (Peak 35.28M) | Time:00:03.38 | Syncing Pelvis_Core
+Fra:1 Mem:34.51M (Peak 35.28M) | Time:00:03.38 | Syncing L_Hip_Guard
+Fra:1 Mem:34.58M (Peak 35.28M) | Time:00:03.38 | Syncing R_Hip_Guard
+Fra:1 Mem:34.64M (Peak 35.28M) | Time:00:03.38 | Syncing Neck_Joint
+Fra:1 Mem:34.71M (Peak 35.28M) | Time:00:03.38 | Syncing Featureless_Egg_Head
+Fra:1 Mem:34.78M (Peak 35.28M) | Time:00:03.38 | Syncing L_Shoulder_Joint
+Fra:1 Mem:34.85M (Peak 35.28M) | Time:00:03.38 | Syncing L_Upper_Arm
+Fra:1 Mem:34.86M (Peak 35.28M) | Time:00:03.38 | Syncing L_Elbow_Joint
+Fra:1 Mem:34.93M (Peak 35.28M) | Time:00:03.38 | Syncing L_Forearm
+Fra:1 Mem:34.95M (Peak 35.28M) | Time:00:03.38 | Syncing L_Wrist_Joint
+Fra:1 Mem:35.01M (Peak 35.28M) | Time:00:03.38 | Syncing L_Palm
+Fra:1 Mem:35.08M (Peak 35.28M) | Time:00:03.38 | Syncing L_Thumb
+Fra:1 Mem:35.11M (Peak 35.28M) | Time:00:03.38 | Syncing R_Shoulder_Joint
+Fra:1 Mem:35.18M (Peak 35.28M) | Time:00:03.38 | Syncing R_Upper_Arm
+Fra:1 Mem:35.19M (Peak 35.28M) | Time:00:03.38 | Syncing R_Elbow_Joint
+Fra:1 Mem:35.26M (Peak 35.28M) | Time:00:03.38 | Syncing R_Forearm
+Fra:1 Mem:35.28M (Peak 35.28M) | Time:00:03.38 | Syncing R_Wrist_Joint
+Fra:1 Mem:35.34M (Peak 35.34M) | Time:00:03.38 | Syncing R_Palm
+Fra:1 Mem:35.41M (Peak 35.41M) | Time:00:03.38 | Syncing R_Thumb
+Fra:1 Mem:35.44M (Peak 35.44M) | Time:00:03.38 | Syncing L_Hip_Joint
+Fra:1 Mem:35.51M (Peak 35.51M) | Time:00:03.38 | Syncing L_Thigh
+Fra:1 Mem:35.53M (Peak 35.53M) | Time:00:03.38 | Syncing L_Knee_Joint
+Fra:1 Mem:35.59M (Peak 35.59M) | Time:00:03.38 | Syncing L_Shin
+Fra:1 Mem:35.61M (Peak 35.61M) | Time:00:03.38 | Syncing L_Ankle_Joint
+Fra:1 Mem:35.68M (Peak 35.68M) | Time:00:03.38 | Syncing L_Foot
+Fra:1 Mem:35.74M (Peak 35.74M) | Time:00:03.38 | Syncing R_Hip_Joint
+Fra:1 Mem:35.81M (Peak 35.81M) | Time:00:03.38 | Syncing R_Thigh
+Fra:1 Mem:35.83M (Peak 35.83M) | Time:00:03.38 | Syncing R_Knee_Joint
+Fra:1 Mem:35.89M (Peak 35.89M) | Time:00:03.38 | Syncing R_Shin
+Fra:1 Mem:35.91M (Peak 35.91M) | Time:00:03.38 | Syncing R_Ankle_Joint
+Fra:1 Mem:35.98M (Peak 35.98M) | Time:00:03.38 | Syncing R_Foot
+Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:03.38 | Syncing Preview_Ground
+Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:03.38 | Syncing Key_Light
+Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:03.38 | Syncing Fill_Light
+Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:03.38 | Syncing Rim_Light
+Fra:1 Mem:36.05M (Peak 36.05M) | Time:00:03.38 | Syncing Preview_Camera
+Fra:1 Mem:36.03M (Peak 36.05M) | Time:00:03.38 | Rendering 1 / 64 samples
+Fra:1 Mem:34.48M (Peak 36.05M) | Time:00:10.02 | Rendering 26 / 64 samples
+Fra:1 Mem:34.48M (Peak 36.05M) | Time:00:14.00 | Rendering 51 / 64 samples
+Fra:1 Mem:34.48M (Peak 36.05M) | Time:00:16.06 | Rendering 64 / 64 samples
 Saved: '/home/runner/work/new3d/new3d/build/mannequin_v03/reference_mannequin_v03_preview.png'
-Time: 00:17.58 (Saving: 00:00.39)
+Time: 00:16.63 (Saving: 00:00.39)
 
 Info: Saved "reference_mannequin_v03.blend"
-21:37:22 | ERROR: Draco mesh compression is not available because library could not be found at /usr/bin/4.0/python/lib/python3.12/site-packages/libextern_draco.so
-21:37:23 | INFO: Starting glTF 2.0 export
-21:37:23 | INFO: Extracting primitive: Sphere.003
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.002
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.004
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.001
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Torso_Breastplate_mesh
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.005
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.006
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.007
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Cone
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.008
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Cone.001
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.010
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.011
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.009
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.012
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Cone.002
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.013
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Cone.003
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.015
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.016
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.014
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.017
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Cone.004
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.018
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Cone.005
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.019
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.020
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.021
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Cone.006
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.022
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Cone.007
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.023
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Extracting primitive: Sphere.024
-21:37:23 | INFO: Primitives created: 1
-21:37:23 | INFO: Finished glTF 2.0 export in 0.14166045188903809 s
+21:39:52 | ERROR: Draco mesh compression is not available because library could not be found at /usr/bin/4.0/python/lib/python3.12/site-packages/libextern_draco.so
+21:39:52 | INFO: Starting glTF 2.0 export
+21:39:52 | INFO: Extracting primitive: Sphere.003
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.002
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.004
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.001
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Torso_Breastplate_mesh
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.005
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.006
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.007
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Cone
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.008
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Cone.001
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.010
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.011
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.009
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.012
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Cone.002
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.013
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Cone.003
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.015
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.016
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.014
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.017
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Cone.004
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.018
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Cone.005
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.019
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.020
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.021
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Cone.006
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.022
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Cone.007
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.023
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Extracting primitive: Sphere.024
+21:39:52 | INFO: Primitives created: 1
+21:39:52 | INFO: Finished glTF 2.0 export in 0.13702917098999023 s
 
 BUILD_COMPLETE /home/runner/work/new3d/new3d/build/mannequin_v03
 
 Blender quit
 total 4.2M
-drwxr-xr-x 2 runner runner 4.0K Jul 25 21:37 .
-drwxr-xr-x 3 runner runner 4.0K Jul 25 21:37 ..
--rw-r--r-- 1 runner runner  329 Jul 25 21:37 README.txt
--rw-r--r-- 1 runner runner 2.6M Jul 25 21:37 reference_mannequin_v03.blend
--rw-r--r-- 1 runner runner 724K Jul 25 21:37 reference_mannequin_v03.glb
--rw-r--r-- 1 runner runner 940K Jul 25 21:37 reference_mannequin_v03_preview.png
+drwxr-xr-x 2 runner runner 4.0K Jul 25 21:40 .
+drwxr-xr-x 3 runner runner 4.0K Jul 25 21:39 ..
+-rw-r--r-- 1 runner runner  329 Jul 25 21:40 README.txt
+-rw-r--r-- 1 runner runner 2.6M Jul 25 21:39 reference_mannequin_v03.blend
+-rw-r--r-- 1 runner runner 718K Jul 25 21:39 reference_mannequin_v03.glb
+-rw-r--r-- 1 runner runner 939K Jul 25 21:40 reference_mannequin_v03_preview.png
