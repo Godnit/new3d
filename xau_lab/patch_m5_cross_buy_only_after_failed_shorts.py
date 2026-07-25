@@ -30,17 +30,23 @@ if text.count(old_m15) != 1:
 text = text.replace(old_m15, new_m15, 1)
 engine.write_text(text, encoding="utf-8")
 
-# Rotate the already-observed holdout to two non-overlapping windows absent from
-# prior named holdout patches. Development and validation remain frozen. These
-# dates are protocol partitions only and never enter the signal logic.
+# The preceding frozen-protocol patch has already rotated the base holdout to
+# Nov-2021 and Apr-2022. Rotate exactly those two tuples to the next untouched,
+# non-overlapping partitions. Development and validation remain unchanged.
+# These dates are protocol partitions only and never enter signal logic.
 runner = Path("xau_lab/hf_window_runner.py")
 rtext = runner.read_text(encoding="utf-8")
-old_a = '("hold_2021_may_available", "holdout", "2021-05-24", "2021-06-05"),'
-old_b = '("hold_2022_dec", "holdout", "2022-12-01", "2022-12-20"),'
+old_a = '("hold_2021_nov_fresh", "holdout", "2021-11-01", "2021-11-20"),'
+old_b = '("hold_2022_apr_fresh", "holdout", "2022-04-04", "2022-04-23"),'
 new_a = '("hold_2021_sep_fresh", "holdout", "2021-09-06", "2021-09-25"),'
 new_b = '("hold_2022_nov_fresh", "holdout", "2022-11-01", "2022-11-20"),'
-if rtext.count(old_a) != 1 or rtext.count(old_b) != 1:
-    raise SystemExit("Expected frozen holdout tuples were not found exactly once")
+count_a = rtext.count(old_a)
+count_b = rtext.count(old_b)
+if count_a != 1 or count_b != 1:
+    raise SystemExit(
+        f"Expected preceding frozen holdout tuples exactly once; "
+        f"Nov-2021={count_a}, Apr-2022={count_b}"
+    )
 rtext = rtext.replace(old_a, new_a, 1).replace(old_b, new_b, 1)
 runner.write_text(rtext, encoding="utf-8")
 
