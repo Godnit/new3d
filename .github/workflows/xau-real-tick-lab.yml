@@ -51,7 +51,6 @@ jobs:
             python xau_lab/patch_cross_sell_fresh_nov_apr_holdout.py || exit $?
             python xau_lab/patch_sell_resumption_expansion.py || exit $?
             python xau_lab/patch_m5_cross_sell_only.py || exit $?
-            python xau_lab/patch_symmetric_cross_after_sell_only.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -128,6 +127,9 @@ jobs:
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
             python xau_lab/patch_execution_order.py || exit $?
             python xau_lab/patch_adaptive_spread.py || exit $?
+            python xau_lab/patch_cross_sell_fresh_nov_apr_holdout.py || exit $?
+            python xau_lab/patch_sell_resumption_expansion.py || exit $?
+            python xau_lab/patch_m5_cross_sell_only.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
@@ -140,13 +142,14 @@ jobs:
         run: python -m pip install --upgrade pip && pip install -r xau_lab/requirements.txt
 
       - name: Download all window artifacts
+        if: steps.rebuild.outputs.exit_code == '0'
         uses: actions/download-artifact@v4
         with:
           pattern: xau-window-*
           path: collected
           merge-multiple: true
 
-      - name: Aggregate diagnostic development, validation, and holdout
+      - name: Aggregate development, validation, and untouched holdout
         if: steps.rebuild.outputs.exit_code == '0'
         id: aggregate
         shell: bash
@@ -162,7 +165,7 @@ jobs:
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload final diagnostic package
+      - name: Upload final research package
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -173,11 +176,10 @@ jobs:
             aggregate_exit_code.txt
             aggregate_rebuild.log
             aggregate_rebuild_exit_code.txt
-            collected/rebuild_*_exit_code.txt
             collected/window_*_exit_code.txt
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Enforce aggregate result
+      - name: Enforce aggregate success and independent holdout gate
         if: steps.rebuild.outputs.exit_code != '0' || steps.aggregate.outputs.exit_code != '0'
         run: exit 1
