@@ -25,7 +25,7 @@ jobs:
       - name: Install Blender and export dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender python3-numpy
+          sudo apt-get install -y blender python3-numpy xvfb libegl1 libgl1 libglx-mesa0
           blender --version
           python3 -c "import numpy; print(numpy.__version__)"
 
@@ -34,7 +34,7 @@ jobs:
           rm -rf build/mannequin_v03 mannequin_v03/generated
           mkdir -p build/mannequin_v03 mannequin_v03/generated
           set +e
-          blender --background --python mannequin_v03/create_reference_mannequin_v03.py -- --output-dir build/mannequin_v03 > mannequin_v03/generated/blender_build.log 2>&1
+          xvfb-run -a blender --background --python mannequin_v03/create_reference_mannequin_v03.py -- --output-dir build/mannequin_v03 > mannequin_v03/generated/blender_build.log 2>&1
           echo $? > mannequin_v03/generated/blender_exit_code.txt
           set -e
           ls -lah build/mannequin_v03 >> mannequin_v03/generated/blender_build.log 2>&1 || true
