@@ -48,6 +48,8 @@ jobs:
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
             python xau_lab/patch_execution_order.py || exit $?
             python xau_lab/patch_adaptive_spread.py || exit $?
+            python xau_lab/patch_research_sell_only.py || exit $?
+            python xau_lab/patch_fresh_holdout_jul_dec2024.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -124,6 +126,7 @@ jobs:
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
             python xau_lab/patch_execution_order.py || exit $?
             python xau_lab/patch_adaptive_spread.py || exit $?
+            python xau_lab/patch_research_sell_only.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
