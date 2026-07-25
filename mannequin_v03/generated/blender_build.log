@@ -1,0 +1,11 @@
+Blender 4.0.2
+Traceback (most recent call last):
+  File "/home/runner/work/new3d/new3d/mannequin_v03/create_reference_mannequin_v03.py", line 141, in <module>
+    scene.view_settings.look = 'Medium High Contrast'
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: bpy_struct: item.attr = val: enum "Medium High Contrast" not found in ('None', 'AgX - Punchy', 'AgX - Greyscale', 'AgX - Very High Contrast', 'AgX - High Contrast', 'AgX - Medium High Contrast', 'AgX - Base Contrast', 'AgX - Medium Low Contrast', 'AgX - Low Contrast', 'AgX - Very Low Contrast')
+
+Blender quit
+total 8.0K
+drwxr-xr-x 2 runner runner 4.0K Jul 25 21:29 .
+drwxr-xr-x 3 runner runner 4.0K Jul 25 21:29 ..
