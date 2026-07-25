@@ -34,7 +34,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild clean diagnostic engine
+      - name: Rebuild clean cost-aware engine
         id: rebuild
         shell: bash
         run: |
@@ -47,12 +47,7 @@ jobs:
             done
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
             python xau_lab/patch_execution_order.py || exit $?
-            python xau_lab/patch_adaptive_spread.py || exit $?
-            python xau_lab/patch_cross_sell_fresh_nov_apr_holdout.py || exit $?
-            python xau_lab/patch_sell_resumption_expansion.py || exit $?
-            python xau_lab/patch_m5_cross_sell_only.py || exit $?
-            python xau_lab/patch_m5_cross_buy_only_after_failed_shorts.py || exit $?
-            python xau_lab/patch_disable_fail_fast.py || exit $?
+            python xau_lab/patch_cost_aware_horizon.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -128,12 +123,7 @@ jobs:
             for f in xau_lab/chunks/part_*.b64; do base64 --decode "$f" >> xau_lab/real_tick_lab.py || exit $?; done
             echo '2804fa65605f00596bb36e1452c5fafcb9ccee1c47db007dde792417254163c6  xau_lab/real_tick_lab.py' | sha256sum --check || exit $?
             python xau_lab/patch_execution_order.py || exit $?
-            python xau_lab/patch_adaptive_spread.py || exit $?
-            python xau_lab/patch_cross_sell_fresh_nov_apr_holdout.py || exit $?
-            python xau_lab/patch_sell_resumption_expansion.py || exit $?
-            python xau_lab/patch_m5_cross_sell_only.py || exit $?
-            python xau_lab/patch_m5_cross_buy_only_after_failed_shorts.py || exit $?
-            python xau_lab/patch_disable_fail_fast.py || exit $?
+            python xau_lab/patch_cost_aware_horizon.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
