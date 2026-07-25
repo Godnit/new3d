@@ -89,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xau-window-${{ matrix.index }}
+          name: xau-window-${{ matrix.index }}-attempt-${{ github.run_attempt }}
           path: |
             window_results/
             rebuild_${{ matrix.index }}.log
@@ -171,7 +171,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xau-real-tick-final
+          name: xau-real-tick-final-attempt-${{ github.run_attempt }}
           path: |
             results/
             aggregate.log
