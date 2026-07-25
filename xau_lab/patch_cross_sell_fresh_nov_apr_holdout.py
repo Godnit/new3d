@@ -9,14 +9,22 @@ text = engine_path.read_text(encoding="utf-8")
 start = text.index("def signal_at(")
 end = text.index("\ndef close_trade", start)
 segment = text[start:end]
-needle = "\n    if sell:\n"
-if segment.count(needle) != 1:
-    raise SystemExit(f"Expected one sell return block in signal_at, found {segment.count(needle)}")
+
+buy_block = "\n    if buy:\n"
+sell_block = "\n    if sell:\n"
+if segment.count(buy_block) != 1 or segment.count(sell_block) != 1:
+    raise SystemExit(
+        f"Expected one buy and one sell return block in signal_at; "
+        f"found buy={segment.count(buy_block)}, sell={segment.count(sell_block)}"
+    )
+
+# The previous patch disabled buy too late, after the buy return block. Disable
+# it immediately before that block, then restrict sells to the EMA9 cross setup.
 segment = segment.replace(
-    needle,
+    buy_block,
     "\n    buy = False  # global cross-sell-only revision\n"
     "    sell = sell and cross_sell\n"
-    "    if sell:\n",
+    "    if buy:\n",
     1,
 )
 text = text[:start] + segment + text[end:]
@@ -36,4 +44,4 @@ if old_a not in windows or old_b not in windows:
 windows = windows.replace(old_a, new_a, 1).replace(old_b, new_b, 1)
 window_path.write_text(windows, encoding="utf-8")
 
-print("Applied global cross-sell-only revision with fixed fresh Nov-2021/Apr-2022 holdout")
+print("Applied corrected global cross-sell-only revision with fixed fresh Nov-2021/Apr-2022 holdout")
