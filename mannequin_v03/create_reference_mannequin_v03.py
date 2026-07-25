@@ -138,7 +138,7 @@ scene.render.resolution_y = 1100
 scene.render.resolution_percentage = 100
 scene.render.image_settings.file_format = 'PNG'
 scene.render.film_transparent = False
-scene.view_settings.look = 'Medium High Contrast'
+scene.view_settings.look = 'AgX - Medium High Contrast'
 scene.unit_settings.system = 'METRIC'
 scene.unit_settings.scale_length = 1.0
 

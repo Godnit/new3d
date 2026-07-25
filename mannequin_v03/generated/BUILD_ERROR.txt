@@ -1,1 +1,0 @@
-Blender produced no output files. See blender_build.log.
