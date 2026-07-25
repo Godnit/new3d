@@ -28,25 +28,32 @@ jobs:
           sudo apt-get install -y blender
           blender --version
 
-      - name: Build model, source file and preview
+      - name: Build and capture Blender log
         run: |
           rm -rf build/mannequin_v03 mannequin_v03/generated
           mkdir -p build/mannequin_v03 mannequin_v03/generated
-          blender --background --python mannequin_v03/create_reference_mannequin_v03.py -- --output-dir build/mannequin_v03
-          ls -lah build/mannequin_v03
+          set +e
+          blender --background --python mannequin_v03/create_reference_mannequin_v03.py -- --output-dir build/mannequin_v03 > mannequin_v03/generated/blender_build.log 2>&1
+          echo $? > mannequin_v03/generated/blender_exit_code.txt
+          set -e
+          ls -lah build/mannequin_v03 >> mannequin_v03/generated/blender_build.log 2>&1 || true
 
-      - name: Package and split generated files
+      - name: Package generated files when present
         run: |
-          tar -czf /tmp/reference_mannequin_v03_bundle.tar.gz -C build/mannequin_v03 .
-          sha256sum /tmp/reference_mannequin_v03_bundle.tar.gz > mannequin_v03/generated/bundle.sha256
-          base64 -w 0 /tmp/reference_mannequin_v03_bundle.tar.gz | split -b 70000 -d -a 3 - mannequin_v03/generated/bundle.b64.part-
-          printf '%s\n' 'Decode with: cat bundle.b64.part-* | base64 -d > reference_mannequin_v03_bundle.tar.gz' > mannequin_v03/generated/DECODE.txt
+          if compgen -G 'build/mannequin_v03/*' > /dev/null; then
+            tar -czf /tmp/reference_mannequin_v03_bundle.tar.gz -C build/mannequin_v03 .
+            sha256sum /tmp/reference_mannequin_v03_bundle.tar.gz > mannequin_v03/generated/bundle.sha256
+            base64 -w 0 /tmp/reference_mannequin_v03_bundle.tar.gz | split -b 70000 -d -a 3 - mannequin_v03/generated/bundle.b64.part-
+            printf '%s\n' 'Decode with: cat bundle.b64.part-* | base64 -d > reference_mannequin_v03_bundle.tar.gz' > mannequin_v03/generated/DECODE.txt
+          else
+            printf '%s\n' 'Blender produced no output files. See blender_build.log.' > mannequin_v03/generated/BUILD_ERROR.txt
+          fi
           ls -lah mannequin_v03/generated
 
-      - name: Commit generated bundle chunks
+      - name: Commit diagnostics or generated bundle
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add mannequin_v03/generated
-          git commit -m 'Add generated Blender mannequin bundle [skip ci]'
+          git commit -m 'Update Blender mannequin build results [skip ci]'
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
