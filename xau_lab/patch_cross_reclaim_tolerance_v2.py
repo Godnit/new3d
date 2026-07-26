@@ -1,16 +1,6 @@
 from pathlib import Path
 
-# One simple, date-agnostic revision for this iteration.
-# The latest audited real-tick run produced only 15 trades across ten independent
-# windows. Validation was positive, but the untouched holdout was flat and the
-# sample was too small. Keep direction (long only), session, trend filters,
-# stops, targets, risk, spread, slippage, and all frozen windows unchanged.
-# Relax only the prior-bar EMA9 crossing test into a small reclaim tolerance:
-# the previous close may sit no more than 0.08 ATR above EMA9, while the signal
-# bar must still touch EMA9 and close back above it. This accounts for quote
-# noise and shallow pullbacks without introducing a new indicator or a
-# date-specific rule.
-
+# Prior frozen revision: tolerate a shallow bullish EMA9 reclaim.
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
 
@@ -27,7 +17,31 @@ if text.count(old) != 1:
     raise SystemExit(
         f"Expected exactly one canonical cross_buy expression, found {text.count(old)}"
     )
-
 text = text.replace(old, new, 1)
+
+# One simple, date-agnostic revision for the new iteration. The final 05:00-only
+# candidate produced just 16 development+validation trades. Earlier development-
+# only hour attribution found recurring server hours 04 and 05 profitable in
+# aggregate, while 06 and 07 were negative. Restore 04:00-05:59 to increase the
+# independent sample without changing direction, signals, trend filters, stops,
+# targets, risk, execution costs, validation windows, or untouched holdouts.
+old_session = '''                name=c.name + "_s0506",
+                baseline_hour_rules=False,
+                session_start=5,
+                session_end=6,
+                blocked_hour=24,
+'''
+new_session = '''                name=c.name + "_s0406_sparsefix",
+                baseline_hour_rules=False,
+                session_start=4,
+                session_end=6,
+                blocked_hour=24,
+'''
+if text.count(old_session) != 1:
+    raise SystemExit(
+        f"Expected exactly one final 05:00-only candidate block, found {text.count(old_session)}"
+    )
+text = text.replace(old_session, new_session, 1)
+
 path.write_text(text, encoding="utf-8")
-print("Applied one revision: 0.08 ATR tolerance for bullish EMA9 reclaim")
+print("Applied frozen EMA9 reclaim tolerance and one new 04:00-05:59 session revision")
