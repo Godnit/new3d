@@ -34,7 +34,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild cost-aware long-only engine with one late-hour exclusion revision
+      - name: Rebuild cost-aware engine with one local-momentum revision
         id: rebuild
         shell: bash
         run: |
@@ -54,6 +54,7 @@ jobs:
             python xau_lab/patch_session_0506_devonly.py || exit $?
             python xau_lab/patch_session_0508_liquidity_revision.py || exit $?
             python xau_lab/patch_session_0509_exclude_late_hour.py || exit $?
+            python xau_lab/patch_local_momentum.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -118,7 +119,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild aggregate engine with one late-hour exclusion revision
+      - name: Rebuild aggregate engine with one local-momentum revision
         id: rebuild
         shell: bash
         run: |
@@ -136,6 +137,7 @@ jobs:
             python xau_lab/patch_session_0506_devonly.py || exit $?
             python xau_lab/patch_session_0508_liquidity_revision.py || exit $?
             python xau_lab/patch_session_0509_exclude_late_hour.py || exit $?
+            python xau_lab/patch_local_momentum.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
