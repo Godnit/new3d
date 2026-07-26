@@ -34,7 +34,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild cost-aware long-only engine with one trend-persistence revision
+      - name: Rebuild cost-aware long-only engine with one development-only hour revision
         id: rebuild
         shell: bash
         run: |
@@ -51,6 +51,7 @@ jobs:
             python xau_lab/patch_session_0407_devval.py || exit $?
             python xau_lab/patch_cross_buy_only_revision.py || exit $?
             python xau_lab/patch_trend_persistence.py || exit $?
+            python xau_lab/patch_session_0506_devonly.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -115,7 +116,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild aggregate engine with one trend-persistence revision
+      - name: Rebuild aggregate engine with one development-only hour revision
         id: rebuild
         shell: bash
         run: |
@@ -130,6 +131,7 @@ jobs:
             python xau_lab/patch_session_0407_devval.py || exit $?
             python xau_lab/patch_cross_buy_only_revision.py || exit $?
             python xau_lab/patch_trend_persistence.py || exit $?
+            python xau_lab/patch_session_0506_devonly.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
