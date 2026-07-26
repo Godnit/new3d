@@ -9,11 +9,12 @@ old = '''    local_up = b1.ema9 > b1.ema21
 '''
 new = '''    local_up = b1.ema9 > b1.ema21
     local_down = b1.ema9 < b1.ema21
-    # One simple anti-whipsaw revision: require the fast M1 EMA to have
-    # persisted in the trade direction across the last three closed bars.
-    # This uses closed bars only and is independent of calendar dates.
-    m1_persist_up = b1.ema9 > b2.ema9 > b3.ema9
-    m1_persist_down = b1.ema9 < b2.ema9 < b3.ema9
+    # One simple activity-preserving anti-whipsaw revision: require only the
+    # latest closed EMA9 slope to point in the trade direction. The previous
+    # three-bar monotonic requirement eliminated nearly every opportunity.
+    # This still uses closed bars only and is independent of calendar dates.
+    m1_persist_up = b1.ema9 > b2.ema9
+    m1_persist_down = b1.ema9 < b2.ema9
     distance = abs(b1.close - b1.ema21) / atr
 '''
 if old not in text:
@@ -47,4 +48,4 @@ if old_sell not in text:
 text = text.replace(old_sell, new_sell, 1)
 
 path.write_text(text, encoding="utf-8")
-print("Added one simple revision: three-closed-bar M1 EMA9 trend persistence")
+print("Added one simple revision: one-step closed-bar EMA9 slope confirmation")
