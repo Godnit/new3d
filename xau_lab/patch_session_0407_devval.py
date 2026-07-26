@@ -3,22 +3,22 @@ from pathlib import Path
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
 
-# One simple, non-date-specific strategy revision based only on development and
-# validation trades from the failed cost-aware run. Across those eight windows,
-# server hours 04, 05 and 06 were approximately flat-to-positive, while hours
-# 00-03 and 07 accounted for nearly all losses. Keep signals, trend filters,
-# stops, targets, risk and execution stress unchanged; only concentrate entries
-# in the recurring 04:00-06:59 EET/EEST liquidity window.
+# One simple, non-date-specific revision based on the development split only.
+# In the latest cost-aware run, development trades opened during recurring
+# server hours 04 and 05 were profitable in aggregate, while hours 06 and 07
+# were negative. Keep every signal, trend, stop, target, risk and execution-cost
+# assumption unchanged; only narrow the entry window to 04:00-05:59 EET/EEST.
+# Validation and holdout windows are not used to define this revision.
 needle = "    return revised\n\n\ndef in_session"
 replacement = '''    focused = [revised[0]]
     for c in revised[1:]:
         focused.append(
             replace(
                 c,
-                name=c.name + "_s0407",
+                name=c.name + "_s0406",
                 baseline_hour_rules=False,
                 session_start=4,
-                session_end=7,
+                session_end=6,
                 blocked_hour=24,
             )
         )
@@ -32,4 +32,4 @@ if text.count(needle) != 1:
 text = text.replace(needle, replacement, 1)
 
 path.write_text(text, encoding="utf-8")
-print("Applied one development/validation-only 04:00-07:00 server-session revision")
+print("Applied one development-only 04:00-06:00 server-session revision")
