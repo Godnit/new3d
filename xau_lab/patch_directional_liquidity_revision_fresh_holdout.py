@@ -1,12 +1,14 @@
 from pathlib import Path
 import re
 
-# One economically defensible strategy revision after the audited run whose
-# development sample was only eight trades: remove the date-mined directional
-# hand-off (long only in server hour 05, short only in 06). A trend-following
-# pullback/cross system should be directionally symmetric; keep the same liquid
-# 04:00-07:00 server session, closed-bar M1/M5/M15 alignment, cost filter,
-# stops, targets, trailing, risk limits and execution stress.
+# The active strategy remains directionally symmetric, but the audited real-tick
+# run 411 showed that server hour 04 was the dominant loss source across the
+# non-holdout sample (-10.92 USD, PF 0.67 across 38 trades). Shift only the
+# liquid-session admission window from 04:00-07:00 to 05:00-08:00. This is a
+# date-agnostic liquidity revision: wait through the thinner opening segment
+# and include one later London hand-off hour. Signals, closed-bar M1/M5/M15
+# alignment, cost filter, stops, targets, trailing, risk limits, execution
+# stress, and all development/validation/holdout dates remain unchanged.
 engine = Path("xau_lab/real_tick_lab.py")
 text = engine.read_text(encoding="utf-8")
 pattern = r"def direction_allowed\(direction: int, hour: int, c: Candidate\) -> bool:\n.*?\n\ndef floor_volume"
@@ -29,14 +31,23 @@ def floor_volume'''
 text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
 if count != 1:
     raise SystemExit(f"Expected one direction_allowed function, replaced {count}")
-text = text.replace('name=c.name + "_early0406"', 'name=c.name + "_sym0407"')
-text = text.replace('_dirL5S6_noH4', '_sym0407')
+
+session_pattern = r"session_start=4,\n(?P<indent>\s*)session_end=7,"
+text, session_count = re.subn(
+    session_pattern,
+    lambda match: "session_start=5,\n" + match.group("indent") + "session_end=8,",
+    text,
+)
+if session_count < 1:
+    raise SystemExit("No active 04:00-07:00 candidate session found")
+
+text = text.replace('name=c.name + "_early0406"', 'name=c.name + "_sym0508"')
+text = text.replace('_dirL5S6_noH4', '_sym0508')
+text = text.replace('_sym0407', '_sym0508')
+text = text.replace('s0407', 's0508')
 engine.write_text(text, encoding="utf-8")
 
-# The July-2021 and November-2022 holdouts have now been inspected. Rotate the
-# gate to two non-overlapping periods that are not part of the active
-# development/validation protocol. This changes evaluation only, never trading
-# logic, and keeps the new holdout hidden from candidate selection.
+# Preserve the same untouched January-2022/December-2023 holdout protocol.
 runner = Path("xau_lab/hf_window_runner.py")
 runner_text = runner.read_text(encoding="utf-8")
 windows = '''WINDOWS = [
@@ -59,15 +70,15 @@ runner_text, count = re.subn(
     flags=re.S,
 )
 if count != 1:
-    raise SystemExit("Could not install fresh January-2022/December-2023 holdout protocol")
+    raise SystemExit("Could not preserve January-2022/December-2023 holdout protocol")
 runner.write_text(runner_text, encoding="utf-8")
 
 aggregate = Path("xau_lab/aggregate_results.py")
 report = aggregate.read_text(encoding="utf-8")
 report = re.sub(
     r"The candidate is considered acceptable only when .*? holdout gate passes;.*?report interval\.",
-    "The candidate is considered acceptable only when the newly untouched January-2022/December-2023 holdout gate passes. These periods do not overlap any active development or validation window.",
+    "The candidate is considered acceptable only when the unchanged January-2022/December-2023 holdout gate passes. These periods do not overlap any active development or validation window.",
     report,
 )
 aggregate.write_text(report, encoding="utf-8")
-print("Applied one revision: symmetric 04-07 liquid-session directions; rotated blind holdout")
+print(f"Applied one revision: symmetric 05-08 liquid session ({session_count} candidate blocks); holdout unchanged")
