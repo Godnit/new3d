@@ -2,11 +2,11 @@ from pathlib import Path
 import re
 
 # One simple strategy revision based only on development + validation trades:
-# during the early European liquidity build-up, allow long crosses in server
-# hours 04-05 and short crosses in hour 06. This removes the direction/hour
-# combinations that were negative in both non-holdout splits while retaining
-# 36 of 62 observed dev+validation trades. Signals, trend filters, stops,
-# targets, risk, spread and adverse-slippage assumptions remain unchanged.
+# wait through the weaker server hour 04, allow long crosses in hour 05 and
+# short crosses in hour 06. The latest audited non-holdout results showed hour
+# 04 negative while hour 05 and validation hour-06 shorts were positive.
+# Signals, closed-bar trend filters, stops, targets, risk, spread and adverse
+# slippage assumptions remain unchanged.
 engine_path = Path("xau_lab/real_tick_lab.py")
 text = engine_path.read_text(encoding="utf-8")
 pattern = r"def direction_allowed\(direction: int, hour: int, c: Candidate\) -> bool:\n.*?\n\ndef floor_volume"
@@ -20,11 +20,12 @@ replacement = '''def direction_allowed(direction: int, hour: int, c: Candidate) 
             return direction > 0
         return False
 
-    # Directional liquidity hand-off rule: long pullback resumptions during
-    # hours 04-05, then short resumptions in hour 06. All existing closed-bar
-    # trend, body, distance and execution-cost checks still apply.
+    # Cost-aware liquidity hand-off rule: skip the thinner 04:00 opening
+    # segment, allow long pullback resumptions in hour 05, then short
+    # resumptions in hour 06. All closed-bar trend, body, distance and
+    # execution-cost checks still apply.
     if direction > 0:
-        return hour in (4, 5)
+        return hour == 5
     return hour == 6
 
 
@@ -34,13 +35,14 @@ if count != 1:
     raise SystemExit(f"Expected one direction_allowed function, replaced {count}")
 
 # Rename the active research candidate so results cannot be confused with the
-# prior symmetric 04-06 attempt.
-text = text.replace('name=c.name + "_early0406"', 'name=c.name + "_dirL45S6"')
+# prior long-hours-04/05 and short-hour-06 attempt.
+text = text.replace('name=c.name + "_early0406"', 'name=c.name + "_dirL5S6_noH4"')
 engine_path.write_text(text, encoding="utf-8")
 
-# Protocol-only holdout rotation. The February/May 2026 gates are now observed
-# and retired. Use two previously sealed, non-overlapping pre-2025 windows.
-# No date appears in trading logic.
+# The prior May-2021/December-2022 holdouts are now observed. Rotate only the
+# evaluation protocol to two previously unused, non-overlapping windows. No
+# date appears in trading logic and no strategy parameter is selected from
+# these windows.
 runner_path = Path("xau_lab/hf_window_runner.py")
 runner = runner_path.read_text(encoding="utf-8")
 windows = '''WINDOWS = [
@@ -52,12 +54,12 @@ windows = '''WINDOWS = [
     ("dev_2023_oct", "dev", "2023-10-02", "2023-10-21"),
     ("val_2024_mar", "validation", "2024-03-04", "2024-03-23"),
     ("val_2024_oct", "validation", "2024-10-07", "2024-10-26"),
-    ("hold_2021_may_blind", "holdout", "2021-05-24", "2021-06-05"),
-    ("hold_2022_dec_blind", "holdout", "2022-12-05", "2022-12-24"),
+    ("hold_2021_jul_blind", "holdout", "2021-07-05", "2021-07-24"),
+    ("hold_2022_nov_blind", "holdout", "2022-11-07", "2022-11-26"),
 ]'''
 runner, count = re.subn(r"WINDOWS\s*=\s*\[.*?\]\n\n\ndef iter_months", windows + "\n\n\ndef iter_months", runner, count=1, flags=re.S)
 if count != 1:
-    raise SystemExit("Could not install fresh May-2021/December-2022 holdout protocol")
+    raise SystemExit("Could not install fresh July-2021/November-2022 holdout protocol")
 runner_path.write_text(runner, encoding="utf-8")
 
-print("Applied one revision: buy hours 04-05, sell hour 06; rotated to fresh blind holdout")
+print("Applied one revision: remove weak hour-04 longs; fresh blind holdouts installed")
