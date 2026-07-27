@@ -4,13 +4,11 @@ import re
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
 
-# Correct the preceding liquidity-horizon revision so its intended 04:00-08:59
-# EET/EEST window is actually reachable. The prior patch widened
-# direction_allowed() but left Candidate.session_start/session_end at 05:00-06:59,
-# silently suppressing hours 04, 07, and 08. This is a chronology-neutral code
-# correction, not a new date-specific strategy rule. Signals, M5/M15 filters,
-# stops, targets, risk, observed spread, adverse slippage, and holdouts are
-# unchanged.
+# One simple, economically defensible revision after the latest development
+# and validation failure: remove server hours 07 and 08, which were negative
+# in both splits, while retaining the earlier European-session hours 04-06.
+# Signals, M5/M15 filters, stops, targets, risk, observed spread, adverse
+# slippage and position-management logic are unchanged.
 pattern = r"def direction_allowed\(direction: int, hour: int, c: Candidate\) -> bool:\n.*?\n\ndef floor_volume"
 replacement = '''def direction_allowed(direction: int, hour: int, c: Candidate) -> bool:
     if c.baseline_hour_rules:
@@ -22,9 +20,9 @@ replacement = '''def direction_allowed(direction: int, hour: int, c: Candidate) 
             return direction > 0
         return False
 
-    # Symmetric European liquid-session rule. Both directions remain subject
-    # to the existing M5/M15 trend and closed-bar signal requirements.
-    return hour in (4, 5, 6, 7, 8)
+    # Earlier European-session window. Both directions remain subject to all
+    # existing closed-bar trend and signal confirmations.
+    return hour in (4, 5, 6)
 
 
 def floor_volume'''
@@ -38,10 +36,10 @@ old_block = '''                name=c.name + "_sym567",
                 session_end=7,
                 blocked_hour=24,
 '''
-new_block = '''                name=c.name + "_sym0408",
+new_block = '''                name=c.name + "_early0406",
                 baseline_hour_rules=False,
                 session_start=4,
-                session_end=9,
+                session_end=7,
                 blocked_hour=24,
 '''
 if text.count(old_block) != 1:
@@ -49,4 +47,4 @@ if text.count(old_block) != 1:
 text = text.replace(old_block, new_block, 1)
 
 path.write_text(text, encoding="utf-8")
-print("Corrected symmetric liquid session: candidate and direction eligibility both use server hours 04-08")
+print("Applied one revision: removed consistently weak server hours 07 and 08")
