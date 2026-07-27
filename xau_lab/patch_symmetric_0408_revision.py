@@ -4,10 +4,13 @@ import re
 path = Path("xau_lab/real_tick_lab.py")
 text = path.read_text(encoding="utf-8")
 
-# One date-agnostic statistical revision after the 05-07 window produced only
-# 35 trades across ten independent weeks and failed development/holdout.
-# Preserve signal, trend, risk, stops, targets, real spread, and slippage.
-# Expand only the liquid-session horizon by one adjacent hour on each side.
+# Correct the preceding liquidity-horizon revision so its intended 04:00-08:59
+# EET/EEST window is actually reachable. The prior patch widened
+# direction_allowed() but left Candidate.session_start/session_end at 05:00-06:59,
+# silently suppressing hours 04, 07, and 08. This is a chronology-neutral code
+# correction, not a new date-specific strategy rule. Signals, M5/M15 filters,
+# stops, targets, risk, observed spread, adverse slippage, and holdouts are
+# unchanged.
 pattern = r"def direction_allowed\(direction: int, hour: int, c: Candidate\) -> bool:\n.*?\n\ndef floor_volume"
 replacement = '''def direction_allowed(direction: int, hour: int, c: Candidate) -> bool:
     if c.baseline_hour_rules:
@@ -29,10 +32,21 @@ text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
 if count != 1:
     raise SystemExit(f"Expected one direction_allowed function, replaced {count}")
 
-old_name = 'name=c.name + "_sym567"'
-if text.count(old_name) != 1:
-    raise SystemExit(f"Expected one symmetric candidate name, found {text.count(old_name)}")
-text = text.replace(old_name, 'name=c.name + "_sym0408"', 1)
+old_block = '''                name=c.name + "_sym567",
+                baseline_hour_rules=False,
+                session_start=5,
+                session_end=7,
+                blocked_hour=24,
+'''
+new_block = '''                name=c.name + "_sym0408",
+                baseline_hour_rules=False,
+                session_start=4,
+                session_end=9,
+                blocked_hour=24,
+'''
+if text.count(old_block) != 1:
+    raise SystemExit(f"Expected one stale 05:00-06:59 candidate block, found {text.count(old_block)}")
+text = text.replace(old_block, new_block, 1)
 
 path.write_text(text, encoding="utf-8")
-print("Applied one revision: symmetric trend-aligned eligibility at server hours 04-08")
+print("Corrected symmetric liquid session: candidate and direction eligibility both use server hours 04-08")
