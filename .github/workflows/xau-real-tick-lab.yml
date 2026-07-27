@@ -14,8 +14,8 @@ on:
       - '.github/workflows/xau-real-tick-lab.yml'
 
 concurrency:
-  group: xau-real-tick-lab
-  cancel-in-progress: true
+  group: xau-real-tick-lab-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   window-backtest:
