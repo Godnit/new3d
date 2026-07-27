@@ -12,14 +12,16 @@ if segment.count(needle) != 1:
 
 segment = segment.replace(
     needle,
-    "\n    # One simple global revision after the latest independent run: research\n"
-    "    # candidates use only bullish EMA9 reclaim/cross entries. In development\n"
-    "    # and validation, cross buys were the only signal family with a positive\n"
-    "    # expectancy, while follow/continuation entries and shorts caused most of\n"
-    "    # the losses. The frozen Headway baseline remains unchanged.\n"
+    "\n    # One simple global revision after the latest independent failure:\n"
+    "    # retain only EMA9 cross/reclaim entries, but restore directional\n"
+    "    # symmetry. The prior buy-only restriction lost in development,\n"
+    "    # validation, and untouched holdout. Gold trends in both directions,\n"
+    "    # so research candidates now permit the same cross trigger for buys\n"
+    "    # and sells while preserving all session, M5/M15 trend, spread, risk,\n"
+    "    # stop, trailing, chronology, and holdout controls.\n"
     "    if not c.baseline_hour_rules:\n"
     "        buy = buy and cross_buy\n"
-    "        sell = False\n"
+    "        sell = sell and cross_sell\n"
     "\n"
     "    if buy:\n",
     1,
@@ -27,4 +29,4 @@ segment = segment.replace(
 
 text = text[:start] + segment + text[end:]
 path.write_text(text, encoding="utf-8")
-print("Applied global cross-buy-only research revision")
+print("Applied symmetric cross-only trend-entry revision")
