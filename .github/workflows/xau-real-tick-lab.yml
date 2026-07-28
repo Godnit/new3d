@@ -34,7 +34,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild cost-aware long-only liquid-session engine
+      - name: Rebuild cost-aware liquid-core engine
         id: rebuild
         shell: bash
         run: |
@@ -65,6 +65,7 @@ jobs:
             python xau_lab/patch_directional_efficiency_filter.py || exit $?
             python xau_lab/patch_long_only_fresh_2022_holdout.py || exit $?
             python xau_lab/patch_extend_long_session_after_sparse_failure.py || exit $?
+            python xau_lab/patch_remove_late_liquid_hour_revision.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -129,7 +130,7 @@ jobs:
           cache: pip
           cache-dependency-path: xau_lab/requirements.txt
 
-      - name: Rebuild aggregate long-only liquid-session engine
+      - name: Rebuild aggregate liquid-core engine
         id: rebuild
         shell: bash
         run: |
@@ -158,6 +159,7 @@ jobs:
             python xau_lab/patch_directional_efficiency_filter.py || exit $?
             python xau_lab/patch_long_only_fresh_2022_holdout.py || exit $?
             python xau_lab/patch_extend_long_session_after_sparse_failure.py || exit $?
+            python xau_lab/patch_remove_late_liquid_hour_revision.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
