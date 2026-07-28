@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
+import random
+import time
 from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub.errors import HfHubHTTPError
 
 import real_tick_lab as lab
 
@@ -38,13 +41,46 @@ def iter_months(start: pd.Timestamp, end: pd.Timestamp):
         current = current + pd.offsets.MonthBegin(1)
 
 
+def retry_hf(callable_fn, label: str, attempts: int = 8):
+    """Retry transient Hugging Face 429/5xx failures with bounded backoff."""
+    for attempt in range(1, attempts + 1):
+        try:
+            return callable_fn()
+        except HfHubHTTPError as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            transient = status in {429, 500, 502, 503, 504}
+            if not transient or attempt == attempts:
+                raise
+            delay = min(90.0, 4.0 * (2 ** (attempt - 1))) + random.uniform(0.0, 3.0)
+            print(
+                f"Transient Hugging Face error for {label}: HTTP {status}; "
+                f"retry {attempt}/{attempts} after {delay:.1f}s",
+                flush=True,
+            )
+            time.sleep(delay)
+
+
+def list_repo_files_resilient() -> list[str]:
+    return retry_hf(
+        lambda: HfApi().list_repo_files(REPO_ID, repo_type="dataset"),
+        "repository file listing",
+    )
+
+
+def download_partition(filename: str) -> str:
+    return retry_hf(
+        lambda: hf_hub_download(REPO_ID, filename=filename, repo_type="dataset"),
+        filename,
+    )
+
+
 def build_window_hf(name: str, split: str, eval_start_s: str, eval_end_s: str) -> lab.WindowData:
     eval_start = pd.Timestamp(eval_start_s, tz="UTC")
     eval_end = pd.Timestamp(eval_end_s, tz="UTC")
     load_start = eval_start - pd.Timedelta(days=2)
     load_end = eval_end + pd.Timedelta(hours=2)
 
-    files = HfApi().list_repo_files(REPO_ID, repo_type="dataset")
+    files = list_repo_files_resilient()
     frames: list[pd.DataFrame] = []
     for year, month in iter_months(load_start, load_end):
         prefix = f"year={year}/month={month:02d}/"
@@ -57,7 +93,7 @@ def build_window_hf(name: str, split: str, eval_start_s: str, eval_end_s: str) -
                 continue
             raise RuntimeError(f"No parquet file found for required partition {prefix}")
         for filename in matches:
-            path = hf_hub_download(REPO_ID, filename=filename, repo_type="dataset")
+            path = download_partition(filename)
             frame = pd.read_parquet(path, columns=["timestamp", "bid_price", "ask_price"])
             frames.append(frame)
             print(f"Loaded {filename}: {len(frame):,} ticks", flush=True)
