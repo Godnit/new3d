@@ -81,9 +81,14 @@ print(
     "reconstructed the completed short-only iteration"
 )
 
-# Exactly one new strategy revision after the short-only protocol failed:
-# restore the engine's existing trend-aligned long entries while preserving all
-# filters, costs, risk, sessions, chronology safeguards and holdout windows.
+# Reconstruct the completed symmetric iteration first.
 revision = Path("xau_lab/patch_restore_symmetric_after_shortcore_failure.py")
 namespace = {"__name__": "__main__", "__file__": str(revision)}
 exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), namespace)
+
+# Exactly one new strategy revision for the current iteration: disable only the
+# long side based on negative development and validation expectancy, then use a
+# newly rotated untouched holdout. No other strategy parameter is changed.
+revision2 = Path("xau_lab/patch_disable_lossmaking_longs_fresh_holdout.py")
+namespace2 = {"__name__": "__main__", "__file__": str(revision2)}
+exec(compile(revision2.read_text(encoding="utf-8"), str(revision2), "exec"), namespace2)
