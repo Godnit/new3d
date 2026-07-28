@@ -69,6 +69,7 @@ jobs:
             python xau_lab/patch_restore_symmetric_after_sparse_short2.py || exit $?
             python xau_lab/patch_extend_liquid_session_one_hour.py || exit $?
             python xau_lab/patch_session_0506_after_failed_0509.py || exit $?
+            python xau_lab/patch_final_long_only_revision.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/hf_window_runner.py || exit $?
           } 2>&1 | tee rebuild_${{ matrix.index }}.log
           code=${PIPESTATUS[0]}
@@ -166,6 +167,7 @@ jobs:
             python xau_lab/patch_restore_symmetric_after_sparse_short2.py || exit $?
             python xau_lab/patch_extend_liquid_session_one_hour.py || exit $?
             python xau_lab/patch_session_0506_after_failed_0509.py || exit $?
+            python xau_lab/patch_final_long_only_revision.py || exit $?
             python -m py_compile xau_lab/real_tick_lab.py xau_lab/aggregate_results.py || exit $?
           } 2>&1 | tee aggregate_rebuild.log
           code=${PIPESTATUS[0]}
