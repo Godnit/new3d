@@ -9,7 +9,7 @@ old = "    body_ok = c.min_body_atr <= body_atr <= c.max_body_atr"
 new = '''    directional_efficiency = body / rng
     body_ok = (
         c.min_body_atr <= body_atr <= c.max_body_atr
-        and directional_efficiency >= 0.55
+        and directional_efficiency >= 0.35
     )'''
 
 if text.count(old) != 1:
@@ -18,11 +18,11 @@ if text.count(old) != 1:
     )
 text = text.replace(old, new, 1)
 
-# One new simple, date-agnostic revision based only on development and
-# validation results from the previous completed run: server hour 07 was
-# negative in both samples. Remove only 07:00-07:59 from the active symmetric
-# liquidity session. Signals, trend filters, stops, targets, risk, costs,
-# execution stress, and every holdout date remain unchanged.
+# Keep the previously established date-agnostic session revision. Only the
+# directional-efficiency threshold is relaxed in this iteration because the
+# previous completed protocol produced just 29 combined trades and one holdout
+# trade. All signals, trend filters, risk, costs, execution stress, and holdout
+# dates remain unchanged.
 pattern = r"session_start=5,\n(?P<indent>\s*)session_end=8,"
 text, session_count = re.subn(
     pattern,
@@ -36,6 +36,6 @@ text = text.replace("_sym0508", "_sym0507")
 text = text.replace("sym0508", "sym0507")
 path.write_text(text, encoding="utf-8")
 print(
-    f"Applied directional efficiency >= 0.55 and one new revision: "
-    f"excluded weak server hour 07 from {session_count} candidate blocks; holdout unchanged"
+    f"Applied directional efficiency >= 0.35 and retained the established "
+    f"05:00-07:00 session in {session_count} candidate blocks; holdout unchanged"
 )
