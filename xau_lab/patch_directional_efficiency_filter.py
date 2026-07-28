@@ -39,3 +39,9 @@ print(
     f"Applied directional efficiency >= 0.35 and retained the established "
     f"05:00-07:00 session in {session_count} candidate blocks; holdout unchanged"
 )
+
+# Execute exactly one subsequent strategy revision for the next independent
+# iteration. Keeping it chained here avoids changing workflow mechanics.
+revision = Path("xau_lab/patch_directional_hour_map_fresh_holdout.py")
+namespace = {"__name__": "__main__", "__file__": str(revision)}
+exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), namespace)
