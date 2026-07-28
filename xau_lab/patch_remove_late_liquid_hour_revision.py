@@ -16,11 +16,7 @@ if old in text:
 text = text.replace("_symLiquid", "_symCore")
 text = text.replace("symLiquid", "symCore")
 
-# One new, economically interpretable strategy revision for this iteration:
-# allow only short entries. In the completed development+validation sample,
-# long trades had negative expectancy while shorts were approximately
-# break-even/positive. All indicators, signal construction, stops, targets,
-# spread stress, slippage and risk sizing remain unchanged.
+# Prior completed iteration: directional asymmetry, short entries only.
 dispatch = '''    if buy:
         name = "CROSS_BUY" if cross_buy else ("FOLLOW_BUY" if follow_buy else "CONT_BUY")
         return 1, name, atr
@@ -81,6 +77,13 @@ report = re.sub(
 aggregate.write_text(report, encoding="utf-8")
 
 print(
-    "Retained the prior liquid-core hour rule; applied one new strategy "
-    "revision (short-only); installed non-overlapping holdout windows"
+    "Retained the prior liquid-core hour rule and non-overlapping holdout protocol; "
+    "reconstructed the completed short-only iteration"
 )
+
+# Exactly one new strategy revision after the short-only protocol failed:
+# restore the engine's existing trend-aligned long entries while preserving all
+# filters, costs, risk, sessions, chronology safeguards and holdout windows.
+revision = Path("xau_lab/patch_restore_symmetric_after_shortcore_failure.py")
+namespace = {"__name__": "__main__", "__file__": str(revision)}
+exec(compile(revision.read_text(encoding="utf-8"), str(revision), "exec"), namespace)
