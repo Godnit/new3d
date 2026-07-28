@@ -5,7 +5,7 @@ import re
 # development trades, negative development expectancy, and zero holdout trades.
 # The side-disable decision was based on too little evidence. Restore the
 # existing trend-aligned long entries without changing any signal formula,
-# session, spread/slippage stress, stop, target, sizing, or chronology safeguard.
+# session, spread/slippage stress, stop, sizing, or chronology safeguard.
 engine = Path("xau_lab/real_tick_lab.py")
 text = engine.read_text(encoding="utf-8")
 old = '''    # Current iteration: development and validation both showed negative long
@@ -30,25 +30,23 @@ text = text.replace("shortCore2", "symmetricCore2")
 # symmetric average wins and losses, producing a 0.75 combined profit factor
 # after real spread and adverse slippage. Preserve every entry and risk rule,
 # but require a 1.50R target so a sub-50% hit rate can have positive expectancy.
-# Insert immediately before in_session regardless of earlier candidate-list
-# transforms; this avoids depending on a brittle exact return marker.
-if "'_rr150'" in text or '"_rr150"' in text:
+# Earlier transforms no longer guarantee that candidates() ends with the exact
+# text `return out`. Wrap the completed function at the candidates()/in_session()
+# boundary instead; this is stable regardless of its internal return expression.
+if "_candidates_before_rr150" in text or "_rr150" in text:
     raise SystemExit("The 1.50R revision is already present before the final patch")
-pattern = r"(?ms)(^def candidates\(\).*?)(^def in_session\()"
+pattern = r"(?m)^def in_session\("
 match = re.search(pattern, text)
 if not match:
-    raise SystemExit("Could not locate candidates()/in_session() boundary for the 1.50R revision")
-candidate_block = match.group(1)
-return_matches = list(re.finditer(r"(?m)^    return out\s*$", candidate_block))
-if not return_matches:
-    raise SystemExit("No final 'return out' found inside candidates()")
-last_return = return_matches[-1]
-updated_block = (
-    candidate_block[:last_return.start()]
-    + "    out = [replace(c, name=c.name + '_rr150', rr=1.50) for c in out]\n"
-    + candidate_block[last_return.start():]
-)
-text = text[:match.start(1)] + updated_block + text[match.start(2):]
+    raise SystemExit("Could not locate in_session() boundary for the 1.50R wrapper")
+wrapper = '''_candidates_before_rr150 = candidates
+
+def candidates() -> list[Candidate]:
+    return [replace(c, name=c.name + "_rr150", rr=1.50) for c in _candidates_before_rr150()]
+
+
+'''
+text = text[:match.start()] + wrapper + text[match.start():]
 engine.write_text(text, encoding="utf-8")
 
 # Protocol rotation only. The previous holdout has now been observed, so replace
