@@ -26,22 +26,29 @@ text = text.replace(old, new, 1)
 text = text.replace("_shortCore2", "_symmetricCore2")
 text = text.replace("shortCore2", "symmetricCore2")
 
-# Current automation iteration: the completed independent run had a 41.94%
-# hit rate and approximately symmetric average wins and losses, producing a
-# 0.75 combined profit factor after real spread and adverse slippage. Preserve
-# every entry and risk rule, but require a 1.50R target so a sub-50% hit rate can
-# have positive expectancy. This is one global payoff revision, not a date,
-# direction, session, or holdout-specific rule.
-marker = "    return out\n\n\ndef in_session"
-replacement = (
-    "    out = [replace(c, name=c.name + '_rr150', rr=1.50) for c in out]\n"
-    "    return out\n\n\ndef in_session"
-)
-if marker not in text:
-    raise SystemExit("Candidate return marker not found for the 1.50R revision")
+# The completed independent run had a 41.94% hit rate and approximately
+# symmetric average wins and losses, producing a 0.75 combined profit factor
+# after real spread and adverse slippage. Preserve every entry and risk rule,
+# but require a 1.50R target so a sub-50% hit rate can have positive expectancy.
+# Insert immediately before in_session regardless of earlier candidate-list
+# transforms; this avoids depending on a brittle exact return marker.
 if "'_rr150'" in text or '"_rr150"' in text:
     raise SystemExit("The 1.50R revision is already present before the final patch")
-text = text.replace(marker, replacement, 1)
+pattern = r"(?ms)(^def candidates\(\).*?)(^def in_session\()"
+match = re.search(pattern, text)
+if not match:
+    raise SystemExit("Could not locate candidates()/in_session() boundary for the 1.50R revision")
+candidate_block = match.group(1)
+return_matches = list(re.finditer(r"(?m)^    return out\s*$", candidate_block))
+if not return_matches:
+    raise SystemExit("No final 'return out' found inside candidates()")
+last_return = return_matches[-1]
+updated_block = (
+    candidate_block[:last_return.start()]
+    + "    out = [replace(c, name=c.name + '_rr150', rr=1.50) for c in out]\n"
+    + candidate_block[last_return.start():]
+)
+text = text[:match.start(1)] + updated_block + text[match.start(2):]
 engine.write_text(text, encoding="utf-8")
 
 # Protocol rotation only. The previous holdout has now been observed, so replace
