@@ -5,6 +5,10 @@ import re
 # abandon the consistently loss-making failed-breakout fade and require the
 # original trend direction to close beyond the prior completed bar's extreme.
 # This is a simple breakout-confirmation rule, applied only to closed bars.
+#
+# IMPORTANT: this patch must not alter the evaluation windows. The runner owns
+# the frozen development, validation, and holdout protocol. Keeping dates out of
+# strategy patches prevents post-result holdout rotation and protocol leakage.
 engine = Path("xau_lab/real_tick_lab.py")
 text = engine.read_text(encoding="utf-8")
 
@@ -47,36 +51,7 @@ if renamed != 1:
     raise SystemExit("Could not rename the sole research candidate")
 engine.write_text(text, encoding="utf-8")
 
-# The previously reported holdout has now been observed. Rotate only the
-# evaluation protocol to two fresh, non-overlapping 2025 windows. These dates
-# are not referenced by strategy logic or parameter selection.
-runner = Path("xau_lab/hf_window_runner.py")
-runner_text = runner.read_text(encoding="utf-8")
-runner_text, first = re.subn(
-    r'\("hold_2025_feb_fresh", "holdout", "2025-02-03", "2025-02-15"\)',
-    '("hold_2025_jul_fresh", "holdout", "2025-07-07", "2025-07-19")',
-    runner_text,
-    count=1,
-)
-runner_text, second = re.subn(
-    r'\("hold_2025_sep_fresh", "holdout", "2025-09-08", "2025-09-20"\)',
-    '("hold_2025_nov_fresh", "holdout", "2025-11-03", "2025-11-15")',
-    runner_text,
-    count=1,
-)
-if first != 1 or second != 1:
-    raise SystemExit(f"Could not rotate fresh holdout: first={first}, second={second}")
-runner.write_text(runner_text, encoding="utf-8")
-
-aggregate = Path("xau_lab/aggregate_results.py")
-report = aggregate.read_text(encoding="utf-8")
-report = report.replace(
-    "fresh February/September 2025 holdout gate",
-    "fresh July/November 2025 holdout gate",
-)
-aggregate.write_text(report, encoding="utf-8")
-
 print(
     "Applied one revision: closed-bar confirmed breakout continuation; "
-    "rotated only the untouched 2025 holdout"
+    "evaluation windows left frozen by design"
 )
