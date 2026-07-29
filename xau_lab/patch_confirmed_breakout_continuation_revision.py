@@ -1,15 +1,19 @@
 from pathlib import Path
 import re
 
-# One strategy revision for this iteration:
+# Strategy state carried forward:
 # abandon the consistently loss-making failed-breakout fade and require the
 # original trend direction to close beyond the prior completed bar's extreme.
-# The latest statistical audit showed marginal breaks remained loss-making, so
-# require a small 0.10 ATR clearance beyond that extreme. This is a universal,
-# cost-aware false-break filter using completed bars only.
+# A 0.10 ATR clearance rejects marginal spread-sensitive breaks.
 #
-# IMPORTANT: this patch must not alter the evaluation windows. The runner owns
-# the frozen development, validation, and holdout protocol. Keeping dates out of
+# One new economically defensible revision for this iteration:
+# require strict completed-M15 trend alignment instead of merely vetoing the
+# opposite M15 trend. The previous buffered-breakout candidate lost broadly in
+# development and validation, consistent with M1 breaks occurring inside weak
+# or sideways higher-timeframe structure. This is universal and date-agnostic.
+#
+# IMPORTANT: this patch must not alter evaluation windows. The runner owns the
+# frozen development, validation, and holdout protocol. Keeping dates out of
 # strategy patches prevents post-result holdout rotation and protocol leakage.
 engine = Path("xau_lab/real_tick_lab.py")
 text = engine.read_text(encoding="utf-8")
@@ -46,15 +50,22 @@ text = text.replace(old, new, 1)
 
 text, renamed = re.subn(
     r'name="universal_liquid_failed_breakout_fade_v1"',
-    'name="universal_liquid_buffered_breakout_v2"',
+    'name="universal_liquid_buffered_breakout_m15strict_v3"',
     text,
     count=1,
 )
 if renamed != 1:
     raise SystemExit("Could not rename the sole research candidate")
+
+old_mode = 'm15_mode="veto"'
+new_mode = 'm15_mode="strict"'
+if text.count(old_mode) != 1:
+    raise SystemExit(f"Expected one M15 veto mode, found {text.count(old_mode)}")
+text = text.replace(old_mode, new_mode, 1)
+
 engine.write_text(text, encoding="utf-8")
 
 print(
-    "Applied one revision: 0.10 ATR closed-bar buffered breakout continuation; "
-    "evaluation windows left frozen by design"
+    "Applied buffered breakout continuation plus one new revision: strict "
+    "completed-M15 trend alignment; evaluation windows remain frozen"
 )
