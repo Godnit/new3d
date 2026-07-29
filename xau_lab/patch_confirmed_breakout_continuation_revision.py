@@ -57,11 +57,18 @@ text, renamed = re.subn(
 if renamed != 1:
     raise SystemExit("Could not rename the sole research candidate")
 
-old_mode = 'm15_mode="veto"'
-new_mode = 'm15_mode="strict"'
-if text.count(old_mode) != 1:
-    raise SystemExit(f"Expected one M15 veto mode, found {text.count(old_mode)}")
-text = text.replace(old_mode, new_mode, 1)
+# The accumulated patch chain contains another historical m15_mode="veto"
+# candidate. Change only the newly renamed research candidate, not every veto
+# occurrence globally.
+pattern = re.compile(
+    r'(name="universal_liquid_buffered_breakout_m15strict_v3".*?m15_mode=")veto(")',
+    flags=re.S,
+)
+text, mode_changes = pattern.subn(r'\1strict\2', text, count=1)
+if mode_changes != 1:
+    raise SystemExit(
+        "Could not set strict M15 mode on the sole buffered-breakout research candidate"
+    )
 
 engine.write_text(text, encoding="utf-8")
 
