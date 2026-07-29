@@ -4,7 +4,9 @@ import re
 # One strategy revision for this iteration:
 # abandon the consistently loss-making failed-breakout fade and require the
 # original trend direction to close beyond the prior completed bar's extreme.
-# This is a simple breakout-confirmation rule, applied only to closed bars.
+# The latest statistical audit showed marginal breaks remained loss-making, so
+# require a small 0.10 ATR clearance beyond that extreme. This is a universal,
+# cost-aware false-break filter using completed bars only.
 #
 # IMPORTANT: this patch must not alter the evaluation windows. The runner owns
 # the frozen development, validation, and holdout protocol. Keeping dates out of
@@ -23,18 +25,19 @@ old = '''        direction, sig_name, atr = signal_at(bars, i, c)
 '''
 new = '''        direction, sig_name, atr = signal_at(bars, i, c)
         if direction != 0:
-            # Confirm continuation with completed bars only: the signal bar
-            # must close beyond the previous bar's high/low in its direction.
+            # Confirm continuation with completed bars only. A 0.10 ATR buffer
+            # rejects marginal, spread-sensitive breaks of the prior extreme.
             signal_bar = bars.iloc[i - 1]
             prior_bar = bars.iloc[i - 2]
+            breakout_buffer = atr * 0.10
             confirmed = (
-                (direction > 0 and signal_bar.close > prior_bar.high)
-                or (direction < 0 and signal_bar.close < prior_bar.low)
+                (direction > 0 and signal_bar.close > prior_bar.high + breakout_buffer)
+                or (direction < 0 and signal_bar.close < prior_bar.low - breakout_buffer)
             )
             if not confirmed:
                 direction = 0
             else:
-                sig_name = "CONFIRMED_BREAKOUT_" + sig_name
+                sig_name = "BUFFERED_BREAKOUT_" + sig_name
         if direction == 0 or not direction_allowed(direction, hour, c):
 '''
 if text.count(old) != 1:
@@ -43,7 +46,7 @@ text = text.replace(old, new, 1)
 
 text, renamed = re.subn(
     r'name="universal_liquid_failed_breakout_fade_v1"',
-    'name="universal_liquid_confirmed_breakout_v1"',
+    'name="universal_liquid_buffered_breakout_v2"',
     text,
     count=1,
 )
@@ -52,6 +55,6 @@ if renamed != 1:
 engine.write_text(text, encoding="utf-8")
 
 print(
-    "Applied one revision: closed-bar confirmed breakout continuation; "
+    "Applied one revision: 0.10 ATR closed-bar buffered breakout continuation; "
     "evaluation windows left frozen by design"
 )
