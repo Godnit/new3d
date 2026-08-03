@@ -2,14 +2,7 @@
 .packages
 .pub/
 build/
-coverage/
-.idea/
-.vscode/
-*.iml
 android/.gradle/
 android/local.properties
-android/key.properties
 *.jks
-*.keystore
-.env
-.DS_Store
+key.properties
