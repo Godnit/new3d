@@ -72,11 +72,43 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
-      - name: Build release APK
+      - name: Build unsigned release APK
         run: flutter build apk --release
 
-      - name: Label development-signed release APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-release-development-signed.apk
+      - name: Sign and verify installable release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "${ANDROID_SDK_ROOT}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -x "${BUILD_TOOLS}/zipalign"
+          test -x "${BUILD_TOOLS}/apksigner"
+
+          mkdir -p "${HOME}/.android"
+          if [ ! -f "${HOME}/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "${HOME}/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
+
+          INPUT_APK="build/app/outputs/flutter-apk/app-release.apk"
+          ALIGNED_APK="build/app/outputs/flutter-apk/app-release-aligned.apk"
+          SIGNED_APK="build/app/outputs/flutter-apk/Piano-Violin-Academy-installable.apk"
+
+          "${BUILD_TOOLS}/zipalign" -p -f 4 "${INPUT_APK}" "${ALIGNED_APK}"
+          "${BUILD_TOOLS}/apksigner" sign \
+            --ks "${HOME}/.android/debug.keystore" \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out "${SIGNED_APK}" \
+            "${ALIGNED_APK}"
+          "${BUILD_TOOLS}/apksigner" verify --verbose --print-certs "${SIGNED_APK}"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -85,13 +117,11 @@ jobs:
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
 
-      - name: Upload release APK
+      - name: Upload installable signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: piano-violin-academy-release-apk
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-release-development-signed.apk
+          name: piano-violin-academy-installable-apk
+          path: build/app/outputs/flutter-apk/Piano-Violin-Academy-installable.apk
           if-no-files-found: error
 
       - name: Publish final result
