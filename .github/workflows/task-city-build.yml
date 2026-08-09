@@ -32,7 +32,7 @@ jobs:
           git clone --depth 1 https://github.com/immaculate-lift-studio/CityCrafter3D.git /tmp/city-models
           cp -a "/tmp/city-models/addons/citycrafter/assets/example_assets/kenney_city-kit-commercial_20/Models/OBJ format"/. task-city/assets/city/
           wget -q -O task-city/assets/fonts/NotoSansArabic-Regular.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf"
-          find task-city/assets/city -type f | head -30
+          find task-city/assets/city -type f | sed -n '1,30p'
           du -sh task-city/assets
 
       - name: Install Godot 4.6.3 with Android templates
