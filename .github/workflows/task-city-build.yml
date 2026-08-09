@@ -35,6 +35,16 @@ jobs:
           find task-city/assets/city -type f | sed -n '1,30p'
           du -sh task-city/assets
 
+      - name: Apply strict typing compatibility fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('task-city/main.gd')
+          s = p.read_text()
+          s = s.replace('var remain := max(0,int(item.deadline)-int(Time.get_unix_time_from_system()))', 'var remain: int = max(0, int(item.deadline) - int(Time.get_unix_time_from_system()))')
+          p.write_text(s)
+          PY
+
       - name: Install Godot 4.6.3 with Android templates
         run: |
           set -euxo pipefail
