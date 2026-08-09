@@ -22,17 +22,21 @@ jobs:
       - name: Install Linux tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip zip wget git xvfb imagemagick python3-pil libgl1 libpulse0
+          sudo apt-get install -y unzip zip wget xvfb imagemagick python3-pil libgl1 libpulse0
 
-      - name: Download lightweight city assets and Arabic font
+      - name: Download selected Sketchfab city and Arabic font
         run: |
           set -euxo pipefail
-          rm -rf /tmp/city-models task-city/assets
-          mkdir -p task-city/assets/city task-city/assets/fonts
-          git clone --depth 1 https://github.com/immaculate-lift-studio/CityCrafter3D.git /tmp/city-models
-          cp -a "/tmp/city-models/addons/citycrafter/assets/example_assets/kenney_city-kit-commercial_20/Models/OBJ format"/. task-city/assets/city/
+          rm -rf task-city/assets
+          mkdir -p task-city/assets/user_city/textures task-city/assets/fonts
+          BASE="https://threejsfundamentals.org/threejs/resources/models/cartoon_lowpoly_small_city_free_pack"
+          wget -q -O task-city/assets/user_city/scene.gltf "$BASE/scene.gltf"
+          wget -q -O task-city/assets/user_city/scene.bin "$BASE/scene.bin"
+          wget -q -O task-city/assets/user_city/textures/World_ap_baseColor.jpeg "$BASE/textures/World_ap_baseColor.jpeg"
           wget -q -O task-city/assets/fonts/NotoSansArabic-Regular.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf"
-          find task-city/assets/city -type f | sed -n '1,30p'
+          test -s task-city/assets/user_city/scene.gltf
+          test -s task-city/assets/user_city/scene.bin
+          test -s task-city/assets/user_city/textures/World_ap_baseColor.jpeg
           du -sh task-city/assets
 
       - name: Apply strict typing compatibility fix
@@ -71,6 +75,7 @@ jobs:
           timeout 40s godot --headless --rendering-method gl_compatibility --quit-after 180 2>&1 | tee smoke.log || true
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" smoke.log; then exit 1; fi
           grep -q "TASKCITY_READY" smoke.log
+          grep -q "SKETCHFAB_CITY_READY" smoke.log
 
       - name: Render real portrait preview
         working-directory: task-city
@@ -83,6 +88,7 @@ jobs:
           xvfb-run -a timeout 35s godot --rendering-method gl_compatibility 2>&1 | tee visual.log
           set -e
           grep -q "TASKCITY_CAPTURED" visual.log
+          grep -q "SKETCHFAB_CITY_READY" visual.log
           test -s build/TaskCity-Preview.png
           identify build/TaskCity-Preview.png
           python3 - <<'PY'
@@ -97,19 +103,19 @@ jobs:
         working-directory: task-city
         run: |
           mkdir -p build
-          godot --headless --rendering-method gl_compatibility --export-debug "Android" build/TaskCity-v1.apk 2>&1 | tee export.log
-          test -s build/TaskCity-v1.apk
-          unzip -t build/TaskCity-v1.apk
-          keytool -printcert -jarfile build/TaskCity-v1.apk | tee build/signature.txt
-          sha256sum build/TaskCity-v1.apk | tee build/SHA256SUMS.txt
-          stat -c 'APK bytes: %s' build/TaskCity-v1.apk
+          godot --headless --rendering-method gl_compatibility --export-debug "Android" build/TaskCity-Sketchfab-v2.apk 2>&1 | tee export.log
+          test -s build/TaskCity-Sketchfab-v2.apk
+          unzip -t build/TaskCity-Sketchfab-v2.apk
+          keytool -printcert -jarfile build/TaskCity-Sketchfab-v2.apk | tee build/signature.txt
+          sha256sum build/TaskCity-Sketchfab-v2.apk | tee build/SHA256SUMS.txt
+          stat -c 'APK bytes: %s' build/TaskCity-Sketchfab-v2.apk
 
       - name: Upload Task City APK and preview
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-v1-Android
+          name: TaskCity-Sketchfab-v2-Android
           path: |
-            task-city/build/TaskCity-v1.apk
+            task-city/build/TaskCity-Sketchfab-v2.apk
             task-city/build/TaskCity-Preview.png
             task-city/build/SHA256SUMS.txt
             task-city/build/signature.txt
@@ -119,7 +125,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-v1-Diagnostics
+          name: TaskCity-Sketchfab-v2-Diagnostics
           path: |
             task-city/import.log
             task-city/smoke.log
