@@ -32,7 +32,17 @@ jobs:
           BASE="https://threejsfundamentals.org/threejs/resources/models/cartoon_lowpoly_small_city_free_pack"
           wget -q -O task-city/assets/user_city/scene.gltf "$BASE/scene.gltf"
           wget -q -O task-city/assets/user_city/scene.bin "$BASE/scene.bin"
-          wget -q -O task-city/assets/user_city/textures/World_ap_baseColor.jpeg "$BASE/textures/World_ap_baseColor.jpeg"
+          for tex in \
+            World_ap_baseColor.jpeg \
+            World_ap.8_baseColor.jpeg \
+            World_ap.9_baseColor.jpeg \
+            World_ap.11_baseColor.jpeg \
+            World_ap.15_baseColor.jpeg \
+            World_ap.16_baseColor.jpeg \
+            World_ap.17_baseColor.jpeg \
+            World_ap.19_baseColor.jpeg; do
+            wget -q -O "task-city/assets/user_city/textures/$tex" "$BASE/textures/$tex"
+          done
           wget -q -O task-city/assets/fonts/NotoSansArabic-Regular.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf"
           test -s task-city/assets/user_city/scene.gltf
           test -s task-city/assets/user_city/scene.bin
