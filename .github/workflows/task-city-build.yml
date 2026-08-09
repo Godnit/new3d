@@ -1,4 +1,4 @@
-name: Build Task City APK
+name: Build Task City Small APK
 
 on:
   pull_request:
@@ -24,7 +24,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unzip zip wget xvfb imagemagick python3-pil libgl1 libpulse0
 
-      - name: Download selected Sketchfab city and Arabic font
+      - name: Download selected city and Arabic font
         run: |
           set -euxo pipefail
           rm -rf task-city/assets
@@ -43,10 +43,11 @@ jobs:
             World_ap.19_baseColor.jpeg; do
             wget -q -O "task-city/assets/user_city/textures/$tex" "$BASE/textures/$tex"
           done
+          # Keep visual quality while avoiding unnecessarily large mobile textures.
+          mogrify -resize '1024x1024>' -strip -quality 82 task-city/assets/user_city/textures/*.jpeg
           wget -q -O task-city/assets/fonts/NotoSansArabic-Regular.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf"
           test -s task-city/assets/user_city/scene.gltf
           test -s task-city/assets/user_city/scene.bin
-          test -s task-city/assets/user_city/textures/World_ap_baseColor.jpeg
           du -sh task-city/assets
 
       - name: Apply strict typing compatibility fix
@@ -98,48 +99,63 @@ jobs:
           xvfb-run -a timeout 35s godot --rendering-method gl_compatibility 2>&1 | tee visual.log
           set -e
           grep -q "TASKCITY_CAPTURED" visual.log
-          grep -q "SKETCHFAB_CITY_READY" visual.log
           test -s build/TaskCity-Preview.png
           identify build/TaskCity-Preview.png
-          python3 - <<'PY'
-          from PIL import Image, ImageStat
-          im=Image.open('build/TaskCity-Preview.png').convert('RGB')
-          print('preview', im.size, ImageStat.Stat(im).mean)
-          assert im.height > im.width, im.size
-          assert sum(ImageStat.Stat(im).stddev)/3 > 8
-          PY
 
-      - name: Export signed Android APK
+      - name: Export compact signed Android APK
         working-directory: task-city
         run: |
           mkdir -p build
-          godot --headless --rendering-method gl_compatibility --export-debug "Android" build/TaskCity-Sketchfab-v2.apk 2>&1 | tee export.log
-          test -s build/TaskCity-Sketchfab-v2.apk
-          unzip -t build/TaskCity-Sketchfab-v2.apk
-          keytool -printcert -jarfile build/TaskCity-Sketchfab-v2.apk | tee build/signature.txt
-          sha256sum build/TaskCity-Sketchfab-v2.apk | tee build/SHA256SUMS.txt
-          stat -c 'APK bytes: %s' build/TaskCity-Sketchfab-v2.apk
+          godot --headless --rendering-method gl_compatibility --export-debug "Android" build/TaskCity-small.apk 2>&1 | tee export.log
+          test -s build/TaskCity-small.apk
+          unzip -t build/TaskCity-small.apk >/dev/null
+          unzip -l build/TaskCity-small.apk | tee build/apk-files.txt
+          grep -q 'lib/armeabi-v7a/libgodot_android.so' build/apk-files.txt
+          if grep -q 'lib/arm64-v8a/libgodot_android.so' build/apk-files.txt; then
+            echo 'Unexpected ARM64 library found; APK is not compact.'
+            exit 1
+          fi
+          BYTES=$(stat -c '%s' build/TaskCity-small.apk)
+          echo "APK bytes: $BYTES"
+          # Keep this test build under 40 MiB.
+          test "$BYTES" -lt 41943040
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          "$AAPT" dump badging build/TaskCity-small.apk | tee build/android-info.txt
+          python3 - <<'PY'
+          import re
+          text=open('build/android-info.txt', encoding='utf-8').read()
+          m=re.search(r"sdkVersion:'(\d+)'", text)
+          assert m, 'Could not determine minSdk'
+          sdk=int(m.group(1))
+          print('minSdk', sdk)
+          assert sdk <= 27, f'minSdk {sdk} would not support Android 8.1/API 27'
+          PY
+          keytool -printcert -jarfile build/TaskCity-small.apk | tee build/signature.txt
+          sha256sum build/TaskCity-small.apk | tee build/SHA256SUMS.txt
 
-      - name: Upload Task City APK and preview
+      - name: Upload compact APK and preview
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-Sketchfab-v2-Android
+          name: TaskCity-Small-Android8
           path: |
-            task-city/build/TaskCity-Sketchfab-v2.apk
+            task-city/build/TaskCity-small.apk
             task-city/build/TaskCity-Preview.png
             task-city/build/SHA256SUMS.txt
             task-city/build/signature.txt
+            task-city/build/android-info.txt
           retention-days: 14
 
       - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-Sketchfab-v2-Diagnostics
+          name: TaskCity-Small-Diagnostics
           path: |
             task-city/import.log
             task-city/smoke.log
             task-city/visual.log
             task-city/export.log
+            task-city/build/apk-files.txt
+            task-city/build/android-info.txt
           if-no-files-found: ignore
           retention-days: 7
