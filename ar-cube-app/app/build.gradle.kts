@@ -16,8 +16,8 @@ android {
         applicationId = "com.godnit.arcube"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1-lite"
     }
 
     compileOptions {
@@ -27,6 +27,26 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    buildTypes {
+        debug {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = false
+        }
     }
 
     androidResources {
