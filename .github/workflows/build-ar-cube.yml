@@ -32,32 +32,38 @@ jobs:
         with:
           gradle-version: "8.14.5"
 
-      - name: Build debug APK
+      - name: Build optimized APKs
         working-directory: ar-cube-app
         run: gradle :app:assembleDebug --stacktrace
 
-      - name: Prepare APK
+      - name: Prepare APKs
         run: |
           mkdir -p out
-          cp ar-cube-app/app/build/outputs/apk/debug/app-debug.apk out/AR-Cube-v1-debug.apk
+          ARM64=$(find ar-cube-app/app/build/outputs/apk/debug -type f -name '*arm64-v8a*debug.apk' | head -n 1)
+          ARM32=$(find ar-cube-app/app/build/outputs/apk/debug -type f -name '*armeabi-v7a*debug.apk' | head -n 1)
+          test -n "$ARM64" && test -n "$ARM32"
+          cp "$ARM64" out/AR-Cube-v1.1-lite-arm64.apk
+          cp "$ARM32" out/AR-Cube-v1.1-lite-arm32.apk
+          ls -lh out/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AR-Cube-v1-APK
-          path: out/AR-Cube-v1-debug.apk
+          name: AR-Cube-v1.1-Lite-APKs
+          path: out/*.apk
           if-no-files-found: error
 
-      - name: Publish APK to branch
+      - name: Publish APKs to branch
         run: |
           mkdir -p apk-output
-          cp out/AR-Cube-v1-debug.apk apk-output/AR-Cube-v1-debug.apk
+          cp out/AR-Cube-v1.1-lite-arm64.apk apk-output/AR-Cube-v1.1-lite-arm64.apk
+          cp out/AR-Cube-v1.1-lite-arm32.apk apk-output/AR-Cube-v1.1-lite-arm32.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apk-output/AR-Cube-v1-debug.apk
+          git add apk-output/AR-Cube-v1.1-lite-arm64.apk apk-output/AR-Cube-v1.1-lite-arm32.apk
           if git diff --cached --quiet; then
-            echo "APK unchanged; nothing to commit."
+            echo "APKs unchanged; nothing to commit."
           else
-            git commit -m "Build AR Cube v1 APK"
+            git commit -m "Build AR Cube v1.1 Lite APKs [skip ci]"
             git push origin HEAD:ar-cube-real
           fi
