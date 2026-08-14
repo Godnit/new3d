@@ -1,0 +1,628 @@
+package com.godnit.terrainstudio.gdx;
+
+import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.Preferences;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Mesh;
+import com.badlogic.gdx.graphics.PerspectiveCamera;
+import com.badlogic.gdx.graphics.VertexAttribute;
+import com.badlogic.gdx.graphics.VertexAttributes;
+import com.badlogic.gdx.graphics.g3d.Environment;
+import com.badlogic.gdx.graphics.g3d.Material;
+import com.badlogic.gdx.graphics.g3d.Model;
+import com.badlogic.gdx.graphics.g3d.ModelBatch;
+import com.badlogic.gdx.graphics.g3d.ModelInstance;
+import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
+import com.badlogic.gdx.graphics.g3d.environment.DirectionalShadowLight;
+import com.badlogic.gdx.graphics.g3d.model.MeshPart;
+import com.badlogic.gdx.graphics.g3d.model.Node;
+import com.badlogic.gdx.graphics.g3d.model.NodePart;
+import com.badlogic.gdx.graphics.g3d.utils.DepthShaderProvider;
+import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
+import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder;
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.math.collision.Ray;
+import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.Json;
+
+public class TerrainStudioGame extends ApplicationAdapter {
+    public enum Tool { CAMERA, RAISE, LOWER, SMOOTH, FLATTEN, PAINT, TREE, ROCK, DELETE }
+    public interface StatusListener { void onStatus(String text); }
+
+    private PerspectiveCamera camera;
+    private ModelBatch modelBatch;
+    private ModelBatch shadowBatch;
+    private Environment environment;
+    private DirectionalShadowLight shadowLight;
+    private boolean shadowsEnabled = true;
+
+    private TerrainSurface terrain;
+    private Model treeModel;
+    private Model rockModel;
+    private final Array<Prop> props = new Array<>();
+    private final Array<Snapshot> undo = new Array<>();
+
+    private volatile Tool tool = Tool.CAMERA;
+    private volatile float brushRadius = 2.8f;
+    private volatile float brushStrength = 0.42f;
+    private final Color paintColor = new Color(0.30f, 0.52f, 0.20f, 1f);
+    private float flattenHeight = 0f;
+
+    private float yaw = 42f;
+    private float pitch = 48f;
+    private float distance = 30f;
+    private final Vector3 target = new Vector3(0, 0, 0);
+    private final Vector3 hit = new Vector3();
+    private float lastX, lastY;
+    private float lastMidX, lastMidY, lastPinch;
+    private boolean gestureWasTwoFinger;
+    private StatusListener statusListener;
+
+    @Override
+    public void create() {
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
+        Gdx.gl.glEnable(GL20.GL_CULL_FACE);
+        Gdx.gl.glCullFace(GL20.GL_BACK);
+
+        camera = new PerspectiveCamera(58f, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        camera.near = 0.35f;
+        camera.far = 120f;
+        updateCamera();
+
+        modelBatch = new ModelBatch();
+        environment = new Environment();
+        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.48f, 0.50f, 0.52f, 1f));
+
+        try {
+            shadowLight = new DirectionalShadowLight(512, 512, 42f, 42f, 1f, 80f);
+            shadowLight.set(0.92f, 0.86f, 0.75f, -0.65f, -1.0f, -0.35f);
+            environment.add(shadowLight);
+            environment.shadowMap = shadowLight;
+            shadowBatch = new ModelBatch(new DepthShaderProvider());
+        } catch (Throwable t) {
+            shadowsEnabled = false;
+            shadowLight = null;
+            shadowBatch = null;
+            environment.add(new com.badlogic.gdx.graphics.g3d.environment.DirectionalLight()
+                    .set(0.92f, 0.86f, 0.75f, -0.65f, -1.0f, -0.35f));
+        }
+
+        terrain = new TerrainSurface(49, 36f);
+        buildPropModels();
+        Gdx.input.setInputProcessor(new EditorInput());
+        status("جاهز • libGDX");
+    }
+
+    private void buildPropModels() {
+        final long attrs = VertexAttributes.Usage.Position | VertexAttributes.Usage.Normal;
+        ModelBuilder mb = new ModelBuilder();
+        mb.begin();
+        Material trunkMat = new Material(ColorAttribute.createDiffuse(new Color(0.34f, 0.19f, 0.08f, 1f)));
+        Material leafMat = new Material(ColorAttribute.createDiffuse(new Color(0.17f, 0.46f, 0.17f, 1f)));
+        MeshPartBuilder trunk = mb.part("trunk", GL20.GL_TRIANGLES, attrs, trunkMat);
+        trunk.setVertexTransform(new Matrix4().setToTranslation(0f, 1.15f, 0f));
+        trunk.cylinder(0.38f, 2.3f, 0.38f, 9);
+        MeshPartBuilder crownA = mb.part("crownA", GL20.GL_TRIANGLES, attrs, leafMat);
+        crownA.setVertexTransform(new Matrix4().setToTranslation(0f, 2.7f, 0f));
+        crownA.cone(2.15f, 3.0f, 2.15f, 11);
+        MeshPartBuilder crownB = mb.part("crownB", GL20.GL_TRIANGLES, attrs, leafMat);
+        crownB.setVertexTransform(new Matrix4().setToTranslation(0f, 3.65f, 0f));
+        crownB.cone(1.55f, 2.35f, 1.55f, 11);
+        treeModel = mb.end();
+
+        Material rockMat = new Material(ColorAttribute.createDiffuse(new Color(0.42f, 0.44f, 0.42f, 1f)));
+        rockModel = new ModelBuilder().createSphere(1.7f, 1.15f, 1.5f, 9, 6, rockMat, attrs);
+    }
+
+    @Override
+    public void render() {
+        updateCamera();
+
+        if (shadowsEnabled && shadowLight != null && shadowBatch != null) {
+            shadowLight.begin(target, camera.direction);
+            shadowBatch.begin(shadowLight.getCamera());
+            shadowBatch.render(terrain.instance);
+            for (Prop p : props) shadowBatch.render(p.instance);
+            shadowBatch.end();
+            shadowLight.end();
+        }
+
+        Gdx.gl.glViewport(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
+        Gdx.gl.glClearColor(0.40f, 0.67f, 0.87f, 1f);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
+
+        modelBatch.begin(camera);
+        modelBatch.render(terrain.instance, environment);
+        for (Prop p : props) modelBatch.render(p.instance, environment);
+        modelBatch.end();
+    }
+
+    private void updateCamera() {
+        float py = MathUtils.sinDeg(pitch) * distance;
+        float horizontal = MathUtils.cosDeg(pitch) * distance;
+        float px = MathUtils.sinDeg(yaw) * horizontal;
+        float pz = MathUtils.cosDeg(yaw) * horizontal;
+        camera.position.set(target.x + px, target.y + py, target.z + pz);
+        camera.up.set(Vector3.Y);
+        camera.lookAt(target);
+        camera.update();
+    }
+
+    public void setStatusListener(StatusListener listener) { this.statusListener = listener; }
+    public void setTool(Tool value) { tool = value; status("الأداة: " + arabicTool(value)); }
+    public void setBrushRadius(float value) { brushRadius = MathUtils.clamp(value, 0.7f, 6.5f); }
+    public void setBrushStrength(float value) { brushStrength = MathUtils.clamp(value, 0.05f, 1.0f); }
+    public void setPaintColor(final Color color) {
+        runOnGameThread(() -> paintColor.set(color));
+    }
+    public void setShadowsEnabled(boolean enabled) {
+        runOnGameThread(() -> shadowsEnabled = enabled && shadowLight != null);
+    }
+
+    public void undo() {
+        runOnGameThread(() -> {
+            if (undo.size == 0) { status("لا يوجد تراجع"); return; }
+            Snapshot s = undo.pop();
+            terrain.restore(s.heights, s.colors);
+            restoreProps(s.props);
+            status("تم التراجع");
+        });
+    }
+
+    public void save() {
+        runOnGameThread(() -> {
+            SaveData data = new SaveData();
+            data.heights = terrain.heights.clone();
+            data.colors = terrain.colors.clone();
+            data.props = copyPropData();
+            String json = new Json().toJson(data);
+            Preferences prefs = Gdx.app.getPreferences("terrain-studio-x");
+            prefs.putString("map", json).flush();
+            status("تم حفظ الخريطة");
+        });
+    }
+
+    public void load() {
+        runOnGameThread(() -> {
+            Preferences prefs = Gdx.app.getPreferences("terrain-studio-x");
+            String text = prefs.getString("map", "");
+            if (text.length() == 0) { status("لا توجد خريطة محفوظة"); return; }
+            try {
+                pushUndo();
+                SaveData data = new Json().fromJson(SaveData.class, text);
+                if (data.heights != null && data.colors != null) terrain.restore(data.heights, data.colors);
+                restoreProps(data.props == null ? new Array<PropData>() : data.props);
+                status("تم فتح الخريطة");
+            } catch (Throwable t) { status("تعذر فتح الخريطة"); }
+        });
+    }
+
+    public void newMap() {
+        runOnGameThread(() -> {
+            pushUndo();
+            terrain.reset();
+            props.clear();
+            status("خريطة جديدة");
+        });
+    }
+
+    private void runOnGameThread(Runnable r) {
+        if (Gdx.app != null) Gdx.app.postRunnable(r);
+    }
+
+    private String arabicTool(Tool t) {
+        switch (t) {
+            case RAISE: return "رفع";
+            case LOWER: return "خفض";
+            case SMOOTH: return "تنعيم";
+            case FLATTEN: return "تسطيح";
+            case PAINT: return "طلاء";
+            case TREE: return "شجرة";
+            case ROCK: return "صخرة";
+            case DELETE: return "حذف";
+            default: return "كاميرا";
+        }
+    }
+
+    private void status(String text) {
+        if (statusListener != null) statusListener.onStatus(text);
+    }
+
+    private void pushUndo() {
+        Snapshot s = new Snapshot();
+        s.heights = terrain.heights.clone();
+        s.colors = terrain.colors.clone();
+        s.props = copyPropData();
+        undo.add(s);
+        if (undo.size > 12) undo.removeIndex(0);
+    }
+
+    private Array<PropData> copyPropData() {
+        Array<PropData> out = new Array<>();
+        for (Prop p : props) out.add(new PropData(p.data));
+        return out;
+    }
+
+    private void restoreProps(Array<PropData> data) {
+        props.clear();
+        if (data == null) return;
+        for (PropData d : data) addProp(d.type, d.x, d.z, d.rotation, d.scale, false);
+    }
+
+    private void addProp(int type, float x, float z, float rotation, float scale, boolean withUndo) {
+        if (!terrain.inside(x, z)) return;
+        if (withUndo) pushUndo();
+        float y = terrain.sampleHeight(x, z);
+        ModelInstance instance = new ModelInstance(type == 0 ? treeModel : rockModel);
+        instance.transform.setToTranslation(x, y, z).rotate(Vector3.Y, rotation).scale(scale, scale, scale);
+        PropData data = new PropData();
+        data.type = type; data.x = x; data.z = z; data.rotation = rotation; data.scale = scale;
+        props.add(new Prop(data, instance));
+    }
+
+    private void updatePropHeights() {
+        for (Prop p : props) {
+            float y = terrain.sampleHeight(p.data.x, p.data.z);
+            p.instance.transform.setToTranslation(p.data.x, y, p.data.z)
+                    .rotate(Vector3.Y, p.data.rotation)
+                    .scale(p.data.scale, p.data.scale, p.data.scale);
+        }
+    }
+
+    private boolean pickTerrain(float sx, float sy, Vector3 out) {
+        Ray ray = camera.getPickRay(sx, sy);
+        float prevT = 0f;
+        Vector3 p = new Vector3();
+        float prevDiff = Float.NaN;
+        boolean prevInside = false;
+        for (float t = 0.5f; t <= 100f; t += 0.65f) {
+            p.set(ray.direction).scl(t).add(ray.origin);
+            boolean inside = terrain.inside(p.x, p.z);
+            if (inside) {
+                float diff = p.y - terrain.sampleHeight(p.x, p.z);
+                if (prevInside && !Float.isNaN(prevDiff) && prevDiff > 0f && diff <= 0f) {
+                    float lo = prevT, hi = t;
+                    for (int i = 0; i < 8; i++) {
+                        float mid = (lo + hi) * 0.5f;
+                        p.set(ray.direction).scl(mid).add(ray.origin);
+                        float md = p.y - terrain.sampleHeight(p.x, p.z);
+                        if (md > 0f) lo = mid; else hi = mid;
+                    }
+                    float finalT = (lo + hi) * 0.5f;
+                    out.set(ray.direction).scl(finalT).add(ray.origin);
+                    out.y = terrain.sampleHeight(out.x, out.z);
+                    return true;
+                }
+                prevDiff = diff;
+                prevInside = true;
+                prevT = t;
+            } else {
+                prevInside = false;
+                prevDiff = Float.NaN;
+            }
+        }
+        return false;
+    }
+
+    private void editAt(float sx, float sy, boolean firstTouch) {
+        if (!pickTerrain(sx, sy, hit)) return;
+        if (tool == Tool.TREE) {
+            if (firstTouch) addProp(0, hit.x, hit.z, MathUtils.random(0f, 360f), MathUtils.random(0.82f, 1.18f), true);
+            return;
+        }
+        if (tool == Tool.ROCK) {
+            if (firstTouch) addProp(1, hit.x, hit.z, MathUtils.random(0f, 360f), MathUtils.random(0.75f, 1.25f), true);
+            return;
+        }
+        if (tool == Tool.DELETE) {
+            if (!firstTouch) return;
+            int best = -1;
+            float bestDst = 2.4f;
+            for (int i = 0; i < props.size; i++) {
+                Prop p = props.get(i);
+                float d = Vector2.dst(hit.x, hit.z, p.data.x, p.data.z);
+                if (d < bestDst) { bestDst = d; best = i; }
+            }
+            if (best >= 0) { pushUndo(); props.removeIndex(best); status("تم حذف العنصر"); }
+            return;
+        }
+        if (tool == Tool.CAMERA) return;
+
+        if (firstTouch) {
+            pushUndo();
+            if (tool == Tool.FLATTEN) flattenHeight = terrain.sampleHeight(hit.x, hit.z);
+        }
+        terrain.apply(tool, hit.x, hit.z, brushRadius, brushStrength, flattenHeight, paintColor);
+        updatePropHeights();
+    }
+
+    private class EditorInput extends InputAdapter {
+        @Override
+        public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+            if (Gdx.input.isTouched(1)) {
+                beginTwoFinger();
+                return true;
+            }
+            lastX = screenX; lastY = screenY;
+            gestureWasTwoFinger = false;
+            if (tool != Tool.CAMERA) editAt(screenX, screenY, true);
+            return true;
+        }
+
+        @Override
+        public boolean touchDragged(int screenX, int screenY, int pointer) {
+            if (Gdx.input.isTouched(0) && Gdx.input.isTouched(1)) {
+                handleTwoFinger();
+                gestureWasTwoFinger = true;
+                return true;
+            }
+            if (gestureWasTwoFinger) return true;
+            if (tool == Tool.CAMERA) {
+                float dx = screenX - lastX;
+                float dy = screenY - lastY;
+                yaw -= dx * 0.22f;
+                pitch = MathUtils.clamp(pitch + dy * 0.18f, 18f, 78f);
+            } else {
+                editAt(screenX, screenY, false);
+            }
+            lastX = screenX; lastY = screenY;
+            return true;
+        }
+
+        @Override
+        public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+            if (!Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)) gestureWasTwoFinger = false;
+            return true;
+        }
+
+        private void beginTwoFinger() {
+            float x0 = Gdx.input.getX(0), y0 = Gdx.input.getY(0);
+            float x1 = Gdx.input.getX(1), y1 = Gdx.input.getY(1);
+            lastMidX = (x0 + x1) * 0.5f;
+            lastMidY = (y0 + y1) * 0.5f;
+            lastPinch = Vector2.dst(x0, y0, x1, y1);
+        }
+
+        private void handleTwoFinger() {
+            float x0 = Gdx.input.getX(0), y0 = Gdx.input.getY(0);
+            float x1 = Gdx.input.getX(1), y1 = Gdx.input.getY(1);
+            float midX = (x0 + x1) * 0.5f;
+            float midY = (y0 + y1) * 0.5f;
+            float pinch = Vector2.dst(x0, y0, x1, y1);
+            if (lastPinch <= 0f) { beginTwoFinger(); return; }
+
+            distance = MathUtils.clamp(distance - (pinch - lastPinch) * 0.035f, 8f, 58f);
+
+            float dx = midX - lastMidX;
+            float dy = midY - lastMidY;
+            Vector3 right = new Vector3(camera.direction).crs(Vector3.Y).nor();
+            Vector3 forward = new Vector3(camera.direction.x, 0f, camera.direction.z).nor();
+            float panScale = distance * 0.0018f;
+            target.mulAdd(right, -dx * panScale);
+            target.mulAdd(forward, dy * panScale);
+            target.x = MathUtils.clamp(target.x, -14f, 14f);
+            target.z = MathUtils.clamp(target.z, -14f, 14f);
+            target.y = terrain.sampleHeight(target.x, target.z) * 0.35f;
+
+            lastMidX = midX; lastMidY = midY; lastPinch = pinch;
+        }
+    }
+
+    @Override
+    public void resize(int width, int height) {
+        if (camera != null) {
+            camera.viewportWidth = width;
+            camera.viewportHeight = height;
+            camera.update();
+        }
+    }
+
+    @Override
+    public void dispose() {
+        if (modelBatch != null) modelBatch.dispose();
+        if (shadowBatch != null) shadowBatch.dispose();
+        if (shadowLight != null) shadowLight.dispose();
+        if (terrain != null) terrain.dispose();
+        if (treeModel != null) treeModel.dispose();
+        if (rockModel != null) rockModel.dispose();
+    }
+
+    private static class Prop {
+        final PropData data;
+        final ModelInstance instance;
+        Prop(PropData data, ModelInstance instance) { this.data = data; this.instance = instance; }
+    }
+
+    public static class PropData {
+        public int type;
+        public float x, z, rotation, scale;
+        public PropData() {}
+        PropData(PropData other) {
+            type = other.type; x = other.x; z = other.z; rotation = other.rotation; scale = other.scale;
+        }
+    }
+
+    public static class SaveData {
+        public float[] heights;
+        public float[] colors;
+        public Array<PropData> props = new Array<>();
+    }
+
+    private static class Snapshot {
+        float[] heights;
+        float[] colors;
+        Array<PropData> props;
+    }
+
+    private static class TerrainSurface implements Disposable {
+        final int n;
+        final float size;
+        final float spacing;
+        final float half;
+        final float[] heights;
+        final float[] colors;
+        final float[] vertices;
+        final short[] indices;
+        final Mesh mesh;
+        final Model model;
+        final ModelInstance instance;
+
+        TerrainSurface(int n, float size) {
+            this.n = n;
+            this.size = size;
+            this.spacing = size / (n - 1f);
+            this.half = size * 0.5f;
+            int count = n * n;
+            heights = new float[count];
+            colors = new float[count * 4];
+            vertices = new float[count * 10];
+            indices = new short[(n - 1) * (n - 1) * 6];
+
+            for (int i = 0; i < count; i++) {
+                colors[i * 4] = 0.31f;
+                colors[i * 4 + 1] = 0.53f;
+                colors[i * 4 + 2] = 0.22f;
+                colors[i * 4 + 3] = 1f;
+            }
+            int k = 0;
+            for (int z = 0; z < n - 1; z++) {
+                for (int x = 0; x < n - 1; x++) {
+                    short a = (short)(z * n + x);
+                    short b = (short)(a + 1);
+                    short c = (short)(a + n);
+                    short d = (short)(c + 1);
+                    indices[k++] = a; indices[k++] = c; indices[k++] = b;
+                    indices[k++] = b; indices[k++] = c; indices[k++] = d;
+                }
+            }
+
+            mesh = new Mesh(false, count, indices.length,
+                    new VertexAttribute(VertexAttributes.Usage.Position, 3, "a_position"),
+                    new VertexAttribute(VertexAttributes.Usage.Normal, 3, "a_normal"),
+                    new VertexAttribute(VertexAttributes.Usage.ColorUnpacked, 4, "a_color"));
+            mesh.setIndices(indices);
+            updateMesh();
+
+            MeshPart part = new MeshPart("terrain", mesh, 0, indices.length, GL20.GL_TRIANGLES);
+            part.update();
+            Material material = new Material(ColorAttribute.createDiffuse(Color.WHITE));
+            Node node = new Node();
+            node.id = "terrain-node";
+            node.parts.add(new NodePart(part, material));
+            model = new Model();
+            model.meshes.add(mesh);
+            model.meshParts.add(part);
+            model.materials.add(material);
+            model.nodes.add(node);
+            model.manageDisposable(mesh);
+            instance = new ModelInstance(model);
+        }
+
+        boolean inside(float x, float z) { return x >= -half && x <= half && z >= -half && z <= half; }
+
+        float sampleHeight(float x, float z) {
+            if (!inside(x, z)) return 0f;
+            float gx = (x + half) / spacing;
+            float gz = (z + half) / spacing;
+            int x0 = MathUtils.clamp((int)Math.floor(gx), 0, n - 1);
+            int z0 = MathUtils.clamp((int)Math.floor(gz), 0, n - 1);
+            int x1 = Math.min(x0 + 1, n - 1);
+            int z1 = Math.min(z0 + 1, n - 1);
+            float tx = gx - x0, tz = gz - z0;
+            float h00 = heights[z0 * n + x0];
+            float h10 = heights[z0 * n + x1];
+            float h01 = heights[z1 * n + x0];
+            float h11 = heights[z1 * n + x1];
+            return MathUtils.lerp(MathUtils.lerp(h00, h10, tx), MathUtils.lerp(h01, h11, tx), tz);
+        }
+
+        void apply(Tool tool, float cx, float cz, float radius, float strength, float flatHeight, Color paint) {
+            float[] old = tool == Tool.SMOOTH ? heights.clone() : null;
+            for (int z = 0; z < n; z++) {
+                float wz = -half + z * spacing;
+                for (int x = 0; x < n; x++) {
+                    float wx = -half + x * spacing;
+                    float d = Vector2.dst(wx, wz, cx, cz);
+                    if (d > radius) continue;
+                    float t = 1f - d / radius;
+                    float falloff = t * t * (3f - 2f * t);
+                    int idx = z * n + x;
+                    switch (tool) {
+                        case RAISE:
+                            heights[idx] = MathUtils.clamp(heights[idx] + 0.22f * strength * falloff, -7f, 14f);
+                            break;
+                        case LOWER:
+                            heights[idx] = MathUtils.clamp(heights[idx] - 0.22f * strength * falloff, -7f, 14f);
+                            break;
+                        case FLATTEN:
+                            heights[idx] = MathUtils.lerp(heights[idx], flatHeight, 0.18f * strength * falloff);
+                            break;
+                        case SMOOTH:
+                            float sum = 0f; int count = 0;
+                            for (int oz = -1; oz <= 1; oz++) for (int ox = -1; ox <= 1; ox++) {
+                                int nx = x + ox, nz = z + oz;
+                                if (nx >= 0 && nx < n && nz >= 0 && nz < n) { sum += old[nz * n + nx]; count++; }
+                            }
+                            heights[idx] = MathUtils.lerp(heights[idx], sum / Math.max(1, count), 0.35f * strength * falloff);
+                            break;
+                        case PAINT:
+                            int ci = idx * 4;
+                            float a = 0.30f * strength * falloff;
+                            colors[ci] = MathUtils.lerp(colors[ci], paint.r, a);
+                            colors[ci + 1] = MathUtils.lerp(colors[ci + 1], paint.g, a);
+                            colors[ci + 2] = MathUtils.lerp(colors[ci + 2], paint.b, a);
+                            break;
+                        default: break;
+                    }
+                }
+            }
+            updateMesh();
+        }
+
+        void reset() {
+            for (int i = 0; i < heights.length; i++) heights[i] = 0f;
+            for (int i = 0; i < heights.length; i++) {
+                colors[i * 4] = 0.31f; colors[i * 4 + 1] = 0.53f; colors[i * 4 + 2] = 0.22f; colors[i * 4 + 3] = 1f;
+            }
+            updateMesh();
+        }
+
+        void restore(float[] h, float[] c) {
+            if (h.length != heights.length || c.length != colors.length) return;
+            System.arraycopy(h, 0, heights, 0, heights.length);
+            System.arraycopy(c, 0, colors, 0, colors.length);
+            updateMesh();
+        }
+
+        void updateMesh() {
+            int v = 0;
+            Vector3 normal = new Vector3();
+            for (int z = 0; z < n; z++) {
+                for (int x = 0; x < n; x++) {
+                    int idx = z * n + x;
+                    float wx = -half + x * spacing;
+                    float wz = -half + z * spacing;
+                    float hl = heights[z * n + Math.max(0, x - 1)];
+                    float hr = heights[z * n + Math.min(n - 1, x + 1)];
+                    float hd = heights[Math.max(0, z - 1) * n + x];
+                    float hu = heights[Math.min(n - 1, z + 1) * n + x];
+                    normal.set(hl - hr, spacing * 2f, hd - hu).nor();
+                    vertices[v++] = wx; vertices[v++] = heights[idx]; vertices[v++] = wz;
+                    vertices[v++] = normal.x; vertices[v++] = normal.y; vertices[v++] = normal.z;
+                    int ci = idx * 4;
+                    vertices[v++] = colors[ci]; vertices[v++] = colors[ci + 1]; vertices[v++] = colors[ci + 2]; vertices[v++] = colors[ci + 3];
+                }
+            }
+            mesh.setVertices(vertices);
+        }
+
+        @Override public void dispose() { model.dispose(); }
+    }
+}
