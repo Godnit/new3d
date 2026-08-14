@@ -1,0 +1,65 @@
+name: Build Terrain Studio APK
+
+on:
+  push:
+    branches: [ terrain-editor-phase1 ]
+    paths:
+      - 'projects/terrain-editor/**'
+      - '.github/workflows/build-terrain-studio-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "build-tools;35.0.1" "platforms;android-35"
+
+      - name: Export Android APK
+        id: export
+        uses: firebelley/godot-export@v7.0.0
+        with:
+          godot_executable_download_url: https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          godot_export_templates_download_url: https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+          relative_project_path: ./projects/terrain-editor
+          archive_output: false
+          use_preset_export_path: true
+          export_debug: true
+
+      - name: Collect APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          APK="$(find projects/terrain-editor -type f -name '*.apk' | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "APK not found"
+            find projects/terrain-editor -maxdepth 6 -type f | sort
+            exit 1
+          fi
+          cp "$APK" dist/TerrainStudio.apk
+          ls -lh dist/TerrainStudio.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TerrainStudio-APK
+          path: dist/TerrainStudio.apk
+          if-no-files-found: error
+          retention-days: 30
