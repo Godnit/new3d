@@ -1,0 +1,61 @@
+name: Build Terrain Studio Native APK
+
+on:
+  push:
+    branches: [ terrain-editor-phase1 ]
+    paths:
+      - 'projects/terrain-studio-native/**'
+      - '.github/workflows/build-terrain-studio-native.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/terrain-studio-native
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Verify APK
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          ls -lh "$APK"
+          $ANDROID_HOME/build-tools/34.0.0/aapt dump badging "$APK" | head -n 12
+          unzip -l "$APK" | grep -E 'classes.dex|AndroidManifest.xml'
+
+      - name: Collect APK
+        run: |
+          mkdir -p output
+          cp app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Native-OpenGLES2.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TerrainStudio-Native-OpenGLES2-APK
+          path: projects/terrain-studio-native/output/TerrainStudio-Native-OpenGLES2.apk
+          if-no-files-found: error
