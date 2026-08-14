@@ -6,7 +6,7 @@ ext.gdxVersion = '1.14.2'
 
 android {
     namespace 'com.godnit.terrainstudio.gdx'
-    compileSdk 34
+    compileSdk 36
 
     defaultConfig {
         applicationId 'com.godnit.terrainstudio.gdx'
