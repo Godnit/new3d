@@ -4,10 +4,10 @@
     <application
         android:allowBackup="true"
         android:hardwareAccelerated="true"
-        android:label="Terrain Studio X"
+        android:label="Terrain Studio Mini 3D"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".MainActivity"
+            android:name=".BlenderActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode"
             android:exported="true"
             android:screenOrientation="landscape">
