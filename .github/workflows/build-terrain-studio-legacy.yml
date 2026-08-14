@@ -1,0 +1,60 @@
+name: Build Terrain Studio Legacy APK
+
+on:
+  push:
+    branches: [ terrain-editor-phase1 ]
+    paths:
+      - 'projects/terrain-editor-gles2/**'
+      - '.github/workflows/build-terrain-studio-legacy.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Export Android APK with Godot 3.6.2
+        uses: firebelley/godot-export@v7.0.0
+        with:
+          godot_executable_download_url: https://github.com/godotengine/godot/releases/download/3.6.2-stable/Godot_v3.6.2-stable_x11.64.zip
+          godot_export_templates_download_url: https://github.com/godotengine/godot/releases/download/3.6.2-stable/Godot_v3.6.2-stable_export_templates.tpz
+          relative_project_path: ./projects/terrain-editor-gles2
+          archive_output: false
+          use_preset_export_path: true
+          export_debug: true
+          use_godot_3: true
+
+      - name: Collect APK
+        run: |
+          mkdir -p dist
+          find . ~/.local/share/godot -type f -name '*.apk' -print
+          APK=$(find . ~/.local/share/godot -type f -name 'TerrainStudioLegacy.apk' | head -n 1)
+          if [ -z "$APK" ]; then
+            APK=$(find . ~/.local/share/godot -type f -name '*.apk' | head -n 1)
+          fi
+          test -n "$APK"
+          cp "$APK" dist/TerrainStudio-Legacy-GLES2-ARMv7.apk
+          ls -lh dist/TerrainStudio-Legacy-GLES2-ARMv7.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TerrainStudio-Legacy-GLES2-APK
+          path: dist/TerrainStudio-Legacy-GLES2-ARMv7.apk
+          if-no-files-found: error
