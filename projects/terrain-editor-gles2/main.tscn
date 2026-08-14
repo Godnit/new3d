@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=2]
 
-[ext_resource path="res://terrain_editor_legacy_v2.gd" type="Script" id=1]
+[ext_resource path="res://terrain_editor_legacy_v3.gd" type="Script" id=1]
 
 [node name="TerrainEditorLegacy" type="Spatial"]
 script = ExtResource( 1 )
