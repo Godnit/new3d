@@ -33,8 +33,15 @@ import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.Json;
 
 public class TerrainStudioGame extends ApplicationAdapter {
-    public enum Tool { CAMERA, RAISE, LOWER, SMOOTH, FLATTEN, PAINT, TREE, ROCK, DELETE }
+    public enum Tool {
+        CAMERA, SELECT,
+        RAISE, LOWER, SMOOTH, FLATTEN, NOISE, PAINT,
+        TREE, ROCK, BUSH, CRATE, PILLAR,
+        DELETE
+    }
+
     public interface StatusListener { void onStatus(String text); }
+    public interface SelectionListener { void onSelection(String text); }
 
     private PerspectiveCamera camera;
     private ModelBatch modelBatch;
@@ -46,8 +53,16 @@ public class TerrainStudioGame extends ApplicationAdapter {
     private TerrainSurface terrain;
     private Model treeModel;
     private Model rockModel;
+    private Model bushModel;
+    private Model crateModel;
+    private Model pillarModel;
+    private Model gizmoModel;
+    private ModelInstance gizmoInstance;
+
     private final Array<Prop> props = new Array<>();
     private final Array<Snapshot> undo = new Array<>();
+    private int selectedIndex = -1;
+    private boolean selectionDragSnapshotTaken = false;
 
     private volatile Tool tool = Tool.CAMERA;
     private volatile float brushRadius = 2.8f;
@@ -64,6 +79,7 @@ public class TerrainStudioGame extends ApplicationAdapter {
     private float lastMidX, lastMidY, lastPinch;
     private boolean gestureWasTwoFinger;
     private StatusListener statusListener;
+    private SelectionListener selectionListener;
 
     @Override
     public void create() {
@@ -96,12 +112,15 @@ public class TerrainStudioGame extends ApplicationAdapter {
 
         terrain = new TerrainSurface(49, 36f);
         buildPropModels();
+        buildGizmo();
         Gdx.input.setInputProcessor(new EditorInput());
-        status("جاهز • libGDX");
+        emitSelection();
+        status("جاهز للتحرير");
     }
 
     private void buildPropModels() {
         final long attrs = VertexAttributes.Usage.Position | VertexAttributes.Usage.Normal;
+
         ModelBuilder mb = new ModelBuilder();
         mb.begin();
         Material trunkMat = new Material(ColorAttribute.createDiffuse(new Color(0.34f, 0.19f, 0.08f, 1f)));
@@ -119,11 +138,55 @@ public class TerrainStudioGame extends ApplicationAdapter {
 
         Material rockMat = new Material(ColorAttribute.createDiffuse(new Color(0.42f, 0.44f, 0.42f, 1f)));
         rockModel = new ModelBuilder().createSphere(1.7f, 1.15f, 1.5f, 9, 6, rockMat, attrs);
+
+        mb = new ModelBuilder();
+        mb.begin();
+        Material bushStem = new Material(ColorAttribute.createDiffuse(new Color(0.26f, 0.18f, 0.08f, 1f)));
+        Material bushLeaf = new Material(ColorAttribute.createDiffuse(new Color(0.20f, 0.55f, 0.20f, 1f)));
+        MeshPartBuilder stem = mb.part("stem", GL20.GL_TRIANGLES, attrs, bushStem);
+        stem.setVertexTransform(new Matrix4().setToTranslation(0f, 0.45f, 0f));
+        stem.cylinder(0.24f, 0.9f, 0.24f, 8);
+        MeshPartBuilder bush = mb.part("bush", GL20.GL_TRIANGLES, attrs, bushLeaf);
+        bush.setVertexTransform(new Matrix4().setToTranslation(0f, 1.15f, 0f));
+        bush.sphere(2.15f, 1.55f, 2.15f, 10, 7);
+        bushModel = mb.end();
+
+        Material crateMat = new Material(ColorAttribute.createDiffuse(new Color(0.52f, 0.31f, 0.13f, 1f)));
+        crateModel = new ModelBuilder().createBox(1.65f, 1.65f, 1.65f, crateMat, attrs);
+
+        Material pillarMat = new Material(ColorAttribute.createDiffuse(new Color(0.63f, 0.63f, 0.60f, 1f)));
+        pillarModel = new ModelBuilder().createCylinder(1.15f, 3.25f, 1.15f, 12, pillarMat, attrs);
+    }
+
+    private void buildGizmo() {
+        final long attrs = VertexAttributes.Usage.Position | VertexAttributes.Usage.Normal;
+        Material red = new Material(ColorAttribute.createDiffuse(new Color(0.95f, 0.18f, 0.16f, 1f)));
+        Material green = new Material(ColorAttribute.createDiffuse(new Color(0.18f, 0.92f, 0.28f, 1f)));
+        Material blue = new Material(ColorAttribute.createDiffuse(new Color(0.16f, 0.42f, 0.98f, 1f)));
+        Material centerMat = new Material(ColorAttribute.createDiffuse(new Color(1.0f, 0.82f, 0.14f, 1f)));
+
+        ModelBuilder mb = new ModelBuilder();
+        mb.begin();
+        MeshPartBuilder xAxis = mb.part("x", GL20.GL_TRIANGLES, attrs, red);
+        xAxis.setVertexTransform(new Matrix4().setToTranslation(1.25f, 0.14f, 0f));
+        xAxis.box(2.5f, 0.10f, 0.10f);
+        MeshPartBuilder yAxis = mb.part("y", GL20.GL_TRIANGLES, attrs, green);
+        yAxis.setVertexTransform(new Matrix4().setToTranslation(0f, 1.38f, 0f));
+        yAxis.box(0.10f, 2.75f, 0.10f);
+        MeshPartBuilder zAxis = mb.part("z", GL20.GL_TRIANGLES, attrs, blue);
+        zAxis.setVertexTransform(new Matrix4().setToTranslation(0f, 0.14f, 1.25f));
+        zAxis.box(0.10f, 0.10f, 2.5f);
+        MeshPartBuilder center = mb.part("center", GL20.GL_TRIANGLES, attrs, centerMat);
+        center.setVertexTransform(new Matrix4().setToTranslation(0f, 0.14f, 0f));
+        center.box(0.32f, 0.32f, 0.32f);
+        gizmoModel = mb.end();
+        gizmoInstance = new ModelInstance(gizmoModel);
     }
 
     @Override
     public void render() {
         updateCamera();
+        refreshGizmoTransform();
 
         if (shadowsEnabled && shadowLight != null && shadowBatch != null) {
             shadowLight.begin(target, camera.direction);
@@ -141,6 +204,7 @@ public class TerrainStudioGame extends ApplicationAdapter {
         modelBatch.begin(camera);
         modelBatch.render(terrain.instance, environment);
         for (Prop p : props) modelBatch.render(p.instance, environment);
+        if (hasSelection() && gizmoInstance != null) modelBatch.render(gizmoInstance, environment);
         modelBatch.end();
     }
 
@@ -155,15 +219,159 @@ public class TerrainStudioGame extends ApplicationAdapter {
         camera.update();
     }
 
+    private void refreshGizmoTransform() {
+        if (!hasSelection() || gizmoInstance == null) return;
+        Prop p = props.get(selectedIndex);
+        float y = terrain.sampleHeight(p.data.x, p.data.z) + p.data.yOffset;
+        float s = MathUtils.clamp(distance / 27f, 0.72f, 1.45f);
+        gizmoInstance.transform.setToTranslation(p.data.x, y + 0.08f, p.data.z).scale(s, s, s);
+    }
+
     public void setStatusListener(StatusListener listener) { this.statusListener = listener; }
-    public void setTool(Tool value) { tool = value; status("الأداة: " + arabicTool(value)); }
+    public void setSelectionListener(SelectionListener listener) {
+        this.selectionListener = listener;
+        if (Gdx.app != null) runOnGameThread(this::emitSelection);
+    }
+
+    public void setTool(Tool value) {
+        tool = value;
+        if (value == Tool.SELECT) status("اضغط مجسمًا لتحديده ثم اسحبه");
+        else status("الأداة: " + arabicTool(value));
+    }
+
     public void setBrushRadius(float value) { brushRadius = MathUtils.clamp(value, 0.7f, 6.5f); }
     public void setBrushStrength(float value) { brushStrength = MathUtils.clamp(value, 0.05f, 1.0f); }
+
     public void setPaintColor(final Color color) {
         runOnGameThread(() -> paintColor.set(color));
     }
+
     public void setShadowsEnabled(boolean enabled) {
-        runOnGameThread(() -> shadowsEnabled = enabled && shadowLight != null);
+        runOnGameThread(() -> {
+            shadowsEnabled = enabled && shadowLight != null;
+            if (shadowLight != null) environment.shadowMap = shadowsEnabled ? shadowLight : null;
+            status(shadowsEnabled ? "تم تشغيل الظلال" : "تم إيقاف الظلال");
+        });
+    }
+
+    public void resetView() {
+        runOnGameThread(() -> {
+            yaw = 42f;
+            pitch = 48f;
+            distance = 30f;
+            target.set(0f, 0f, 0f);
+            status("تمت إعادة الكاميرا");
+        });
+    }
+
+    public void clearSelection() {
+        runOnGameThread(() -> {
+            selectedIndex = -1;
+            emitSelection();
+            status("تم إلغاء التحديد");
+        });
+    }
+
+    public void nudgeSelected(float rightAmount, float forwardAmount) {
+        runOnGameThread(() -> {
+            if (!hasSelection()) { status("حدد مجسمًا أولًا"); return; }
+            pushUndo();
+            Vector3 forward = new Vector3(camera.direction.x, 0f, camera.direction.z);
+            if (forward.len2() < 0.0001f) forward.set(0f, 0f, -1f);
+            else forward.nor();
+            Vector3 right = new Vector3(forward).crs(Vector3.Y).nor();
+            Prop p = props.get(selectedIndex);
+            float nx = p.data.x + right.x * rightAmount + forward.x * forwardAmount;
+            float nz = p.data.z + right.z * rightAmount + forward.z * forwardAmount;
+            if (!terrain.inside(nx, nz)) { status("وصل العنصر إلى حافة الخريطة"); return; }
+            p.data.x = nx;
+            p.data.z = nz;
+            applyPropTransform(p);
+            emitSelection();
+        });
+    }
+
+    public void raiseSelected(float delta) {
+        runOnGameThread(() -> {
+            if (!hasSelection()) { status("حدد مجسمًا أولًا"); return; }
+            pushUndo();
+            Prop p = props.get(selectedIndex);
+            p.data.yOffset = MathUtils.clamp(p.data.yOffset + delta, -4f, 10f);
+            applyPropTransform(p);
+            emitSelection();
+        });
+    }
+
+    public void rotateSelected(float degrees) {
+        runOnGameThread(() -> {
+            if (!hasSelection()) { status("حدد مجسمًا أولًا"); return; }
+            pushUndo();
+            Prop p = props.get(selectedIndex);
+            p.data.rotation = (p.data.rotation + degrees) % 360f;
+            if (p.data.rotation < 0f) p.data.rotation += 360f;
+            applyPropTransform(p);
+            emitSelection();
+        });
+    }
+
+    public void scaleSelected(float factor) {
+        runOnGameThread(() -> {
+            if (!hasSelection()) { status("حدد مجسمًا أولًا"); return; }
+            pushUndo();
+            Prop p = props.get(selectedIndex);
+            p.data.scale = MathUtils.clamp(p.data.scale * factor, 0.25f, 4.0f);
+            applyPropTransform(p);
+            emitSelection();
+        });
+    }
+
+    public void resetSelectedTransform() {
+        runOnGameThread(() -> {
+            if (!hasSelection()) { status("حدد مجسمًا أولًا"); return; }
+            pushUndo();
+            Prop p = props.get(selectedIndex);
+            p.data.rotation = 0f;
+            p.data.scale = 1f;
+            p.data.yOffset = 0f;
+            applyPropTransform(p);
+            emitSelection();
+            status("تمت إعادة تحويلات العنصر");
+        });
+    }
+
+    public void duplicateSelected() {
+        runOnGameThread(() -> {
+            if (!hasSelection()) { status("حدد مجسمًا أولًا"); return; }
+            Prop src = props.get(selectedIndex);
+            pushUndo();
+            float nx = MathUtils.clamp(src.data.x + 1.25f, -terrain.half + 0.2f, terrain.half - 0.2f);
+            float nz = MathUtils.clamp(src.data.z + 1.25f, -terrain.half + 0.2f, terrain.half - 0.2f);
+            addProp(src.data.type, nx, nz, src.data.rotation, src.data.scale, src.data.yOffset, false);
+            selectedIndex = props.size - 1;
+            emitSelection();
+            status("تم نسخ العنصر");
+        });
+    }
+
+    public void deleteSelected() {
+        runOnGameThread(() -> {
+            if (!hasSelection()) { status("حدد مجسمًا أولًا"); return; }
+            pushUndo();
+            props.removeIndex(selectedIndex);
+            selectedIndex = -1;
+            emitSelection();
+            status("تم حذف العنصر");
+        });
+    }
+
+    public void focusSelected() {
+        runOnGameThread(() -> {
+            if (!hasSelection()) { status("حدد مجسمًا أولًا"); return; }
+            Prop p = props.get(selectedIndex);
+            target.set(p.data.x, terrain.sampleHeight(p.data.x, p.data.z) + p.data.yOffset + 0.7f, p.data.z);
+            distance = MathUtils.clamp(10f + p.data.scale * 2.5f, 9f, 18f);
+            status("تم تركيز الكاميرا على العنصر");
+        });
     }
 
     public void undo() {
@@ -172,6 +380,8 @@ public class TerrainStudioGame extends ApplicationAdapter {
             Snapshot s = undo.pop();
             terrain.restore(s.heights, s.colors);
             restoreProps(s.props);
+            selectedIndex = -1;
+            emitSelection();
             status("تم التراجع");
         });
     }
@@ -199,8 +409,12 @@ public class TerrainStudioGame extends ApplicationAdapter {
                 SaveData data = new Json().fromJson(SaveData.class, text);
                 if (data.heights != null && data.colors != null) terrain.restore(data.heights, data.colors);
                 restoreProps(data.props == null ? new Array<PropData>() : data.props);
+                selectedIndex = -1;
+                emitSelection();
                 status("تم فتح الخريطة");
-            } catch (Throwable t) { status("تعذر فتح الخريطة"); }
+            } catch (Throwable t) {
+                status("تعذر فتح الخريطة");
+            }
         });
     }
 
@@ -209,6 +423,8 @@ public class TerrainStudioGame extends ApplicationAdapter {
             pushUndo();
             terrain.reset();
             props.clear();
+            selectedIndex = -1;
+            emitSelection();
             status("خريطة جديدة");
         });
     }
@@ -219,20 +435,52 @@ public class TerrainStudioGame extends ApplicationAdapter {
 
     private String arabicTool(Tool t) {
         switch (t) {
+            case SELECT: return "تحديد";
             case RAISE: return "رفع";
             case LOWER: return "خفض";
             case SMOOTH: return "تنعيم";
             case FLATTEN: return "تسطيح";
+            case NOISE: return "خشونة";
             case PAINT: return "طلاء";
             case TREE: return "شجرة";
             case ROCK: return "صخرة";
+            case BUSH: return "شجيرة";
+            case CRATE: return "صندوق";
+            case PILLAR: return "عمود";
             case DELETE: return "حذف";
             default: return "كاميرا";
         }
     }
 
+    private String assetName(int type) {
+        switch (type) {
+            case 1: return "صخرة";
+            case 2: return "شجيرة";
+            case 3: return "صندوق";
+            case 4: return "عمود";
+            default: return "شجرة";
+        }
+    }
+
     private void status(String text) {
         if (statusListener != null) statusListener.onStatus(text);
+    }
+
+    private void emitSelection() {
+        if (selectionListener == null) return;
+        if (!hasSelection()) {
+            selectionListener.onSelection("لا يوجد مجسم محدد");
+            return;
+        }
+        Prop p = props.get(selectedIndex);
+        int scalePercent = Math.round(p.data.scale * 100f);
+        int rot = Math.round(p.data.rotation);
+        int heightCm = Math.round(p.data.yOffset * 100f);
+        selectionListener.onSelection(assetName(p.data.type) + "  •  حجم " + scalePercent + "%  •  دوران " + rot + "°  •  ارتفاع " + heightCm + "سم");
+    }
+
+    private boolean hasSelection() {
+        return selectedIndex >= 0 && selectedIndex < props.size;
     }
 
     private void pushUndo() {
@@ -241,7 +489,7 @@ public class TerrainStudioGame extends ApplicationAdapter {
         s.colors = terrain.colors.clone();
         s.props = copyPropData();
         undo.add(s);
-        if (undo.size > 12) undo.removeIndex(0);
+        if (undo.size > 20) undo.removeIndex(0);
     }
 
     private Array<PropData> copyPropData() {
@@ -253,27 +501,60 @@ public class TerrainStudioGame extends ApplicationAdapter {
     private void restoreProps(Array<PropData> data) {
         props.clear();
         if (data == null) return;
-        for (PropData d : data) addProp(d.type, d.x, d.z, d.rotation, d.scale, false);
+        for (PropData d : data) addProp(d.type, d.x, d.z, d.rotation, d.scale, d.yOffset, false);
     }
 
-    private void addProp(int type, float x, float z, float rotation, float scale, boolean withUndo) {
+    private Model modelForType(int type) {
+        switch (type) {
+            case 1: return rockModel;
+            case 2: return bushModel;
+            case 3: return crateModel;
+            case 4: return pillarModel;
+            default: return treeModel;
+        }
+    }
+
+    private int propTypeForTool(Tool t) {
+        switch (t) {
+            case ROCK: return 1;
+            case BUSH: return 2;
+            case CRATE: return 3;
+            case PILLAR: return 4;
+            default: return 0;
+        }
+    }
+
+    private boolean isPropTool(Tool t) {
+        return t == Tool.TREE || t == Tool.ROCK || t == Tool.BUSH || t == Tool.CRATE || t == Tool.PILLAR;
+    }
+
+    private void addProp(int type, float x, float z, float rotation, float scale, float yOffset, boolean withUndo) {
         if (!terrain.inside(x, z)) return;
         if (withUndo) pushUndo();
-        float y = terrain.sampleHeight(x, z);
-        ModelInstance instance = new ModelInstance(type == 0 ? treeModel : rockModel);
-        instance.transform.setToTranslation(x, y, z).rotate(Vector3.Y, rotation).scale(scale, scale, scale);
+        Model model = modelForType(type);
+        if (model == null) return;
+        ModelInstance instance = new ModelInstance(model);
         PropData data = new PropData();
-        data.type = type; data.x = x; data.z = z; data.rotation = rotation; data.scale = scale;
-        props.add(new Prop(data, instance));
+        data.type = type;
+        data.x = x;
+        data.z = z;
+        data.rotation = rotation;
+        data.scale = scale;
+        data.yOffset = yOffset;
+        Prop prop = new Prop(data, instance);
+        props.add(prop);
+        applyPropTransform(prop);
+    }
+
+    private void applyPropTransform(Prop p) {
+        float y = terrain.sampleHeight(p.data.x, p.data.z) + p.data.yOffset;
+        p.instance.transform.setToTranslation(p.data.x, y, p.data.z)
+                .rotate(Vector3.Y, p.data.rotation)
+                .scale(p.data.scale, p.data.scale, p.data.scale);
     }
 
     private void updatePropHeights() {
-        for (Prop p : props) {
-            float y = terrain.sampleHeight(p.data.x, p.data.z);
-            p.instance.transform.setToTranslation(p.data.x, y, p.data.z)
-                    .rotate(Vector3.Y, p.data.rotation)
-                    .scale(p.data.scale, p.data.scale, p.data.scale);
-        }
+        for (Prop p : props) applyPropTransform(p);
     }
 
     private boolean pickTerrain(float sx, float sy, Vector3 out) {
@@ -311,28 +592,85 @@ public class TerrainStudioGame extends ApplicationAdapter {
         return false;
     }
 
+    private void selectNearest(float x, float z) {
+        int best = -1;
+        float bestDst = Float.MAX_VALUE;
+        for (int i = 0; i < props.size; i++) {
+            Prop p = props.get(i);
+            float radius = 1.5f + p.data.scale * 1.4f;
+            float d = Vector2.dst(x, z, p.data.x, p.data.z);
+            if (d < radius && d < bestDst) {
+                bestDst = d;
+                best = i;
+            }
+        }
+        selectedIndex = best;
+        emitSelection();
+        if (best >= 0) status("تم تحديد " + assetName(props.get(best).data.type));
+        else status("لا يوجد مجسم هنا");
+    }
+
+    private void dragSelectedTo(float x, float z) {
+        if (!hasSelection() || !terrain.inside(x, z)) return;
+        if (!selectionDragSnapshotTaken) {
+            pushUndo();
+            selectionDragSnapshotTaken = true;
+        }
+        Prop p = props.get(selectedIndex);
+        p.data.x = x;
+        p.data.z = z;
+        applyPropTransform(p);
+        emitSelection();
+    }
+
+    private void deleteNearest(float x, float z) {
+        int best = -1;
+        float bestDst = 2.5f;
+        for (int i = 0; i < props.size; i++) {
+            Prop p = props.get(i);
+            float d = Vector2.dst(x, z, p.data.x, p.data.z);
+            if (d < bestDst) {
+                bestDst = d;
+                best = i;
+            }
+        }
+        if (best >= 0) {
+            pushUndo();
+            props.removeIndex(best);
+            if (selectedIndex == best) selectedIndex = -1;
+            else if (selectedIndex > best) selectedIndex--;
+            emitSelection();
+            status("تم حذف العنصر");
+        }
+    }
+
     private void editAt(float sx, float sy, boolean firstTouch) {
         if (!pickTerrain(sx, sy, hit)) return;
-        if (tool == Tool.TREE) {
-            if (firstTouch) addProp(0, hit.x, hit.z, MathUtils.random(0f, 360f), MathUtils.random(0.82f, 1.18f), true);
-            return;
-        }
-        if (tool == Tool.ROCK) {
-            if (firstTouch) addProp(1, hit.x, hit.z, MathUtils.random(0f, 360f), MathUtils.random(0.75f, 1.25f), true);
-            return;
-        }
-        if (tool == Tool.DELETE) {
-            if (!firstTouch) return;
-            int best = -1;
-            float bestDst = 2.4f;
-            for (int i = 0; i < props.size; i++) {
-                Prop p = props.get(i);
-                float d = Vector2.dst(hit.x, hit.z, p.data.x, p.data.z);
-                if (d < bestDst) { bestDst = d; best = i; }
+
+        if (tool == Tool.SELECT) {
+            if (firstTouch) {
+                selectionDragSnapshotTaken = false;
+                selectNearest(hit.x, hit.z);
+            } else if (hasSelection()) {
+                dragSelectedTo(hit.x, hit.z);
             }
-            if (best >= 0) { pushUndo(); props.removeIndex(best); status("تم حذف العنصر"); }
             return;
         }
+
+        if (isPropTool(tool)) {
+            if (firstTouch) {
+                int type = propTypeForTool(tool);
+                float scale = type == 1 ? MathUtils.random(0.75f, 1.25f) : MathUtils.random(0.88f, 1.12f);
+                addProp(type, hit.x, hit.z, MathUtils.random(0f, 360f), scale, 0f, true);
+            }
+            return;
+        }
+
+        if (tool == Tool.DELETE) {
+            if (firstTouch) deleteNearest(hit.x, hit.z);
+            return;
+        }
+
         if (tool == Tool.CAMERA) return;
 
         if (firstTouch) {
@@ -350,8 +688,10 @@ public class TerrainStudioGame extends ApplicationAdapter {
                 beginTwoFinger();
                 return true;
             }
-            lastX = screenX; lastY = screenY;
+            lastX = screenX;
+            lastY = screenY;
             gestureWasTwoFinger = false;
+            selectionDragSnapshotTaken = false;
             if (tool != Tool.CAMERA) editAt(screenX, screenY, true);
             return true;
         }
@@ -364,6 +704,7 @@ public class TerrainStudioGame extends ApplicationAdapter {
                 return true;
             }
             if (gestureWasTwoFinger) return true;
+
             if (tool == Tool.CAMERA) {
                 float dx = screenX - lastX;
                 float dy = screenY - lastY;
@@ -372,13 +713,15 @@ public class TerrainStudioGame extends ApplicationAdapter {
             } else {
                 editAt(screenX, screenY, false);
             }
-            lastX = screenX; lastY = screenY;
+            lastX = screenX;
+            lastY = screenY;
             return true;
         }
 
         @Override
         public boolean touchUp(int screenX, int screenY, int pointer, int button) {
             if (!Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)) gestureWasTwoFinger = false;
+            selectionDragSnapshotTaken = false;
             return true;
         }
 
@@ -396,9 +739,12 @@ public class TerrainStudioGame extends ApplicationAdapter {
             float midX = (x0 + x1) * 0.5f;
             float midY = (y0 + y1) * 0.5f;
             float pinch = Vector2.dst(x0, y0, x1, y1);
-            if (lastPinch <= 0f) { beginTwoFinger(); return; }
+            if (lastPinch <= 0f) {
+                beginTwoFinger();
+                return;
+            }
 
-            distance = MathUtils.clamp(distance - (pinch - lastPinch) * 0.035f, 8f, 58f);
+            distance = MathUtils.clamp(distance - (pinch - lastPinch) * 0.035f, 7f, 62f);
 
             float dx = midX - lastMidX;
             float dy = midY - lastMidY;
@@ -407,11 +753,13 @@ public class TerrainStudioGame extends ApplicationAdapter {
             float panScale = distance * 0.0018f;
             target.mulAdd(right, -dx * panScale);
             target.mulAdd(forward, dy * panScale);
-            target.x = MathUtils.clamp(target.x, -14f, 14f);
-            target.z = MathUtils.clamp(target.z, -14f, 14f);
+            target.x = MathUtils.clamp(target.x, -16f, 16f);
+            target.z = MathUtils.clamp(target.z, -16f, 16f);
             target.y = terrain.sampleHeight(target.x, target.z) * 0.35f;
 
-            lastMidX = midX; lastMidY = midY; lastPinch = pinch;
+            lastMidX = midX;
+            lastMidY = midY;
+            lastPinch = pinch;
         }
     }
 
@@ -432,20 +780,32 @@ public class TerrainStudioGame extends ApplicationAdapter {
         if (terrain != null) terrain.dispose();
         if (treeModel != null) treeModel.dispose();
         if (rockModel != null) rockModel.dispose();
+        if (bushModel != null) bushModel.dispose();
+        if (crateModel != null) crateModel.dispose();
+        if (pillarModel != null) pillarModel.dispose();
+        if (gizmoModel != null) gizmoModel.dispose();
     }
 
     private static class Prop {
         final PropData data;
         final ModelInstance instance;
-        Prop(PropData data, ModelInstance instance) { this.data = data; this.instance = instance; }
+        Prop(PropData data, ModelInstance instance) {
+            this.data = data;
+            this.instance = instance;
+        }
     }
 
     public static class PropData {
         public int type;
-        public float x, z, rotation, scale;
+        public float x, z, rotation, scale, yOffset;
         public PropData() {}
         PropData(PropData other) {
-            type = other.type; x = other.x; z = other.z; rotation = other.rotation; scale = other.scale;
+            type = other.type;
+            x = other.x;
+            z = other.z;
+            rotation = other.rotation;
+            scale = other.scale;
+            yOffset = other.yOffset;
         }
     }
 
@@ -491,6 +851,7 @@ public class TerrainStudioGame extends ApplicationAdapter {
                 colors[i * 4 + 2] = 0.22f;
                 colors[i * 4 + 3] = 1f;
             }
+
             int k = 0;
             for (int z = 0; z < n - 1; z++) {
                 for (int x = 0; x < n - 1; x++) {
@@ -498,8 +859,12 @@ public class TerrainStudioGame extends ApplicationAdapter {
                     short b = (short)(a + 1);
                     short c = (short)(a + n);
                     short d = (short)(c + 1);
-                    indices[k++] = a; indices[k++] = c; indices[k++] = b;
-                    indices[k++] = b; indices[k++] = c; indices[k++] = d;
+                    indices[k++] = a;
+                    indices[k++] = c;
+                    indices[k++] = b;
+                    indices[k++] = b;
+                    indices[k++] = c;
+                    indices[k++] = d;
                 }
             }
 
@@ -525,7 +890,9 @@ public class TerrainStudioGame extends ApplicationAdapter {
             instance = new ModelInstance(model);
         }
 
-        boolean inside(float x, float z) { return x >= -half && x <= half && z >= -half && z <= half; }
+        boolean inside(float x, float z) {
+            return x >= -half && x <= half && z >= -half && z <= half;
+        }
 
         float sampleHeight(float x, float z) {
             if (!inside(x, z)) return 0f;
@@ -535,7 +902,8 @@ public class TerrainStudioGame extends ApplicationAdapter {
             int z0 = MathUtils.clamp((int)Math.floor(gz), 0, n - 1);
             int x1 = Math.min(x0 + 1, n - 1);
             int z1 = Math.min(z0 + 1, n - 1);
-            float tx = gx - x0, tz = gz - z0;
+            float tx = gx - x0;
+            float tz = gz - z0;
             float h00 = heights[z0 * n + x0];
             float h10 = heights[z0 * n + x1];
             float h01 = heights[z1 * n + x0];
@@ -565,12 +933,24 @@ public class TerrainStudioGame extends ApplicationAdapter {
                             heights[idx] = MathUtils.lerp(heights[idx], flatHeight, 0.18f * strength * falloff);
                             break;
                         case SMOOTH:
-                            float sum = 0f; int count = 0;
-                            for (int oz = -1; oz <= 1; oz++) for (int ox = -1; ox <= 1; ox++) {
-                                int nx = x + ox, nz = z + oz;
-                                if (nx >= 0 && nx < n && nz >= 0 && nz < n) { sum += old[nz * n + nx]; count++; }
+                            float sum = 0f;
+                            int count = 0;
+                            for (int oz = -1; oz <= 1; oz++) {
+                                for (int ox = -1; ox <= 1; ox++) {
+                                    int nx = x + ox;
+                                    int nz = z + oz;
+                                    if (nx >= 0 && nx < n && nz >= 0 && nz < n) {
+                                        sum += old[nz * n + nx];
+                                        count++;
+                                    }
+                                }
                             }
                             heights[idx] = MathUtils.lerp(heights[idx], sum / Math.max(1, count), 0.35f * strength * falloff);
+                            break;
+                        case NOISE:
+                            heights[idx] = MathUtils.clamp(
+                                    heights[idx] + MathUtils.random(-0.18f, 0.18f) * strength * falloff,
+                                    -7f, 14f);
                             break;
                         case PAINT:
                             int ci = idx * 4;
@@ -579,7 +959,8 @@ public class TerrainStudioGame extends ApplicationAdapter {
                             colors[ci + 1] = MathUtils.lerp(colors[ci + 1], paint.g, a);
                             colors[ci + 2] = MathUtils.lerp(colors[ci + 2], paint.b, a);
                             break;
-                        default: break;
+                        default:
+                            break;
                     }
                 }
             }
@@ -589,7 +970,10 @@ public class TerrainStudioGame extends ApplicationAdapter {
         void reset() {
             for (int i = 0; i < heights.length; i++) heights[i] = 0f;
             for (int i = 0; i < heights.length; i++) {
-                colors[i * 4] = 0.31f; colors[i * 4 + 1] = 0.53f; colors[i * 4 + 2] = 0.22f; colors[i * 4 + 3] = 1f;
+                colors[i * 4] = 0.31f;
+                colors[i * 4 + 1] = 0.53f;
+                colors[i * 4 + 2] = 0.22f;
+                colors[i * 4 + 3] = 1f;
             }
             updateMesh();
         }
@@ -614,15 +998,25 @@ public class TerrainStudioGame extends ApplicationAdapter {
                     float hd = heights[Math.max(0, z - 1) * n + x];
                     float hu = heights[Math.min(n - 1, z + 1) * n + x];
                     normal.set(hl - hr, spacing * 2f, hd - hu).nor();
-                    vertices[v++] = wx; vertices[v++] = heights[idx]; vertices[v++] = wz;
-                    vertices[v++] = normal.x; vertices[v++] = normal.y; vertices[v++] = normal.z;
+                    vertices[v++] = wx;
+                    vertices[v++] = heights[idx];
+                    vertices[v++] = wz;
+                    vertices[v++] = normal.x;
+                    vertices[v++] = normal.y;
+                    vertices[v++] = normal.z;
                     int ci = idx * 4;
-                    vertices[v++] = colors[ci]; vertices[v++] = colors[ci + 1]; vertices[v++] = colors[ci + 2]; vertices[v++] = colors[ci + 3];
+                    vertices[v++] = colors[ci];
+                    vertices[v++] = colors[ci + 1];
+                    vertices[v++] = colors[ci + 2];
+                    vertices[v++] = colors[ci + 3];
                 }
             }
             mesh.setVertices(vertices);
         }
 
-        @Override public void dispose() { model.dispose(); }
+        @Override
+        public void dispose() {
+            model.dispose();
+        }
     }
 }
