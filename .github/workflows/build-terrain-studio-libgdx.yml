@@ -1,0 +1,62 @@
+name: Build Terrain Studio X libGDX APK
+
+on:
+  push:
+    branches: [ terrain-studio-libgdx ]
+    paths:
+      - 'projects/terrain-studio-libgdx/**'
+      - '.github/workflows/build-terrain-studio-libgdx.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: projects/terrain-studio-libgdx
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+
+      - name: Verify APK
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          ls -lh "$APK"
+          $ANDROID_HOME/build-tools/34.0.0/aapt dump badging "$APK" | head -n 15
+          unzip -l "$APK" | grep -E 'classes.dex|libgdx.so|AndroidManifest.xml'
+
+      - name: Collect APK
+        run: |
+          mkdir -p output
+          cp app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-X-libGDX.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TerrainStudio-X-libGDX-APK
+          path: projects/terrain-studio-libgdx/output/TerrainStudio-X-libGDX.apk
+          if-no-files-found: error
+          compression-level: 0
