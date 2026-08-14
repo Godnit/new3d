@@ -1,4 +1,4 @@
-name: Build Terrain Studio X libGDX APK
+name: Build Terrain Studio Mini 3D APK
 
 on:
   push:
@@ -17,6 +17,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Generate Mini Blender v3 sources
+        run: |
+          mkdir -p app/src/main/java/com/godnit/terrainstudio/gdx
+          cat tools/v3/mini_part_* | base64 -d | gzip -d > app/src/main/java/com/godnit/terrainstudio/gdx/MiniBlenderGame.java
+          cat tools/v3/activity_part_* | base64 -d | gzip -d > app/src/main/java/com/godnit/terrainstudio/gdx/BlenderActivity.java
+          base64 -d tools/v3/terrain-debug.keystore.b64 > app/terrain-debug.keystore
+          test -s app/src/main/java/com/godnit/terrainstudio/gdx/MiniBlenderGame.java
+          test -s app/src/main/java/com/godnit/terrainstudio/gdx/BlenderActivity.java
+          test -s app/terrain-debug.keystore
+          echo "Generated Java sources:"
+          wc -l app/src/main/java/com/godnit/terrainstudio/gdx/MiniBlenderGame.java app/src/main/java/com/godnit/terrainstudio/gdx/BlenderActivity.java
 
       - name: Java 17
         uses: actions/setup-java@v5
@@ -51,12 +63,12 @@ jobs:
       - name: Collect APK
         run: |
           mkdir -p output
-          cp app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-X-libGDX.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Mini3D-v3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TerrainStudio-X-libGDX-APK
-          path: projects/terrain-studio-libgdx/output/TerrainStudio-X-libGDX.apk
+          name: TerrainStudio-Mini3D-v3-APK
+          path: projects/terrain-studio-libgdx/output/TerrainStudio-Mini3D-v3.apk
           if-no-files-found: error
           compression-level: 0
