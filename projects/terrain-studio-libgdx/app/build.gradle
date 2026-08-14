@@ -12,8 +12,8 @@ android {
         applicationId 'com.godnit.terrainstudio.mini3d'
         minSdk 21
         targetSdk 34
-        versionCode 3
-        versionName '0.3-mini-blender'
+        versionCode 4
+        versionName '0.4-blender-controls'
     }
 
     sourceSets {
