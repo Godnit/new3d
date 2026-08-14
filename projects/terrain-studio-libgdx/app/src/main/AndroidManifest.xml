@@ -7,7 +7,7 @@
         android:label="Terrain Studio Mini 3D"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".BlenderActivity"
+            android:name=".BlenderActivityV4"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode"
             android:exported="true"
             android:screenOrientation="landscape">
