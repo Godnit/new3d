@@ -64,6 +64,25 @@ jobs:
           export_debug: true
           use_godot_3: true
 
+      - name: Runtime smoke test GLES2 scene
+        run: |
+          GODOT="$HOME/.local/share/godot/godot_executable/Godot_v3.6.2-stable_x11.64"
+          test -x "$GODOT"
+          set +e
+          timeout 10s "$GODOT" --path projects/terrain-editor-gles2 --audio-driver Dummy > /tmp/terrain-smoke.log 2>&1
+          CODE=$?
+          set -e
+          cat /tmp/terrain-smoke.log
+          if grep -Eiq "SCRIPT ERROR|Parse Error|Invalid call|Invalid get index|Cannot get class|Failed to load script|Condition .* is true.*script" /tmp/terrain-smoke.log; then
+            echo "Runtime script error detected"
+            exit 1
+          fi
+          if [ "$CODE" -ne 0 ] && [ "$CODE" -ne 124 ]; then
+            echo "Godot runtime exited unexpectedly with code $CODE"
+            exit "$CODE"
+          fi
+          echo "Legacy GLES2 scene stayed alive during smoke test"
+
       - name: Collect APK
         run: |
           mkdir -p dist
