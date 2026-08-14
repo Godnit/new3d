@@ -1,0 +1,63 @@
+plugins {
+    id 'com.android.application'
+}
+
+ext.gdxVersion = '1.14.2'
+
+android {
+    namespace 'com.godnit.terrainstudio.gdx'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.godnit.terrainstudio.gdx'
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '0.2-libgdx'
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets']
+            jniLibs.srcDirs = ['libs']
+        }
+    }
+
+    buildTypes {
+        debug { minifyEnabled false }
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+configurations { natives }
+
+dependencies {
+    implementation "com.badlogicgames.gdx:gdx:$gdxVersion"
+    implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+}
+
+tasks.register('copyAndroidNatives') {
+    doLast {
+        file('libs/armeabi-v7a').mkdirs()
+        configurations.natives.files.each { jar ->
+            if (jar.name.contains('natives-armeabi-v7a')) {
+                copy {
+                    from zipTree(jar)
+                    into 'libs/armeabi-v7a'
+                    include '*.so'
+                }
+            }
+        }
+    }
+}
+
+preBuild.dependsOn copyAndroidNatives
