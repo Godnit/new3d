@@ -9,11 +9,11 @@ android {
     compileSdk 36
 
     defaultConfig {
-        applicationId 'com.godnit.terrainstudio.gdx'
+        applicationId 'com.godnit.terrainstudio.mini3d'
         minSdk 21
         targetSdk 34
-        versionCode 1
-        versionName '0.2-libgdx'
+        versionCode 3
+        versionName '0.3-mini-blender'
     }
 
     sourceSets {
@@ -23,8 +23,20 @@ android {
         }
     }
 
+    signingConfigs {
+        debug {
+            storeFile file('terrain-debug.keystore')
+            storePassword 'terrainstudio'
+            keyAlias 'terrain'
+            keyPassword 'terrainstudio'
+        }
+    }
+
     buildTypes {
-        debug { minifyEnabled false }
+        debug {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
