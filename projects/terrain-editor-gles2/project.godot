@@ -1,0 +1,30 @@
+; Terrain Studio Legacy Compatibility
+; Godot 3.6.2 + GLES2 for older Android/ARMv7 devices
+config_version=4
+
+[application]
+config/name="Terrain Studio Legacy"
+run/main_scene="res://main.tscn"
+
+[display]
+
+[display/window]
+size/width=960
+size/height=540
+size/test_width=960
+size/test_height=540
+stretch/mode="2d"
+stretch/aspect="expand"
+handheld/orientation=0
+
+[rendering]
+quality/driver/driver_name="GLES2"
+quality/driver/fallback_to_gles2=true
+vram_compression/import_etc=true
+vram_compression/import_etc2=false
+environment/default_clear_color=Color(0.38, 0.62, 0.82, 1)
+quality/shadows/filter_mode=0
+quality/shadows/filter_mode.mobile=0
+
+[audio]
+driver/enable_input=false
