@@ -1,4 +1,4 @@
-name: Build Terrain Studio Mini 3D V7 APK
+name: Build Terrain Studio Mini 3D V8 APK
 
 on:
   push:
@@ -52,6 +52,9 @@ jobs:
           p.write_text(s,encoding='utf-8')
           PY
 
+      - name: Apply V8 Blender gizmo
+        run: python3 tools/apply_v8.py
+
       - name: Prepare signing key
         run: |
           base64 -d tools/v3/terrain-debug.keystore.b64 > app/terrain-debug.keystore
@@ -90,12 +93,12 @@ jobs:
       - name: Collect APK
         run: |
           mkdir -p output
-          cp app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Mini3D-v7.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Mini3D-v8.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TerrainStudio-Mini3D-v7-APK
-          path: projects/terrain-studio-libgdx/output/TerrainStudio-Mini3D-v7.apk
+          name: TerrainStudio-Mini3D-v8-APK
+          path: projects/terrain-studio-libgdx/output/TerrainStudio-Mini3D-v8.apk
           if-no-files-found: error
           compression-level: 0
