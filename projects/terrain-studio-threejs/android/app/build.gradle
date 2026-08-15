@@ -15,9 +15,9 @@ android {
     signingConfigs {
         releaseLike {
             storeFile file('terrain-debug.keystore')
-            storePassword 'android'
+            storePassword 'terrainstudio'
             keyAlias 'terrain'
-            keyPassword 'android'
+            keyPassword 'terrainstudio'
         }
     }
 
@@ -26,5 +26,10 @@ android {
             signingConfig signingConfigs.releaseLike
             minifyEnabled false
         }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
