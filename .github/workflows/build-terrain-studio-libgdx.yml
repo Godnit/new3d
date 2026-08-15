@@ -1,4 +1,4 @@
-name: Build Terrain Studio Mini 3D V6 APK
+name: Build Terrain Studio Mini 3D V7 APK
 
 on:
   push:
@@ -23,6 +23,9 @@ jobs:
 
       - name: Apply V6 interaction fixes
         run: python3 tools/apply_v6.py
+
+      - name: Apply V7 stable controls
+        run: python3 tools/apply_v7.py
 
       - name: Prepare signing key
         run: |
@@ -62,12 +65,12 @@ jobs:
       - name: Collect APK
         run: |
           mkdir -p output
-          cp app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Mini3D-v6.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Mini3D-v7.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TerrainStudio-Mini3D-v6-APK
-          path: projects/terrain-studio-libgdx/output/TerrainStudio-Mini3D-v6.apk
+          name: TerrainStudio-Mini3D-v7-APK
+          path: projects/terrain-studio-libgdx/output/TerrainStudio-Mini3D-v7.apk
           if-no-files-found: error
           compression-level: 0
