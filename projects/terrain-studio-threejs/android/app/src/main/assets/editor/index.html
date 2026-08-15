@@ -11,7 +11,7 @@ button,input{font:inherit}.app{position:fixed;inset:0;direction:ltr}.viewport{po
 .top{position:absolute;z-index:20;top:0;left:0;right:0;height:42px;background:#17191def;border-bottom:1px solid #34383e;display:flex;align-items:center;gap:5px;padding:4px 7px;direction:ltr}
 .brand{font-weight:700;font-size:13px;padding:0 7px;color:#f3f5f8;white-space:nowrap}.sel{min-width:92px;max-width:155px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#bfc7d0;font-size:11px}
 .top button,.tool,.mini,.panelBtn{border:1px solid #41464e;background:#2d3137;color:#e9edf2;border-radius:7px;height:32px;padding:0 8px}
-.top button.active,.tool.active{background:#285f86;border-color:#4ba8ec}
+.top button.active,.tool.active,.shadeBar button.active{background:#285f86;border-color:#4ba8ec}
 .left{position:absolute;z-index:30;left:7px;top:50px;bottom:8px;width:50px;display:flex;flex-direction:column;gap:5px;direction:ltr;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding-bottom:6px}
 .left::-webkit-scrollbar{display:none}.tool{flex:0 0 46px;width:48px;height:46px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center}
 .addMenu{position:absolute;z-index:35;left:62px;top:50px;width:174px;max-height:calc(100% - 60px);overflow-y:auto;padding:7px;background:#1c2025f7;border:1px solid #41464e;border-radius:9px;display:none;direction:rtl}
@@ -29,8 +29,10 @@ button,input{font:inherit}.app{position:fixed;inset:0;direction:ltr}.viewport{po
 .outliner.open{display:block}.outlinerList{max-height:calc(46vh - 36px);overflow:auto}.outlinerRow{height:34px;display:grid;grid-template-columns:1fr 34px 34px;border-bottom:1px solid #30353b;background:#20242a;direction:ltr}.outlinerRow.active{background:#285f86}
 .outlinerName,.outlinerIcon{border:0;background:transparent;color:#dce2e8}.outlinerName{text-align:right;padding:0 8px;direction:rtl}.outlinerIcon{font-size:14px;padding:0}
 .viewNav{position:absolute;z-index:23;right:8px;top:50px;display:grid;grid-template-columns:repeat(4,32px);gap:3px;padding:4px;background:#171a1ec9;border:1px solid #3a3f46;border-radius:8px;direction:ltr}
-.viewNav button{height:29px;border:1px solid #41464e;background:#2d3137;color:#dce4ec;border-radius:5px;font-size:10px;padding:0}.viewNav button.iso{color:#76c8ff}.file{display:none}
-@media(max-width:720px){.brand{display:none}.sel{max-width:112px;min-width:72px}.top button{padding:0 6px}.properties{width:220px}.outliner{width:210px}.viewNav{grid-template-columns:repeat(4,29px)}}
+.viewNav button{height:29px;border:1px solid #41464e;background:#2d3137;color:#dce4ec;border-radius:5px;font-size:10px;padding:0}.viewNav button.iso{color:#76c8ff}
+.shadeBar{position:absolute;z-index:23;right:8px;top:122px;display:flex;gap:3px;padding:4px;background:#171a1ec9;border:1px solid #3a3f46;border-radius:8px;direction:ltr}
+.shadeBar button{height:29px;min-width:36px;border:1px solid #41464e;background:#2d3137;color:#dce4ec;border-radius:5px;font-size:10px;padding:0 7px}.file{display:none}
+@media(max-width:720px){.brand{display:none}.sel{max-width:112px;min-width:72px}.top button{padding:0 6px}.properties{width:220px}.outliner{width:210px}.viewNav{grid-template-columns:repeat(4,29px)}.shadeBar button{min-width:32px;padding:0 5px}}
 </style>
 </head>
 <body>
@@ -54,6 +56,9 @@ button,input{font:inherit}.app{position:fixed;inset:0;direction:ltr}.viewport{po
     <button class="tool" data-mode="scale" title="حجم">⤢</button>
     <button id="duplicateBtn" class="tool" title="نسخ">⧉</button>
     <button id="deleteBtn" class="tool" title="حذف">⌫</button>
+    <button id="gridBtn" class="tool active" title="إظهار أو إخفاء الشبكة">▦</button>
+    <button id="sunVisibleBtn" class="tool active" title="إظهار أو إخفاء الشمس">☀</button>
+    <button id="shadowsBtn" class="tool active" title="الظلال">◐</button>
   </div>
   <div id="addMenu" class="addMenu">
     <button data-add="Cube">■ مكعب</button>
@@ -92,8 +97,8 @@ button,input{font:inherit}.app{position:fixed;inset:0;direction:ltr}.viewport{po
       <div class="section">
         <div class="sectionTitle">World & Light</div>
         <div class="sectionBody">
-          <div class="sliderRow"><label>Ambient</label><input id="ambientInput" type="range" min="0" max="2.5" step="0.05" value="0.62"></div>
-          <div class="sliderRow"><label>Sun</label><input id="sunInput" type="range" min="0" max="5" step="0.05" value="2.05"></div>
+          <div class="sliderRow"><label>Ambient</label><input id="ambientInput" type="range" min="0" max="3" step="0.05" value="1.0"></div>
+          <div class="sliderRow"><label>Sun</label><input id="sunInput" type="range" min="0" max="6" step="0.05" value="2.8"></div>
           <div class="colorRow"><label>الخلفية</label><input id="backgroundInput" type="color" value="#202328"></div>
         </div>
       </div>
@@ -101,6 +106,9 @@ button,input{font:inherit}.app{position:fixed;inset:0;direction:ltr}.viewport{po
   </div>
   <div class="viewNav">
     <button class="iso" data-view="iso">ISO</button><button data-view="top">TOP</button><button data-view="front">FR</button><button data-view="right">R</button><button data-view="back">BK</button><button data-view="left">L</button><button data-view="bottom">BT</button>
+  </div>
+  <div class="shadeBar">
+    <button data-shading="solid">Solid</button><button class="active" data-shading="material">Mat</button><button data-shading="wire">Wire</button>
   </div>
   <div id="outliner" class="outliner"><div class="panelHead"><span>Outliner</span></div><div id="outlinerList" class="outlinerList"></div></div>
   <input id="fileInput" class="file" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
