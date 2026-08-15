@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Terrain Studio 3D</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#25282d;color:#e9edf2;font-family:Arial,sans-serif}button,input{font:inherit}.app{position:fixed;inset:0;direction:ltr}.viewport{position:absolute;inset:42px 0 0 0;touch-action:none}.top{position:absolute;z-index:20;top:0;left:0;right:0;height:42px;background:#17191deF;border-bottom:1px solid #34383e;display:flex;align-items:center;gap:6px;padding:4px 7px;direction:ltr}.brand{font-weight:700;font-size:13px;padding:0 8px;color:#f3f5f8;white-space:nowrap}.sel{min-width:120px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#bfc7d0;font-size:11px}.top button,.tool,.mini{border:1px solid #41464e;background:#2d3137;color:#e9edf2;border-radius:5px;height:32px;padding:0 9px}.top button.active,.tool.active{background:#285f86;border-color:#4ba8ec}.left{position:absolute;z-index:30;left:7px;top:52px;width:48px;display:flex;flex-direction:column;gap:5px;direction:ltr}.tool{width:48px;height:45px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center}.tool small{display:none}.addMenu{position:absolute;z-index:35;left:61px;top:52px;width:166px;padding:7px;background:#1c2025f7;border:1px solid #41464e;border-radius:7px;display:none;direction:rtl}.addMenu.open{display:block}.addMenu button{width:100%;height:34px;margin:2px 0;background:#30353c;color:#fff;border:1px solid #454b54;border-radius:5px;text-align:right;padding:0 10px}.right{position:absolute;z-index:25;right:7px;top:52px;width:225px;background:#1b1e22ef;border:1px solid #3b4047;border-radius:6px;overflow:hidden;direction:rtl}.panelTitle{height:31px;padding:7px 9px;background:#262a30;border-bottom:1px solid #3b4047;font-size:11px;font-weight:700}.transformPanel{padding:6px}.transformPanel.disabled{opacity:.45;pointer-events:none}.row{display:grid;grid-template-columns:40px 1fr 1fr 1fr;gap:4px;align-items:center;margin:4px 0;direction:ltr}.row label{font-size:10px;color:#aeb7c1;text-align:left}.row input{width:100%;height:27px;background:#292e34;color:#eef2f6;border:1px solid #41464e;border-radius:4px;padding:0 4px;font-size:10px}.outliner{position:absolute;z-index:26;right:7px;bottom:8px;width:210px;max-height:42%;display:none;background:#1b1e22ef;border:1px solid #3b4047;border-radius:6px;overflow:auto;direction:rtl}.outliner.open{display:block}.outlinerItem{display:block;width:100%;height:31px;border:0;border-bottom:1px solid #30353b;background:#20242a;color:#dce2e8;text-align:right;padding:0 8px}.outlinerItem.active{background:#285f86}.file{display:none}@media(max-width:720px){.right{width:205px}.brand{display:none}.sel{max-width:130px}.top button{padding:0 6px}.viewport{inset:42px 0 0}.left{top:49px}.addMenu{top:49px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="viewport" class="viewport"></div>
+  <div class="top">
+    <div class="brand">Terrain Studio 3D</div>
+    <button id="newBtn">جديد</button>
+    <button id="focusBtn">◎</button>
+    <button id="spaceBtn">Global</button>
+    <button id="snapBtn">Snap</button>
+    <button id="outlinerBtn">☰</button>
+    <div id="selectionName" class="sel">لا يوجد تحديد</div>
+    <div id="modeName" class="sel">تحريك</div>
+  </div>
+  <div class="left">
+    <button id="addBtn" class="tool" title="إضافة">＋</button>
+    <button class="tool active" data-mode="translate" title="تحريك">↔</button>
+    <button class="tool" data-mode="rotate" title="تدوير">⟳</button>
+    <button class="tool" data-mode="scale" title="حجم">⤢</button>
+    <button id="duplicateBtn" class="tool" title="نسخ">⧉</button>
+    <button id="deleteBtn" class="tool" title="حذف">⌫</button>
+  </div>
+  <div id="addMenu" class="addMenu">
+    <button data-add="Cube">■ مكعب</button><button data-add="Sphere">● كرة</button><button data-add="Cylinder">▥ أسطوانة</button><button data-add="Cone">▲ مخروط</button><button data-add="Torus">◎ حلقة</button><button data-add="Plane">▭ سطح</button><button id="importBtn">⇩ استيراد GLB / GLTF</button>
+  </div>
+  <div class="right">
+    <div class="panelTitle">Transform</div>
+    <div id="transformPanel" class="transformPanel disabled">
+      <div class="row"><label>Location</label><input id="px" inputmode="decimal"><input id="py" inputmode="decimal"><input id="pz" inputmode="decimal"></div>
+      <div class="row"><label>Rotation</label><input id="rx" inputmode="decimal"><input id="ry" inputmode="decimal"><input id="rz" inputmode="decimal"></div>
+      <div class="row"><label>Scale</label><input id="sx" inputmode="decimal"><input id="sy" inputmode="decimal"><input id="sz" inputmode="decimal"></div>
+    </div>
+  </div>
+  <div id="outliner" class="outliner"><div class="panelTitle">Outliner</div><div id="outlinerList"></div></div>
+  <input id="fileInput" class="file" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
+</div>
+<script src="app.js"></script>
+</body>
+</html>

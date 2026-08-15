@@ -1,0 +1,30 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.godnit.terrainstudio.three'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.godnit.terrainstudio.three'
+        minSdk 21
+        targetSdk 34
+        versionCode 9
+        versionName '0.9'
+    }
+
+    signingConfigs {
+        releaseLike {
+            storeFile file('terrain-debug.keystore')
+            storePassword 'android'
+            keyAlias 'terrain'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.releaseLike
+            minifyEnabled false
+        }
+    }
+}
