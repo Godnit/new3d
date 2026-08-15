@@ -31,7 +31,6 @@ jobs:
           import re
           p=Path('tools/apply_v7.py')
           s=p.read_text(encoding='utf-8')
-          # V6 may already have compacted tool buttons. Make this cosmetic replacement optional.
           s=re.sub(
               r"a = must_replace\(a,\n'''    private LinearLayout\.LayoutParams toolLp\(\)\{LinearLayout\.LayoutParams lp=new LinearLayout\.LayoutParams\(dp\(50\),dp\(48\)\);lp\.setMargins\(0,dp\(2\),0,dp\(2\)\);return lp;\}''',\n'''    private LinearLayout\.LayoutParams toolLp\(\)\{LinearLayout\.LayoutParams lp=new LinearLayout\.LayoutParams\(dp\(48\),dp\(44\)\);lp\.setMargins\(0,dp\(2\),0,dp\(2\)\);return lp;\}''', 'compact tools'\)",
               "a = a.replace('dp(50),dp(48)', 'dp(48),dp(44)')",
@@ -41,6 +40,17 @@ jobs:
           p.write_text(s,encoding='utf-8')
           PY
           python3 tools/apply_v7.py
+
+      - name: Fix V7 Java labels
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('app/src/main/java/com/godnit/terrainstudio/gdx/BlenderActivityV4.java')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r'toolButton\("([^"\n]*)\n([^"\n]*)"\)', lambda m: 'toolButton("'+m.group(1)+'\\n'+m.group(2)+'")', s)
+          p.write_text(s,encoding='utf-8')
+          PY
 
       - name: Prepare signing key
         run: |
