@@ -1,8 +1,8 @@
-name: Build Terrain Studio Three V10 APK
+name: Build Terrain Studio Three V11 APK
 
 on:
   push:
-    branches: [ terrain-studio-threejs-v10 ]
+    branches: [ terrain-studio-threejs-v11 ]
     paths:
       - 'projects/terrain-studio-threejs/**'
       - '.github/workflows/build-terrain-studio-threejs.yml'
@@ -21,6 +21,8 @@ jobs:
           node-version: '22'
       - name: Install web dependencies
         run: npm install --no-audit --no-fund
+      - name: Apply V11 color compatibility fix
+        run: python3 tools/apply-v11-colors.py
       - name: Bundle Three.js editor
         run: npm run build:web
       - uses: actions/setup-java@v5
@@ -51,10 +53,10 @@ jobs:
       - name: Collect
         run: |
           mkdir -p output
-          cp android/app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Three-V10.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Three-V11.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: TerrainStudio-Three-V10-APK
-          path: projects/terrain-studio-threejs/output/TerrainStudio-Three-V10.apk
+          name: TerrainStudio-Three-V11-APK
+          path: projects/terrain-studio-threejs/output/TerrainStudio-Three-V11.apk
           if-no-files-found: error
           compression-level: 0
