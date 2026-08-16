@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Floppy Physics</title>
+<style>
+html,body,#game{margin:0;width:100%;height:100%;overflow:hidden;background:#86b9dc;touch-action:none;font-family:Arial,sans-serif}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:fixed;inset:0;pointer-events:none;user-select:none;-webkit-user-select:none}
+#joystick{position:absolute;left:24px;bottom:24px;width:150px;height:150px;border-radius:50%;background:rgba(24,31,38,.27);border:2px solid rgba(255,255,255,.28);box-shadow:inset 0 0 30px rgba(0,0,0,.16);pointer-events:auto;touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:68px;height:68px;margin-left:-34px;margin-top:-34px;border-radius:50%;background:rgba(248,250,252,.78);border:2px solid rgba(255,255,255,.88);box-shadow:0 5px 18px rgba(0,0,0,.22);will-change:transform}
+.btn{position:absolute;width:88px;height:88px;border-radius:50%;border:2px solid rgba(255,255,255,.40);background:rgba(28,36,44,.42);color:white;font-size:18px;font-weight:700;pointer-events:auto;touch-action:none;box-shadow:0 5px 20px rgba(0,0,0,.18)}
+#jump{right:28px;bottom:28px}
+#reset{right:30px;top:22px;width:62px;height:62px;font-size:25px;background:rgba(28,36,44,.35)}
+#tip{position:absolute;top:20px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:18px;background:rgba(18,25,31,.27);color:rgba(255,255,255,.88);font-size:14px;white-space:nowrap;opacity:.92}
+@media(max-height:500px){#joystick{width:126px;height:126px}#knob{width:58px;height:58px;margin-left:-29px;margin-top:-29px}.btn{width:76px;height:76px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <div id="tip">اسحب يمين الشاشة لتدوير الكاميرا</div>
+  <div id="joystick"><div id="knob"></div></div>
+  <button id="jump" class="btn">قفز</button>
+  <button id="reset" class="btn">↻</button>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
