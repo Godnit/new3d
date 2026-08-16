@@ -1,0 +1,60 @@
+name: Build Floppy Physics V1 APK
+
+on:
+  push:
+    branches: [ floppy-physics-game-v1 ]
+    paths:
+      - 'projects/floppy-physics-game/**'
+      - '.github/workflows/build-floppy-physics.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: projects/floppy-physics-game
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install web dependencies
+        run: npm install --no-audit --no-fund
+      - name: Bundle Three.js + Cannon physics
+        run: npm run build:web
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Android packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "build-tools;35.0.0" "platforms;android-36"
+      - name: Stable signing key
+        run: |
+          base64 -d ../terrain-studio-libgdx/tools/v3/terrain-debug.keystore.b64 > android/app/floppy-debug.keystore
+          test -s android/app/floppy-debug.keystore
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Build APK
+        working-directory: projects/floppy-physics-game/android
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+      - name: Verify APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | head -n 12
+          unzip -l "$APK" | grep -E 'classes.dex|assets/game/app.js|assets/game/index.html|AndroidManifest.xml'
+      - name: Collect
+        run: |
+          mkdir -p output
+          cp android/app/build/outputs/apk/debug/app-debug.apk output/Floppy-Physics-V1.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Floppy-Physics-V1-APK
+          path: projects/floppy-physics-game/output/Floppy-Physics-V1.apk
+          if-no-files-found: error
+          compression-level: 0
