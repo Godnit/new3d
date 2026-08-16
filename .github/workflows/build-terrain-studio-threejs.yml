@@ -1,8 +1,8 @@
-name: Build Terrain Studio Three V13 APK
+name: Build Terrain Studio Three V14 APK
 
 on:
   push:
-    branches: [ terrain-studio-threejs-v13 ]
+    branches: [ terrain-studio-threejs-v14 ]
     paths:
       - 'projects/terrain-studio-threejs/**'
       - '.github/workflows/build-terrain-studio-threejs.yml'
@@ -29,6 +29,8 @@ jobs:
         run: python3 tools/apply-v13-studio-import.py
       - name: Apply V13 UI
         run: python3 tools/apply-v13-ui.py
+      - name: Apply V14 shadows and duplicate fixes
+        run: python3 tools/apply-v14-shadows-duplicate.py
       - name: Bundle Three.js editor
         run: npm run build:web
       - uses: actions/setup-java@v5
@@ -59,10 +61,10 @@ jobs:
       - name: Collect
         run: |
           mkdir -p output
-          cp android/app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Three-V13.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Three-V14.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: TerrainStudio-Three-V13-APK
-          path: projects/terrain-studio-threejs/output/TerrainStudio-Three-V13.apk
+          name: TerrainStudio-Three-V14-APK
+          path: projects/terrain-studio-threejs/output/TerrainStudio-Three-V14.apk
           if-no-files-found: error
           compression-level: 0
