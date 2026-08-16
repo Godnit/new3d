@@ -1,0 +1,15 @@
+{
+  "name": "floppy-physics-game",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build:web": "esbuild src/game.js --bundle --format=iife --platform=browser --target=es2017 --minify --outfile=android/app/src/main/assets/game/app.js"
+  },
+  "dependencies": {
+    "three": "0.162.0",
+    "cannon-es": "0.20.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.9"
+  }
+}
