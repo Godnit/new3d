@@ -1,0 +1,35 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.godnit.floppyphysics'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.godnit.floppyphysics'
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '0.1-v1'
+    }
+
+    signingConfigs {
+        releaseLike {
+            storeFile file('floppy-debug.keystore')
+            storePassword 'terrainstudio'
+            keyAlias 'terrain'
+            keyPassword 'terrainstudio'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.releaseLike
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
