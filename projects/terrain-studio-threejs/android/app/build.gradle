@@ -8,8 +8,8 @@ android {
         applicationId 'com.godnit.terrainstudio.three'
         minSdk 21
         targetSdk 34
-        versionCode 12
-        versionName '1.2-v12'
+        versionCode 13
+        versionName '1.3-v13'
     }
 
     signingConfigs {
