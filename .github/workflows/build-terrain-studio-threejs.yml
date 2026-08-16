@@ -1,8 +1,8 @@
-name: Build Terrain Studio Three V15 APK
+name: Build Terrain Studio Three V16 APK
 
 on:
   push:
-    branches: [ terrain-studio-threejs-v15 ]
+    branches: [ terrain-studio-threejs-v16 ]
     paths:
       - 'projects/terrain-studio-threejs/**'
       - '.github/workflows/build-terrain-studio-threejs.yml'
@@ -33,6 +33,8 @@ jobs:
         run: python3 tools/apply-v14-shadows-duplicate.py
       - name: Apply V15 real lighting and shadow catcher
         run: python3 tools/apply-v15-real-lighting.py
+      - name: Apply V16 lighting core
+        run: python3 tools/apply-v16-lighting-core.py
       - name: Bundle Three.js editor
         run: npm run build:web
       - uses: actions/setup-java@v5
@@ -63,10 +65,10 @@ jobs:
       - name: Collect
         run: |
           mkdir -p output
-          cp android/app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Three-V15.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk output/TerrainStudio-Three-V16.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: TerrainStudio-Three-V15-APK
-          path: projects/terrain-studio-threejs/output/TerrainStudio-Three-V15.apk
+          name: TerrainStudio-Three-V16-APK
+          path: projects/terrain-studio-threejs/output/TerrainStudio-Three-V16.apk
           if-no-files-found: error
           compression-level: 0
