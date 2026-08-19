@@ -1,0 +1,61 @@
+from pathlib import Path
+import re
+
+runner = Path("xau_lab/hf_window_runner.py")
+text = runner.read_text(encoding="utf-8")
+
+new_windows = '''WINDOWS = [
+    ("dev_2021_jun", "dev", "2021-06-14", "2021-06-19"),
+    ("dev_2021_oct", "dev", "2021-10-11", "2021-10-16"),
+    ("dev_2022_mar", "dev", "2022-03-07", "2022-03-12"),
+    ("dev_2022_sep", "dev", "2022-09-19", "2022-09-24"),
+    ("dev_2023_mar", "dev", "2023-03-13", "2023-03-18"),
+    ("dev_2023_oct", "dev", "2023-10-09", "2023-10-14"),
+    ("val_2024_feb", "validation", "2024-02-12", "2024-02-17"),
+    ("val_2024_aug", "validation", "2024-08-12", "2024-08-17"),
+    ("hold_2025_apr", "holdout", "2025-04-14", "2025-04-19"),
+    ("hold_2025_nov", "holdout", "2025-11-10", "2025-11-15"),
+]
+'''
+
+# April/November 2025 have not been used in earlier holdout decisions.
+pattern = r"WINDOWS = \[\n.*?\n\]\n"
+text, count = re.subn(pattern, new_windows, text, count=1, flags=re.S)
+if count != 1:
+    raise SystemExit("window protocol block not found")
+
+old_print = '''    print(
+        f"Built {name}: ticks={len(ticks):,}, M1 bars={len(bars):,}, "
+        f"range={bars.index.min()}..{bars.index.max()}",
+        flush=True,
+    )
+'''
+new_print = '''    spread_q = bars["spread_first"].quantile([0.50, 0.90, 0.99]).to_dict()
+    ratio = (bars["spread_first"] / bars["atr14"]).replace([np.inf, -np.inf], np.nan)
+    ratio_q = ratio.quantile([0.50, 0.90, 0.99]).to_dict()
+    print(
+        f"Built {name}: ticks={len(ticks):,}, M1 bars={len(bars):,}, "
+        f"range={bars.index.min()}..{bars.index.max()}, "
+        f"spread_q50/q90/q99={spread_q.get(0.5, float('nan')):.3f}/"
+        f"{spread_q.get(0.9, float('nan')):.3f}/{spread_q.get(0.99, float('nan')):.3f}, "
+        f"spreadATR_q50/q90/q99={ratio_q.get(0.5, float('nan')):.3f}/"
+        f"{ratio_q.get(0.9, float('nan')):.3f}/{ratio_q.get(0.99, float('nan')):.3f}",
+        flush=True,
+    )
+'''
+if old_print in text:
+    text = text.replace(old_print, new_print, 1)
+elif "spread_q50/q90/q99" not in text:
+    raise SystemExit("diagnostic print marker not found")
+
+runner.write_text(text, encoding="utf-8")
+
+aggregate = Path("xau_lab/aggregate_results.py")
+report = aggregate.read_text(encoding="utf-8")
+report = re.sub(
+    r"The previously inspected .*? holdout gate passes\.",
+    "The previously inspected January/February/March/May/August/September/October/December 2025 windows are retired from holdout use. The candidate is considered acceptable only when the newly untouched April/November 2025 holdout gate passes.",
+    report,
+)
+aggregate.write_text(report, encoding="utf-8")
+print("Patched protocol: preserve 2024 validation and use newly untouched April/November 2025 holdout")

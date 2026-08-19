@@ -1,0 +1,38 @@
+name: Probe XAU Tick Dataset Mirror
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - xau-real-tick-lab
+    paths:
+      - '.github/workflows/hf-xau-tick-probe.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install huggingface_hub
+      - name: List XAUUSD real-tick parquet files
+        shell: bash
+        run: |
+          python - <<'PY'
+          from huggingface_hub import HfApi
+          files = HfApi().list_repo_files('CarlosSilva1/xauusd-ticks', repo_type='dataset')
+          selected = [f for f in files if f.endswith('.parquet')]
+          with open('xau_tick_files.txt','w',encoding='utf-8') as out:
+              out.write('\n'.join(selected))
+          print('Total parquet files:', len(selected))
+          for f in selected[:100]:
+              print(f)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xau-tick-file-list
+          path: xau_tick_files.txt
+          retention-days: 7
