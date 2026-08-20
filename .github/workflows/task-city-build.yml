@@ -1,0 +1,129 @@
+name: Build Task City APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'task-city/**'
+      - '.github/workflows/task-city-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip zip wget git xvfb imagemagick python3-pil libgl1 libpulse0
+
+      - name: Download lightweight city assets and Arabic font
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/city-models task-city/assets
+          mkdir -p task-city/assets/city task-city/assets/fonts
+          git clone --depth 1 https://github.com/immaculate-lift-studio/CityCrafter3D.git /tmp/city-models
+          cp -a "/tmp/city-models/addons/citycrafter/assets/example_assets/kenney_city-kit-commercial_20/Models/OBJ format"/. task-city/assets/city/
+          wget -q -O task-city/assets/fonts/NotoSansArabic-Regular.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf"
+          find task-city/assets/city -type f | sed -n '1,30p'
+          du -sh task-city/assets
+
+      - name: Apply strict typing compatibility fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('task-city/main.gd')
+          s = p.read_text()
+          s = s.replace('var remain := max(0,int(item.deadline)-int(Time.get_unix_time_from_system()))', 'var remain: int = max(0, int(item.deadline) - int(Time.get_unix_time_from_system()))')
+          p.write_text(s)
+          PY
+
+      - name: Install Godot 4.6.3 with Android templates
+        run: |
+          set -euxo pipefail
+          wget -q -O /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip"
+          wget -q -O /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_export_templates.tpz"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo install -m 0755 /tmp/godot/Godot_v4.6.3-stable_linux.x86_64 /usr/local/bin/godot
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.6.3.stable" /tmp/godot-templates
+          unzip -q /tmp/templates.tpz -d /tmp/godot-templates
+          cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.6.3.stable/"
+          godot --version
+
+      - name: Prepare Android debug signing
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=Task City,C=YE" -keyalg RSA -keysize 2048 -validity 10000
+
+      - name: Import and smoke test
+        working-directory: task-city
+        run: |
+          set -o pipefail
+          timeout 15m godot --headless --editor --rendering-method gl_compatibility --import 2>&1 | tee import.log
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" import.log; then exit 1; fi
+          timeout 40s godot --headless --rendering-method gl_compatibility --quit-after 180 2>&1 | tee smoke.log || true
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" smoke.log; then exit 1; fi
+          grep -q "TASKCITY_READY" smoke.log
+
+      - name: Render real portrait preview
+        working-directory: task-city
+        env:
+          TASKCITY_CAPTURE: "1"
+          TASKCITY_CAPTURE_PATH: ${{ github.workspace }}/task-city/build/TaskCity-Preview.png
+        run: |
+          mkdir -p build
+          set +e
+          xvfb-run -a timeout 35s godot --rendering-method gl_compatibility 2>&1 | tee visual.log
+          set -e
+          grep -q "TASKCITY_CAPTURED" visual.log
+          test -s build/TaskCity-Preview.png
+          identify build/TaskCity-Preview.png
+          python3 - <<'PY'
+          from PIL import Image, ImageStat
+          im=Image.open('build/TaskCity-Preview.png').convert('RGB')
+          print('preview', im.size, ImageStat.Stat(im).mean)
+          assert im.height > im.width, im.size
+          assert sum(ImageStat.Stat(im).stddev)/3 > 8
+          PY
+
+      - name: Export signed Android APK
+        working-directory: task-city
+        run: |
+          mkdir -p build
+          godot --headless --rendering-method gl_compatibility --export-debug "Android" build/TaskCity-v1.apk 2>&1 | tee export.log
+          test -s build/TaskCity-v1.apk
+          unzip -t build/TaskCity-v1.apk
+          keytool -printcert -jarfile build/TaskCity-v1.apk | tee build/signature.txt
+          sha256sum build/TaskCity-v1.apk | tee build/SHA256SUMS.txt
+          stat -c 'APK bytes: %s' build/TaskCity-v1.apk
+
+      - name: Upload Task City APK and preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaskCity-v1-Android
+          path: |
+            task-city/build/TaskCity-v1.apk
+            task-city/build/TaskCity-Preview.png
+            task-city/build/SHA256SUMS.txt
+            task-city/build/signature.txt
+          retention-days: 14
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaskCity-v1-Diagnostics
+          path: |
+            task-city/import.log
+            task-city/smoke.log
+            task-city/visual.log
+            task-city/export.log
+          if-no-files-found: ignore
+          retention-days: 7
